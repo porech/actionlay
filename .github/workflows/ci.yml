@@ -1,0 +1,73 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools (macOS)
+        if: runner.os == 'macOS'
+        run: brew install nasm ffmpeg
+
+      - name: Install build tools (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y nasm libva-dev libasound2-dev ffmpeg
+
+      - name: MSVC environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: MSYS2 tools (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          path-type: inherit
+          install: make nasm diffutils git
+
+      - name: Cache FFmpeg
+        uses: actions/cache@v4
+        with:
+          path: third_party/ffmpeg
+          key: ffmpeg-${{ matrix.target }}-${{ hashFiles('scripts/ffmpeg-version.env', 'scripts/build-ffmpeg.sh') }}
+
+      - name: Build FFmpeg (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: ./scripts/build-ffmpeg.sh ${{ matrix.target }}
+
+      - name: Build FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: ./scripts/build-ffmpeg.sh ${{ matrix.target }}
+
+      - name: Export FFMPEG_DIR
+        run: echo "FFMPEG_DIR=$GITHUB_WORKSPACE/third_party/ffmpeg/${{ matrix.target }}" >> "$GITHUB_ENV"
+
+      - name: libclang for bindgen (Windows)
+        if: runner.os == 'Windows'
+        run: echo "LIBCLANG_PATH=C:\\Program Files\\LLVM\\bin" >> "$GITHUB_ENV"
+
+      # - name: Synthetic samples (macOS/Linux)
+      #   if: runner.os != 'Windows'
+      #   run: ./scripts/make-synthetic-samples.sh && echo "ACTIONLAY_SAMPLES=$GITHUB_WORKSPACE/samples/synthetic" >> "$GITHUB_ENV"
+      # Re-enabled in Task 4 when scripts/make-synthetic-samples.sh exists.
+
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
