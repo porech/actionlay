@@ -54,7 +54,9 @@ jobs:
       - name: Build FFmpeg (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: ./scripts/build-ffmpeg.sh ${{ matrix.target }}
+        run: |
+          if [ -f /usr/bin/link.exe ]; then mv /usr/bin/link.exe /usr/bin/link.exe.bak; fi
+          ./scripts/build-ffmpeg.sh ${{ matrix.target }}
 
       - name: Export FFMPEG_DIR
         run: echo "FFMPEG_DIR=$GITHUB_WORKSPACE/third_party/ffmpeg/${{ matrix.target }}" >> "$GITHUB_ENV"
