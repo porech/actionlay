@@ -11,16 +11,25 @@ pub(crate) enum Interp {
     /// Hold the earlier sample (discrete values).
     Step,
     /// Circular interpolation of an angle in degrees along the shortest arc
-    /// (359 -> 1 passes through 0, never 180). Results are normalised to
-    /// [0, 360). MUST be used for `azi`, `cog` and `ori.yaw` when the series
-    /// are built (Task 9).
-    Angle,
+    /// (359 -> 1 passes through 0, never 180); the interpolated result is
+    /// normalised to [0, 360). For `cog`. Exactly opposite angles (180 apart)
+    /// take the negative direction (0 -> 180 passes through 270).
+    Angle360,
+    /// Same interpolation, result normalised to (-180, 180]. For `azi` and
+    /// `ori.yaw`. Hold and Stale values are never altered by either variant.
+    Angle180,
 }
 
-/// Normalises degrees to [0, 360).
+/// Normalises degrees to [0, 360), never -0.0.
 fn norm_deg(a: f64) -> f64 {
-    let r = a.rem_euclid(360.0);
+    let r = a.rem_euclid(360.0) + 0.0;
     if r >= 360.0 { 0.0 } else { r }
+}
+
+/// Normalises degrees to (-180, 180].
+fn norm_deg180(a: f64) -> f64 {
+    let r = norm_deg(a);
+    if r > 180.0 { r - 360.0 } else { r }
 }
 
 /// Samples of one metric. Sample k starts at `t[k]`, represents the time
@@ -47,6 +56,10 @@ impl Series {
         };
         let mut last = None;
         for (t, end, v) in samples {
+            debug_assert!(
+                s.t.last().is_none_or(|&p| p <= t),
+                "series samples must be sorted by start time"
+            );
             if v.is_some_and(f64::is_finite) {
                 last = Some(s.t.len());
             }
@@ -66,14 +79,6 @@ impl Series {
             && self.t[k + 1] - self.t[k] <= MAX_BRIDGE
     }
 
-    /// Output normalisation: angles live in [0, 360).
-    fn out(&self, v: f64) -> f64 {
-        match self.interp {
-            Interp::Angle => norm_deg(v),
-            _ => v,
-        }
-    }
-
     pub fn sample(&self, t: f64) -> Value {
         // last sample starting at or before t
         let k = self.t.partition_point(|&s| s <= t);
@@ -88,20 +93,25 @@ impl Series {
                 return Value::Present(match self.interp {
                     Interp::Step => v,
                     Interp::Linear => v + (v1 - v) * f,
-                    Interp::Angle => {
+                    Interp::Angle360 | Interp::Angle180 => {
                         // shortest signed arc from v to v1, in [-180, 180)
                         let delta = (v1 - v + 540.0).rem_euclid(360.0) - 180.0;
-                        norm_deg(v + delta * f)
+                        let x = v + delta * f;
+                        if self.interp == Interp::Angle360 {
+                            norm_deg(x)
+                        } else {
+                            norm_deg180(x)
+                        }
                     }
                 });
             }
             if t < self.end[k] {
-                return Value::Present(self.out(v));
+                return Value::Present(v);
             }
         }
         match self.last_valid[k] {
             Some(j) => Value::Stale {
-                value: self.out(self.v[j].unwrap_or(f64::NAN)),
+                value: self.v[j].unwrap_or(f64::NAN),
                 age: (t - self.end[j]).max(0.0),
             },
             None => Value::Absent,
@@ -257,50 +267,83 @@ mod tests {
         assert_eq!(gaps_and_coverage(&[(0.0, 1.0)], 0.0), (vec![], 0.0));
     }
 
-    fn angle(a: f64, b: f64, t: f64) -> Value {
-        s(Interp::Angle, &[(0.0, 0.1, Some(a)), (1.0, 1.1, Some(b))]).sample(t)
-    }
-
-    fn present(v: Value) -> f64 {
-        match v {
+    fn angle(interp: Interp, a: f64, b: f64, t: f64) -> f64 {
+        match s(interp, &[(0.0, 0.1, Some(a)), (1.0, 1.1, Some(b))]).sample(t) {
             Value::Present(x) => x,
             other => panic!("not present: {other:?}"),
         }
     }
 
     #[test]
-    fn angle_crosses_north_through_zero() {
-        let m = present(angle(359.0, 1.0, 0.5));
-        assert!(m.abs() < 1e-9 && m >= 0.0, "{m}");
-        let m = present(angle(10.0, 350.0, 0.5));
-        assert!(m.abs() < 1e-9 && m >= 0.0, "{m}");
-        // quarter way 359 -> 1 is 359.5, not near 180
-        assert!((present(angle(359.0, 1.0, 0.25)) - 359.5).abs() < 1e-9);
-        assert!((present(angle(10.0, 350.0, 0.25)) - 5.0).abs() < 1e-9);
+    fn angle360_crosses_north_through_zero() {
+        let m = angle(Interp::Angle360, 359.0, 1.0, 0.5);
+        assert!(m == 0.0 && m.is_sign_positive(), "{m}");
+        let m = angle(Interp::Angle360, 10.0, 350.0, 0.5);
+        assert!(m == 0.0 && m.is_sign_positive(), "{m}");
+        assert!((angle(Interp::Angle360, 359.0, 1.0, 0.25) - 359.5).abs() < 1e-9);
+        assert!((angle(Interp::Angle360, 90.0, 100.0, 0.5) - 95.0).abs() < 1e-9);
+        assert!((angle(Interp::Angle360, 100.0, 90.0, 0.5) - 95.0).abs() < 1e-9);
     }
 
     #[test]
-    fn angle_without_wrap_is_linear() {
-        assert!((present(angle(90.0, 100.0, 0.5)) - 95.0).abs() < 1e-9);
-        assert!((present(angle(100.0, 90.0, 0.5)) - 95.0).abs() < 1e-9);
-    }
-
-    #[test]
-    fn angle_results_are_normalised() {
-        // negative inputs (e.g. yaw in (-180, 180]) come out in [0, 360)
-        assert!((present(angle(-10.0, -20.0, 0.5)) - 345.0).abs() < 1e-9);
+    fn angle180_is_signed() {
+        assert!((angle(Interp::Angle180, -10.0, -20.0, 0.5) + 15.0).abs() < 1e-9);
+        assert!((angle(Interp::Angle180, 90.0, 100.0, 0.5) - 95.0).abs() < 1e-9);
+        // 170 -> -170 crosses +-180
         for i in 0..=100 {
-            let v = present(angle(-170.0, 170.0, i as f64 / 100.0));
-            assert!((0.0..360.0).contains(&v), "{v}");
+            let v = angle(Interp::Angle180, 170.0, -170.0, i as f64 / 100.0);
+            assert!(v > -180.0 && v <= 180.0, "{v}");
         }
-        // hold and stale values are normalised too
-        let ser = s(Interp::Angle, &[(0.0, 1.0, Some(-90.0))]);
-        assert_eq!(ser.sample(0.5), Value::Present(270.0));
+        assert!((angle(Interp::Angle180, 170.0, -170.0, 0.25) - 175.0).abs() < 1e-9);
+        // the midpoint is exactly +-180 and maps to 180
+        assert_eq!(angle(Interp::Angle180, 170.0, -170.0, 0.5), 180.0);
+        assert_eq!(angle(Interp::Angle180, -170.0, 170.0, 0.5), 180.0);
+        let m = angle(Interp::Angle180, 10.0, -10.0, 0.5);
+        assert!(m == 0.0 && m.is_sign_positive(), "{m}");
+    }
+
+    #[test]
+    fn angle_hold_and_stale_keep_the_stored_value() {
+        for interp in [Interp::Angle180, Interp::Angle360] {
+            let ser = s(interp, &[(0.0, 1.0, Some(-90.0))]);
+            assert_eq!(ser.sample(0.5), Value::Present(-90.0));
+            assert_eq!(
+                ser.sample(1.5),
+                Value::Stale {
+                    value: -90.0,
+                    age: 0.5
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn angle_tie_goes_the_negative_way() {
+        // 0 and 180 are equally far both ways; the code takes delta = -180
+        assert_eq!(angle(Interp::Angle360, 0.0, 180.0, 0.5), 270.0);
+        assert_eq!(angle(Interp::Angle180, 0.0, 180.0, 0.5), -90.0);
+        assert_eq!(angle(Interp::Angle360, 180.0, 0.0, 0.5), 90.0);
+    }
+
+    #[test]
+    fn boundaries() {
+        // gap of exactly MAX_BRIDGE is bridged
+        let ser = s(
+            Interp::Linear,
+            &[(0.0, 0.1, Some(0.0)), (2.0, 2.1, Some(10.0))],
+        );
+        assert_eq!(ser.sample(1.0), Value::Present(5.0));
+        assert_eq!(ser.covered(), vec![(0.0, 2.1)]);
+        // t == t[k+1] returns the next sample's value
+        assert_eq!(ser.sample(2.0), Value::Present(10.0));
+        // t == end[k] with an invalid next sample: Stale with age 0
+        let ser = s(Interp::Linear, &[(0.0, 1.0, Some(4.0)), (1.0, 2.0, None)]);
+        assert_eq!(ser.sample(0.999), Value::Present(4.0));
         assert_eq!(
-            ser.sample(1.5),
+            ser.sample(1.0),
             Value::Stale {
-                value: 270.0,
-                age: 0.5
+                value: 4.0,
+                age: 0.0
             }
         );
     }
