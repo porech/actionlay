@@ -37,7 +37,7 @@ impl eframe::App for App {
         }
 
         if let Some(p) = &mut self.player {
-            transport::handle_keys(ui.ctx(), p);
+            transport::handle_keys(ui.ctx(), p, &self.scrub);
             if let Some(frame) = p.poll_frame() {
                 let color = p.info().video.color;
                 self.view.upload(frame, color);
