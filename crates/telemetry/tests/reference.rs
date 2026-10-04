@@ -182,7 +182,18 @@ fn derived_metrics_match_the_dashboard() {
                 }
             }
         }
+        let expected = EXPECTED.iter().find(|e| e.0 == s).unwrap().1;
+        assert_eq!(rows.len(), expected, "{s}: dashboard rows");
         assert!(locked_rows > 0, "{s}: no locked rows compared");
+        // No column is legitimately empty on these samples (hero6 alt and
+        // speed have fewer cells than rows only because unlocked rows are
+        // skipped), so every column must have been compared.
+        for (col, _, _) in DERIVED {
+            assert!(
+                m.0.get(col).is_some_and(|v| v.1 > 0),
+                "{s}: column {col} was never compared"
+            );
+        }
         m.report(s);
     }
 }
@@ -197,7 +208,9 @@ fn accelerometer_is_close_to_the_original() {
         };
         let ours = by_key(&tel);
         let mut errors = Vec::new();
-        for r in &reference(&format!("{s}.gopro-to-csv.csv")) {
+        let ref_rows = reference(&format!("{s}.gopro-to-csv.csv"));
+        let rows = ref_rows.len();
+        for r in &ref_rows {
             let p = ours[&key(r)];
             let snap = tel.sample(p.t);
             for (m, col) in [
@@ -209,9 +222,10 @@ fn accelerometer_is_close_to_the_original() {
                 errors.push((a - num(r, col).unwrap()).abs());
             }
         }
-        assert!(errors.len() >= 3 * 189, "{s}: only {} cells", errors.len());
+        assert_eq!(errors.len(), 3 * rows, "{s}: compared cells");
         let (mean, p95) = stats(errors);
         eprintln!("{s}: accel mean {mean}, p95 {p95}");
+        // measured mean/p95: hero5 0.114/0.409, hero6 0.113/0.417, max 0.158/0.585
         assert!(mean < 0.25 && p95 < 0.8, "{s}: mean {mean}, p95 {p95}");
     }
 }
@@ -249,13 +263,11 @@ fn gravity_and_orientation_are_close_to_the_original() {
     }
     assert!(grav.len() == 3 * 189 && ori.len() == 3 * 189, "row count");
     let (gm, gp) = stats(grav);
-    eprintln!(
-        "grav mean {gm}, p95 {gp}; ori mean {}, p95 {}",
-        stats(ori.clone()).0,
-        stats(ori.clone()).1
-    );
-    assert!(gm < 0.01 && gp < 0.03, "grav mean {gm}, p95 {gp}");
     let (om, op) = stats(ori);
+    eprintln!("grav mean {gm}, p95 {gp}; ori mean {om}, p95 {op}");
+    // measured: grav mean 0.0029, p95 0.0135
+    assert!(gm < 0.01 && gp < 0.03, "grav mean {gm}, p95 {gp}");
+    // measured: ori mean 0.227 deg, p95 0.774 deg
     assert!(om < 0.5 && op < 2.0, "ori mean {om}°, p95 {op}°");
 }
 
@@ -295,7 +307,17 @@ const ORIGINAL_METRIC_IDS: [&str; 28] = [
 
 /// Deliberately not metrics (plan, "deliberate differences"): the time of day
 /// is `Snapshot::utc`, packet and index are debugging data in `gps_points()`.
-const LEFT_OUT: [&str; 3] = ["timestamp", "gps-packet", "gps-packet-index"];
+/// `pace`, `format` and `dp` are not accessor ids either (pace is a format
+/// string and format/dp are widget attributes in layout_xml.py), so they must
+/// never be mistaken for metrics.
+const LEFT_OUT: [&str; 6] = [
+    "timestamp",
+    "gps-packet",
+    "gps-packet-index",
+    "pace",
+    "format",
+    "dp",
+];
 
 #[test]
 fn every_metric_of_the_original_exists() {
