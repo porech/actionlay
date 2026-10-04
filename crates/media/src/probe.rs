@@ -66,18 +66,28 @@ pub fn probe(path: &Path) -> Result<MediaInfo, MediaError> {
         ),
     };
 
-    let audio = match input.streams().best(ffmpeg::media::Type::Audio) {
-        Some(astream) => {
-            let actx = ffmpeg::codec::Context::from_parameters(astream.parameters())?;
-            let adec = actx.decoder().audio()?;
-            Some(AudioInfo {
-                stream_index: astream.index(),
-                sample_rate: adec.rate(),
-                channels: adec.channels(),
-            })
-        }
-        None => None,
-    };
+    // No usable audio is not fatal: play the video without sound.
+    let audio = input
+        .streams()
+        .best(ffmpeg::media::Type::Audio)
+        .and_then(|astream| {
+            let opened = ffmpeg::codec::Context::from_parameters(astream.parameters())
+                .and_then(|actx| actx.decoder().audio());
+            match opened {
+                Ok(adec) => Some(AudioInfo {
+                    stream_index: astream.index(),
+                    sample_rate: adec.rate(),
+                    channels: adec.channels(),
+                }),
+                Err(e) => {
+                    log::warn!(
+                        "audio decoder unavailable for codec {:?}: {e}; playing without audio",
+                        astream.parameters().id()
+                    );
+                    None
+                }
+            }
+        });
 
     Ok(MediaInfo {
         duration,

@@ -40,3 +40,15 @@ fn probes_ten_bit_and_missing_audio() {
 fn probe_reports_missing_file() {
     assert!(probe(std::path::Path::new("/nonexistent/video.mp4")).is_err());
 }
+
+/// An audio track whose codec has no decoder in our build (pcm_s16le) must not
+/// make the file unopenable: probe() succeeds with `audio: None`.
+#[test]
+fn probe_tolerates_undecodable_audio() {
+    let Some(path) = common::sample("hevc8-pcm-audio.mov") else {
+        return;
+    };
+    let info = probe(&path).unwrap();
+    assert_eq!(info.video.codec, "hevc");
+    assert!(info.audio.is_none());
+}

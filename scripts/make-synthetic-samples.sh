@@ -38,4 +38,12 @@ beep() { # $1 = duration, $2 = sample rate; sample-accurate (aevalsrc), mono
   -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
   -c:a aac -b:a 128k -shortest "$OUT/h264-1080p30-44k.mp4"
 
+# HEVC with uncompressed PCM audio: the app build has no PCM decoder, so probe()
+# must degrade to video-only. (CI regenerates all samples with this script.)
+"$FF" -v error -y \
+  -f lavfi -i "testsrc2=size=640x360:rate=30:duration=2" \
+  -f lavfi -i "$(beep 2 48000)" \
+  -c:v libx265 -preset ultrafast -pix_fmt yuv420p -tag:v hvc1 -x265-params log-level=error \
+  -c:a pcm_s16le -shortest "$OUT/hevc8-pcm-audio.mov"
+
 ls -l "$OUT"

@@ -76,10 +76,11 @@ pub struct PlayerStats {
     pub backend: &'static str,
     pub dropped: u64,
     pub presented: u64,
-    /// An audio output is open for this file.
+    /// Audio is open and still playing (false once it is lost or stalled).
     pub audio_active: bool,
-    /// Last presented frame minus the audio clock (0 when audio is not driving).
-    pub av_offset: f64,
+    /// Last presented frame minus the audio clock; None when audio is not
+    /// driving the clock.
+    pub av_offset: Option<f64>,
 }
 
 enum Command {
@@ -343,15 +344,15 @@ impl Player {
 
     pub fn stats(&self) -> PlayerStats {
         let av_offset = if self.audio_driven() {
-            self.last_frame_pts - self.current_time()
+            Some(self.last_frame_pts - self.current_time())
         } else {
-            0.0
+            None
         };
         PlayerStats {
             backend: *self.shared.backend.lock().unwrap(),
             dropped: self.dropped,
             presented: self.presented,
-            audio_active: self.audio.is_some() && !self.audio_dead,
+            audio_active: self.audio.is_some() && !self.audio_dead && !self.audio_lost,
             av_offset,
         }
     }

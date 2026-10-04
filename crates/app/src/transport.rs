@@ -124,7 +124,7 @@ pub fn show(ui: &mut egui::Ui, player: &mut Player, scrub: &mut ScrubState) {
     let st = player.stats();
     let v = &player.info().video;
     ui.small(format!(
-        "{}x{} {} @ {:.2} fps · decoder: {} · presented {} · dropped {} · audio: {} · A/V {:+.0} ms",
+        "{}x{} {} @ {:.2} fps · decoder: {} · presented {} · dropped {} · audio: {} · A/V {}",
         v.width,
         v.height,
         v.codec,
@@ -133,7 +133,8 @@ pub fn show(ui: &mut egui::Ui, player: &mut Player, scrub: &mut ScrubState) {
         st.presented,
         st.dropped,
         if st.audio_active { "on" } else { "off" },
-        st.av_offset * 1000.0
+        st.av_offset
+            .map_or_else(|| "n/a".to_string(), |o| format!("{:+.0} ms", o * 1000.0))
     ));
 }
 

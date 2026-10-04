@@ -34,7 +34,7 @@ Tempo dal comando al primo frame consegnato a `poll_frame`. Open = `Player::open
 Lettura: i valori dipendono dalla distanza dal keyframe precedente (seek preciso e R2 ridecodificano da li'). Intervallo keyframe misurato con ffprobe: GX013370.MP4 un keyframe ogni 0.5 s; hevc8-1440p100-sync.mp4 keyframe a 0, 2.5, 5.0 s (GOP di 2.5 s, 5x piu' lungo). Sul file reale il caso peggiore e' ~0.3 s. Sul sintetico con VideoToolbox arriva a 0.9–1.4 s: e' coerente con il GOP piu' lungo, e il confronto col software (<= 155 ms sullo stesso file) fa pensare, probabilmente, che il costo per frame del readback GPU->CPU pesi sulla ridecodifica dal keyframe; la causa non e' stata isolata con una misura dedicata. Le ripetizioni singole non sono riportate. Il test temporaneo usato per la misura e' stato rimosso (non committato).
 
 ## Qualita' del codice (misurato)
-- `cargo test --workspace -- --test-threads=1`: tutti i test passano (0 falliti, vedi output in task-10-report.md).
+- `cargo test --workspace -- --test-threads=1`: tutti i test passano, 0 falliti: app unit 5, media unit 21, audio_decode 2, ffmpeg_link 2, player 8, probe 4 (incluso `probe_tolerates_undecodable_audio`, audio PCM senza decoder -> `audio: None`), video_decode 5.
 - `cargo fmt --all --check`: ok. `cargo clippy --workspace --all-targets -- -D warnings`: pulito.
 
 ## Riproduzione — PENDING — user check (macOS)
@@ -47,7 +47,7 @@ Non verificabile dall'agente. Lanciare `source scripts/env.sh && ./target/releas
 - [ ] PENDING — user check: **Robustezza.** Seek rapidi ripetuti, seek a fine file, apertura di `samples/synthetic/hevc8-1080p30-noaudio.mp4`: nessun crash, nessun blocco. A fine file: si ferma sull'ultimo frame e resta in pausa; premendo play riparte dall'inizio.
 
 ## Windows — PENDING — user check
-Serve una macchina Windows 10/11 con GPU (i runner CI non ne hanno). Copiare `actionlay.exe` e `decode-bench.exe` (artefatti CI o build locale, Task 2) e i campioni sintetici, poi:
+Serve una macchina Windows 10/11 con GPU (i runner CI non ne hanno). Copiare `actionlay.exe` e `decode-bench.exe` (dall'artefatto CI `actionlay-x86_64-pc-windows-msvc`, che contiene `actionlay.exe` e `decode-bench.exe`; in alternativa build locale con `cargo build --release -p actionlay-app -p actionlay-media --bins`) e i campioni sintetici, poi:
 
 - [ ] PENDING — user check: `decode-bench.exe` HW/SW sugli stessi file della tabella; atteso `decoder: d3d11va`, HW >= fps sorgente.
 - [ ] PENDING — user check: `dumpbin /dependents actionlay.exe` non deve elencare `avcodec*.dll` (ne' altre DLL FFmpeg).
