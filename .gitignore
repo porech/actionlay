@@ -1,6 +1,9 @@
 /target/
 /samples/*
 !/samples/README.md
+!/samples/gopro/
+/samples/gopro/*
+!/samples/gopro/README.md
 .DS_Store
 /.superpowers/
 /third_party/

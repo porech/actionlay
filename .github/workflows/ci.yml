@@ -107,6 +107,30 @@ jobs:
         if: runner.os != 'Windows'
         run: echo "ACTIONLAY_SAMPLES=$GITHUB_WORKSPACE/samples/synthetic" >> "$GITHUB_ENV"
 
+      # Public GoPro samples (Apache-2.0) for the telemetry tests. Plain
+      # downloads, so every OS gets them; fetched only when the pinned list
+      # in the script changes.
+      - name: Cache GoPro samples
+        id: gopro-cache
+        uses: actions/cache@v4
+        with:
+          path: samples/gopro/*.mp4
+          key: gopro-samples-${{ hashFiles('scripts/fetch-gopro-samples.sh') }}
+
+      - name: Fetch GoPro samples
+        if: steps.gopro-cache.outputs.cache-hit != 'true'
+        run: bash ./scripts/fetch-gopro-samples.sh
+
+      - name: Require GoPro samples in tests
+        run: echo "ACTIONLAY_REQUIRE_GOPRO_SAMPLES=1" >> "$GITHUB_ENV"
+
+      - name: Private sample stays out of tests and CI
+        run: |
+          if grep -rn "GX013370" crates scripts .github --exclude=ci.yml; then
+            echo "samples/GX013370.MP4 is private: tests and CI must not use it" >&2
+            exit 1
+          fi
+
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       # Player tests open the audio device and are timing-sensitive, so they
