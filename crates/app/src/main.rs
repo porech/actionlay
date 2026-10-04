@@ -36,11 +36,12 @@ impl eframe::App for App {
             self.open(path);
         }
 
-        if let Some(p) = &mut self.player
-            && let Some(frame) = p.poll_frame()
-        {
-            let color = p.info().video.color;
-            self.view.upload(frame, color);
+        if let Some(p) = &mut self.player {
+            transport::handle_keys(ui.ctx(), p);
+            if let Some(frame) = p.poll_frame() {
+                let color = p.info().video.color;
+                self.view.upload(frame, color);
+            }
         }
 
         egui::Panel::bottom("transport").show(ui, |ui| {
