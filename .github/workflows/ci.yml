@@ -22,13 +22,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Synthetic samples only change with their script; the ffmpeg CLI that
+      # generates them is installed only on a cache miss.
+      - name: Cache synthetic samples (macOS/Linux)
+        id: samples-cache
+        if: runner.os != 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: samples/synthetic
+          key: samples-${{ matrix.target }}-${{ hashFiles('scripts/make-synthetic-samples.sh') }}
+
       - name: Install build tools (macOS)
         if: runner.os == 'macOS'
-        run: brew install nasm ffmpeg
+        run: |
+          brew install nasm
+          if [ "${{ steps.samples-cache.outputs.cache-hit }}" != "true" ]; then brew install ffmpeg; fi
 
       - name: Install build tools (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y nasm libva-dev libasound2-dev ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm libva-dev libasound2-dev
+          if [ "${{ steps.samples-cache.outputs.cache-hit }}" != "true" ]; then sudo apt-get install -y ffmpeg; fi
 
       - name: MSVC environment (Windows)
         if: runner.os == 'Windows'
@@ -75,9 +90,22 @@ jobs:
           if (-not $link) { throw "MSVC link.exe not found on PATH" }
           "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=$link" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+      # Caches the registry and compiled dependencies (not our own crates).
+      # The key includes the FFmpeg build inputs: ffmpeg-sys-next's bindings
+      # would otherwise survive an FFmpeg upgrade at the same FFMPEG_DIR path.
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}-${{ hashFiles('scripts/ffmpeg-version.env', 'scripts/build-ffmpeg.sh') }}
+          cache-on-failure: true
+
       - name: Synthetic samples (macOS/Linux)
+        if: runner.os != 'Windows' && steps.samples-cache.outputs.cache-hit != 'true'
+        run: ./scripts/make-synthetic-samples.sh
+
+      - name: Export ACTIONLAY_SAMPLES (macOS/Linux)
         if: runner.os != 'Windows'
-        run: ./scripts/make-synthetic-samples.sh && echo "ACTIONLAY_SAMPLES=$GITHUB_WORKSPACE/samples/synthetic" >> "$GITHUB_ENV"
+        run: echo "ACTIONLAY_SAMPLES=$GITHUB_WORKSPACE/samples/synthetic" >> "$GITHUB_ENV"
 
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
