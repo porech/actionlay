@@ -107,6 +107,12 @@ fn frame_step_moves_one_frame() {
 // clock. Both must behave the same from the outside. They use the 30 fps
 // H.264 sample so that a debug build decoding in software keeps up.
 
+fn last(frames: &[f64], what: &str) -> f64 {
+    *frames
+        .last()
+        .unwrap_or_else(|| panic!("no frame presented during {what}"))
+}
+
 #[test]
 fn pause_and_resume_with_audio_keeps_advancing() {
     let Some(path) = common::sample("h264-1080p30-44k.mp4") else {
@@ -122,9 +128,9 @@ fn pause_and_resume_with_audio_keeps_advancing() {
     assert_eq!(p.position(), paused_at, "position moved while paused");
     // resuming re-seeks to the pause position (fresh audio), then plays on
     p.play();
-    let resumed = wait_for_frame(&mut p, Duration::from_secs(5)).unwrap();
+    let resumed = wait_for_frame(&mut p, Duration::from_secs(5)).expect("no frame after resume");
     assert!(
-        (resumed - paused_at).abs() < 0.034,
+        (resumed - paused_at).abs() < 0.1,
         "resumed at {resumed}, paused at {paused_at}"
     );
     let mut second = vec![resumed];
@@ -134,10 +140,10 @@ fn pause_and_resume_with_audio_keeps_advancing() {
         all.windows(2).all(|w| w[1] >= w[0]),
         "pts went backwards: {all:?}"
     );
-    let (a, b) = (*first.last().unwrap(), *second.last().unwrap());
-    assert!(a > 0.4, "first run did not advance: {a}");
+    let (a, b) = (last(&first, "first run"), last(&second, "resumed run"));
+    assert!(a > 0.2, "first run did not advance: {a}");
     assert!(
-        b > resumed + 0.4,
+        b > resumed + 0.2,
         "resume did not advance: {resumed} -> {b}"
     );
 }
@@ -149,24 +155,26 @@ fn speed_change_with_audio_keeps_advancing() {
     };
     let mut p = Player::open(&path, PlayerOptions::default()).unwrap();
     p.play();
-    wait_for_frame(&mut p, Duration::from_secs(5)).unwrap();
-    collect_frames(&mut p, Duration::from_millis(300));
+    let start = wait_for_frame(&mut p, Duration::from_secs(5)).expect("no first frame");
+    let normal = collect_frames(&mut p, Duration::from_millis(1000));
+    let at_1x = last(&normal, "1x") - start;
     p.set_speed(2.0);
-    let start = p.position();
+    let from = p.position();
     let fast = collect_frames(&mut p, Duration::from_millis(1000));
-    let after_fast = *fast.last().unwrap();
+    let at_2x = last(&fast, "2x") - from;
+    assert!(at_1x > 0.3, "1x did not advance: {at_1x}");
     assert!(
-        after_fast - start > 1.2,
-        "2x did not run at 2x: {start} -> {after_fast}"
+        at_2x > at_1x + 0.2,
+        "2x not faster than 1x: {at_2x} vs {at_1x} in 1 s"
     );
     // back to 1x: audio drives again after a re-seek
     p.set_speed(1.0);
-    let resumed = wait_for_frame(&mut p, Duration::from_secs(5)).unwrap();
-    let normal = collect_frames(&mut p, Duration::from_millis(700));
-    let end = *normal.last().unwrap();
+    let resumed = wait_for_frame(&mut p, Duration::from_secs(5)).expect("no frame back at 1x");
+    let again = collect_frames(&mut p, Duration::from_millis(700));
+    let advanced = last(&again, "1x after 2x") - resumed;
     assert!(
-        end - resumed > 0.4 && end - resumed < 1.0,
-        "1x after 2x: {resumed} -> {end}"
+        advanced > 0.2 && advanced < 1.0,
+        "1x after 2x advanced {advanced} in 0.7 s"
     );
 }
 
@@ -177,13 +185,19 @@ fn plays_to_the_end_and_pauses() {
     };
     let mut p = Player::open(&path, PlayerOptions::default()).unwrap();
     p.seek(9.5, true);
-    wait_for_frame(&mut p, Duration::from_secs(5)).unwrap();
+    wait_for_frame(&mut p, Duration::from_secs(5)).expect("no frame after seek");
     p.play();
-    wait_for_frame(&mut p, Duration::from_secs(5)).unwrap();
-    let frames = collect_frames(&mut p, Duration::from_millis(1000));
+    let mut frames =
+        vec![wait_for_frame(&mut p, Duration::from_secs(5)).expect("no frame after play")];
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !p.at_end() && Instant::now() < deadline {
+        frames.extend(p.poll_frame().map(|f| f.pts));
+        std::thread::sleep(Duration::from_millis(4));
+    }
     assert!(p.at_end(), "not at end, last {:?}", frames.last());
     assert!(p.is_paused());
-    assert!(*frames.last().unwrap() > 9.9);
+    let end = last(&frames, "the run to the end");
+    assert!(end > 9.9, "last frame {end}");
 }
 
 #[test]

@@ -71,4 +71,9 @@ jobs:
 
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
+      # Player tests open the audio device and are timing-sensitive, so they
+      # must not run concurrently. Every other test is fast; running the whole
+      # workspace single-threaded keeps each test running exactly once (a
+      # per-target split cannot exclude only tests/player.rs, and
+      # `--exclude actionlay-media` fails while it is the only member).
+      - run: cargo test --workspace -- --test-threads=1

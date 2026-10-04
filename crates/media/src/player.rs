@@ -51,8 +51,9 @@ const QUEUE_CAP: usize = 4;
 const MAX_VIDEO_PACKETS: usize = 512;
 /// Longest the worker waits without checking its commands.
 const POLL: Duration = Duration::from_millis(5);
-/// How long the audio may starve a full video queue before playback falls
-/// back to the system clock.
+/// How long the audio may starve a full video queue, or stand still with
+/// samples queued (stalled device), before playback falls back to the system
+/// clock.
 const AUDIO_STARVATION: Duration = Duration::from_millis(500);
 
 #[derive(Debug, Clone, Copy)]
@@ -120,6 +121,11 @@ pub struct Player {
     audio: Option<Arc<Mutex<AudioOutput>>>,
     /// Audio stopped arriving for this generation; the system clock drives.
     audio_lost: bool,
+    /// The output device stopped consuming samples. Sticky for the lifetime
+    /// of the player (a seek would only freeze again on a dead device): the
+    /// system clock drives from then on; reopening the file retries audio.
+    audio_dead: bool,
+    stall: StallDetector,
     starving_since: Option<Instant>,
     clock: SystemClock,
     position: f64,
@@ -188,6 +194,8 @@ impl Player {
             generation: 0,
             audio,
             audio_lost: false,
+            audio_dead: false,
+            stall: StallDetector::default(),
             starving_since: None,
             clock: SystemClock::new(0.0, Instant::now()),
             position: 0.0,
@@ -295,6 +303,7 @@ impl Player {
         self.queue.clear();
         self.end_seen = false;
         self.audio_lost = false;
+        self.stall.reset();
         self.starving_since = None;
         self.awaiting_seek_frame = true;
         self.seek_frame_ready = None;
@@ -337,7 +346,7 @@ impl Player {
             backend: *self.shared.backend.lock().unwrap(),
             dropped: self.dropped,
             presented: self.presented,
-            audio_active: self.audio.is_some(),
+            audio_active: self.audio.is_some() && !self.audio_dead,
             av_offset,
         }
     }
@@ -404,12 +413,23 @@ impl Player {
     }
 
     /// Falls back to the system clock when the audio runs out (end of the
-    /// audio track, or no audio while video is waiting).
+    /// audio track, or no audio while video is waiting) or the output device
+    /// stops consuming samples.
     fn watch_audio(&mut self) {
         if !self.audio_driven() {
+            self.stall.reset();
             return;
         }
-        let queued = self.audio.as_ref().unwrap().lock().unwrap().queued_frames();
+        let (queued, clock) = {
+            let a = self.audio.as_ref().unwrap().lock().unwrap();
+            (a.queued_frames(), a.clock())
+        };
+        if self.stall.stalled(queued, clock, Instant::now()) {
+            log::warn!("audio output stalled at {clock:.3}s, using the system clock from now on");
+            self.audio_dead = true;
+            self.update_audio_mode();
+            return;
+        }
         if queued > 0 {
             self.starving_since = None;
             return;
@@ -451,7 +471,7 @@ impl Player {
 
     /// Audio would drive playback if it were playing (ignores a lost track).
     fn audio_can_drive(&self) -> bool {
-        self.audio.is_some() && self.speed() == 1.0
+        self.audio.is_some() && !self.audio_dead && self.speed() == 1.0
     }
 
     fn audio_driven(&self) -> bool {
@@ -482,6 +502,39 @@ impl Drop for Player {
             // The worker checks its commands at least every POLL, even when
             // the channel or the audio buffer is full.
             let _ = t.join();
+        }
+    }
+}
+
+/// Detects an audio output that stopped consuming samples: samples are
+/// queued but the audio clock has not moved for [`AUDIO_STARVATION`].
+#[derive(Debug, Default)]
+struct StallDetector {
+    /// Last clock value seen and when it was first seen.
+    last: Option<(f64, Instant)>,
+}
+
+impl StallDetector {
+    fn reset(&mut self) {
+        self.last = None;
+    }
+
+    /// Records one observation while audio drives playback; returns true
+    /// once the output is considered stalled.
+    fn stalled(&mut self, queued: usize, clock: f64, now: Instant) -> bool {
+        if queued == 0 {
+            // An empty buffer is starvation, handled separately.
+            self.last = None;
+            return false;
+        }
+        match self.last {
+            Some((seen, since)) if seen == clock => {
+                now.saturating_duration_since(since) >= AUDIO_STARVATION
+            }
+            _ => {
+                self.last = Some((clock, now));
+                false
+            }
         }
     }
 }
@@ -846,4 +899,53 @@ fn queue_audio(p: &mut Pipeline, chunk: AudioChunk, rate: u32) {
         p.audio_buf.extend_from_slice(&chunk.samples);
     }
     g.audio_synced = true;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MS: Duration = Duration::from_millis(1);
+
+    #[test]
+    fn moving_clock_is_not_stalled() {
+        let t0 = Instant::now();
+        let mut d = StallDetector::default();
+        for i in 0..100u32 {
+            assert!(!d.stalled(4800, f64::from(i) * 0.01, t0 + i * 10 * MS));
+        }
+    }
+
+    #[test]
+    fn frozen_clock_with_queued_samples_is_stalled() {
+        let t0 = Instant::now();
+        let mut d = StallDetector::default();
+        assert!(!d.stalled(4800, 1.0, t0));
+        assert!(!d.stalled(4800, 1.0, t0 + 499 * MS));
+        assert!(d.stalled(4800, 1.0, t0 + 500 * MS));
+    }
+
+    #[test]
+    fn empty_buffer_or_reset_restarts_the_wait() {
+        let t0 = Instant::now();
+        let mut d = StallDetector::default();
+        assert!(!d.stalled(4800, 1.0, t0));
+        // starvation (empty buffer) is not a stall, and restarts the wait
+        assert!(!d.stalled(0, 1.0, t0 + 400 * MS));
+        assert!(!d.stalled(4800, 1.0, t0 + 600 * MS));
+        assert!(!d.stalled(4800, 1.0, t0 + 1000 * MS));
+        assert!(d.stalled(4800, 1.0, t0 + 1100 * MS));
+        d.reset();
+        assert!(!d.stalled(4800, 1.0, t0 + 2000 * MS));
+    }
+
+    #[test]
+    fn clock_moving_again_restarts_the_wait() {
+        let t0 = Instant::now();
+        let mut d = StallDetector::default();
+        assert!(!d.stalled(4800, 1.0, t0));
+        assert!(!d.stalled(4800, 1.01, t0 + 450 * MS));
+        assert!(!d.stalled(4800, 1.01, t0 + 900 * MS));
+        assert!(d.stalled(4800, 1.01, t0 + 950 * MS));
+    }
 }
