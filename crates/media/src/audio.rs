@@ -209,6 +209,13 @@ impl AudioOutput {
         self.base_pts = base_pts;
     }
 
+    /// Frames the output callback has consumed since the last reset. Unlike
+    /// [`Self::clock`] it is not clamped by the output latency, so it shows
+    /// whether the device is consuming at all.
+    pub fn frames_played(&self) -> u64 {
+        self.shared.frames_played.load(Ordering::Relaxed)
+    }
+
     pub fn clock(&self) -> f64 {
         audio_clock_time(
             self.base_pts,
