@@ -6,6 +6,8 @@ mod error;
 pub mod ffmpeg_info;
 pub mod frame;
 pub mod hw;
+pub mod player;
+pub mod present;
 pub mod probe;
 pub mod video;
 
