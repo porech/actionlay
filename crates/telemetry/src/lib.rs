@@ -4,13 +4,18 @@
 #[allow(dead_code)] // used by telemetry.rs (Task 9)
 mod extract;
 pub mod gpmf;
+#[allow(dead_code)] // used by telemetry.rs (Task 9)
+mod lock;
 pub mod metric;
+#[allow(dead_code)] // used by derive.rs (Task 7)
+mod smoothing;
 #[cfg(test)]
 mod test_support;
 pub mod units;
 mod value;
 
 pub use extract::{Derived, GpsPoint};
+pub use lock::LockOptions;
 pub use metric::Metric;
 pub use value::{GpsLock, Value};
 
