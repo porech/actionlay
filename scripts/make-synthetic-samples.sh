@@ -7,8 +7,8 @@ OUT="${1:-$ROOT/samples/synthetic}"
 FF="${FFMPEG_BIN:-ffmpeg}"
 mkdir -p "$OUT"
 
-beep() { # $1 = duration, $2 = sample rate
-  echo "sine=frequency=1000:sample_rate=$2:duration=$1,volume=enable='gte(mod(t\,1)\,0.01)':volume=0"
+beep() { # $1 = duration, $2 = sample rate; sample-accurate (aevalsrc), mono
+  echo "aevalsrc=sin(2*PI*1000*t)*lt(mod(t\,1)\,0.01):s=$2:d=$1"
 }
 
 # GoPro-like: 1920x1440 100 fps HEVC 8-bit full range, 48 kHz audio
