@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/media", "crates/app", "crates/telemetry"]
+members = ["crates/media", "crates/app", "crates/telemetry", "crates/telemetry-cli"]
 
 [workspace.package]
 version = "0.1.0"
@@ -18,3 +18,4 @@ log = "0.4"
 chrono = { version = "0.4.45", default-features = false, features = ["std"] }
 geographiclib-rs = "0.2.7"
 anyhow = "1"
+clap = { version = "4.6.7", features = ["derive"] }

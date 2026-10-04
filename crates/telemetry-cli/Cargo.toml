@@ -1,0 +1,16 @@
+[package]
+name = "actionlay-telemetry-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "actionlay-telemetry"
+path = "src/main.rs"
+
+[dependencies]
+actionlay-media = { path = "../media" }
+actionlay-telemetry = { path = "../telemetry" }
+chrono.workspace = true
+clap.workspace = true

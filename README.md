@@ -8,10 +8,11 @@ top: speed, altitude, maps, heart rate and more. You can also design the
 dashboard visually and export the result. It is free, open source, and ships
 as a single executable for Windows, macOS and Linux.
 
-> **Status: early prototype (milestone M0).** Today ActionLay is a fast,
-> hardware-accelerated video player for GoPro footage. The telemetry overlay,
-> the layout editor and the export are being built next; see the
-> [roadmap](#roadmap). Expect rough edges.
+> **Status: early prototype (milestone M1).** Today ActionLay is a fast,
+> hardware-accelerated video player for GoPro footage, and it reads the
+> telemetry GoPro cameras record. The overlay, the layout editor and the
+> export are being built next; see the [roadmap](#roadmap). Expect rough
+> edges.
 
 ## What works today
 
@@ -25,13 +26,17 @@ as a single executable for Windows, macOS and Linux.
   0.25x to 4x.
 - No installation and nothing else to download: FFmpeg is built into the
   executable.
+- Reads GoPro telemetry (GPS, speed, altitude, accelerometer, gravity,
+  orientation, camera temperature) and computes the same derived values as
+  gopro-dashboard-overlay. `actionlay-telemetry dump VIDEO` prints them as
+  CSV or JSON; `actionlay-telemetry info VIDEO` shows where data is missing.
 
 ## Roadmap
 
 | Milestone | What you get |
 |---|---|
 | **M0** ✅ | Video player with hardware decoding and synced audio |
-| M1 | Telemetry from GoPro files (GPS, speed, altitude, accelerometer, …) |
+| **M1** ✅ | Telemetry from GoPro files (GPS, speed, altitude, accelerometer, …) |
 | M2 | Dashboard overlay drawn live on the video |
 | M3 | All dashboard widgets: gauges, charts, compasses, moving and journey maps, plus a G-meter. Every widget is deeply customisable, with good defaults and a polished look when data is missing. Layouts from gopro-dashboard-overlay can be imported |
 | M4 | Visual layout editor: add, move, resize and style widgets, with anchors that adapt to any resolution or aspect ratio. It warns you when a widget can't work with the data in your video, and layouts can be shared as files |
@@ -103,6 +108,7 @@ To run the tests, first generate the synthetic sample videos. This needs an
 
 ```bash
 ./scripts/make-synthetic-samples.sh
+./scripts/fetch-gopro-samples.sh     # public GoPro samples, ~33 MB
 cargo test --workspace -- --test-threads=1
 ```
 
@@ -125,9 +131,15 @@ ActionLay stands on the shoulders of these open-source projects:
 - **[Gyroflow](https://github.com/gyroflow/gyroflow)** is the architectural
   reference for a Rust desktop app that plays and processes action-camera
   footage.
+- **[gpmf-parser](https://github.com/gopro/gpmf-parser)** by GoPro documents
+  the GPMF telemetry format; its sample videos (Apache-2.0) are ActionLay's
+  telemetry test files.
 - **[telemetry-parser](https://github.com/AdrianEddy/telemetry-parser)** by
-  AdrianEddy is the planned telemetry reader for GoPro, DJI, Insta360 and
-  other cameras.
+  AdrianEddy is the planned telemetry reader for DJI, Insta360 and other
+  cameras.
+- **[GeographicLib](https://geographiclib.sourceforge.io)** (Charles Karney),
+  through [geographiclib-rs](https://github.com/georust/geographiclib-rs),
+  computes distances and bearings exactly as gopro-dashboard-overlay does.
 - **[FFmpeg](https://ffmpeg.org)** does the decoding, through the
   [ffmpeg-next](https://github.com/zmwangx/rust-ffmpeg) Rust bindings.
 - **[egui / eframe](https://github.com/emilk/egui)** and

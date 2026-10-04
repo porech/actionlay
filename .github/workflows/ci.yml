@@ -148,7 +148,7 @@ jobs:
       - run: cargo test --workspace -- --test-threads=1
 
       - name: Build release binaries
-        run: cargo build --release -p actionlay-app -p actionlay-media --bins
+        run: cargo build --release -p actionlay-app -p actionlay-media -p actionlay-telemetry-cli --bins
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4
@@ -159,4 +159,6 @@ jobs:
             target/release/actionlay.exe
             target/release/decode-bench
             target/release/decode-bench.exe
+            target/release/actionlay-telemetry
+            target/release/actionlay-telemetry.exe
           if-no-files-found: error
