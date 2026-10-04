@@ -1,18 +1,14 @@
 //! Telemetry of action-camera videos: GoPro GPMF parsing, derived metrics,
 //! and sampling at any file time. Pure Rust; packets come from the caller
 //! (the media crate demuxes them), so this crate never links FFmpeg.
-#[allow(dead_code)] // used by telemetry.rs (Task 9)
 mod derive;
-#[allow(dead_code)] // used by telemetry.rs (Task 9)
 mod extract;
 pub mod gpmf;
-#[allow(dead_code)] // used by telemetry.rs (Task 9)
 mod lock;
 pub mod metric;
-#[allow(dead_code)] // used by telemetry.rs (Task 9)
 mod series;
-#[allow(dead_code)] // used by telemetry.rs (Task 9)
 mod smoothing;
+mod telemetry;
 #[cfg(test)]
 mod test_support;
 pub mod units;
@@ -21,6 +17,9 @@ mod value;
 pub use extract::{Derived, GpsPoint};
 pub use lock::LockOptions;
 pub use metric::Metric;
+pub use telemetry::{
+    Availability, Snapshot, Telemetry, TelemetryError, TelemetryOptions, TrackPoint,
+};
 pub use value::{GpsLock, Value};
 
 /// One demuxed packet of the GoPro metadata stream, times in seconds of
