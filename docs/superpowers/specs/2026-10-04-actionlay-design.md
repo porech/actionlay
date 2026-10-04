@@ -186,14 +186,14 @@ Video e capitoli, riferimento al layout, GPX/FIT, scarti di sincronizzazione, mo
 **Errori**: log su file a rotazione (`tracing`) nella cartella dell'app, indicato all'utente in caso di crash. Messaggi non bloccanti per problemi non fatali (HW assente, tile, GPX fuori intervallo). Buchi di telemetria gestiti come in §4.4.
 
 **Test**
-- `telemetry`: fixture GPMF reali (`tests/fixtures/gpmf/hero7-GX013370.gpmd.bin`, 840 KB) confrontate con i valori prodotti dall'originale; unione GPX/FIT; GPSU; timelapse.
+- `telemetry`: tracce GPMF reali (in locale `samples/hero7-GX013370.gpmd.bin`, 840 KB, non committata; in CI tracce pubblicabili da reperire) confrontate con i valori prodotti dall'originale; unione GPX/FIT; GPSU; timelapse.
 - `layout`: round-trip JSON, validazione schema, importazione di **tutti i 13 layout** senza errori.
 - `render`: **immagini di riferimento** generate con l'originale (Python, solo strumento di sviluppo, non distribuito) per ogni widget e layout, confrontate con tolleranza misurata; snapshot propri per le regressioni.
 - `media`: spezzoni di 2–3 s tagliati dai campioni reali per seek preciso, passaggio tra capitoli, allineamento A/V.
 - End-to-end CLI: export di 3 s, verifica tracce con ffprobe, confronto di frame campione.
 - CI GitHub Actions su macOS, Windows x64, Linux x64.
 
-**Campioni grandi**: fuori dal repo (`samples/`, ignorati da git), scaricati da uno script. Il primo campione (`GX013370.MP4`, HERO7) è documentato in `samples/README.md`. Contiene posizioni GPS reali: **non va pubblicato** (decisione del proprietario). La CI usa solo la fixture GPMF già nel repo e campioni pubblicabili, da reperire.
+**Campioni grandi**: fuori dal repo (`samples/`, ignorati da git), scaricati da uno script. Il primo campione (`GX013370.MP4`, HERO7) è documentato in `samples/README.md`. Contiene posizioni GPS reali: **non va pubblicato** (decisione del proprietario). Né il video né la telemetria estratta vanno committati; la CI usa solo campioni sintetici o pubblicabili.
 
 ## 9. Distribuzione e piattaforme
 
