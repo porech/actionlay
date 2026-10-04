@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/media", "crates/app"]
+members = ["crates/media", "crates/app", "crates/telemetry"]
 
 [workspace.package]
 version = "0.1.0"
@@ -15,4 +15,6 @@ cpal = "0.18"
 ringbuf = "0.5"
 thiserror = "2"
 log = "0.4"
+chrono = { version = "0.4.45", default-features = false, features = ["std"] }
+geographiclib-rs = "0.2.7"
 anyhow = "1"

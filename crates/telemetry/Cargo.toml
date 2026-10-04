@@ -1,0 +1,12 @@
+[package]
+name = "actionlay-telemetry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+chrono.workspace = true
+geographiclib-rs.workspace = true
+thiserror.workspace = true
+log.workspace = true
