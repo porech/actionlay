@@ -65,10 +65,9 @@ jobs:
         if: runner.os == 'Windows'
         run: echo "LIBCLANG_PATH=C:\\Program Files\\LLVM\\bin" >> "$GITHUB_ENV"
 
-      # - name: Synthetic samples (macOS/Linux)
-      #   if: runner.os != 'Windows'
-      #   run: ./scripts/make-synthetic-samples.sh && echo "ACTIONLAY_SAMPLES=$GITHUB_WORKSPACE/samples/synthetic" >> "$GITHUB_ENV"
-      # Re-enabled in Task 4 when scripts/make-synthetic-samples.sh exists.
+      - name: Synthetic samples (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: ./scripts/make-synthetic-samples.sh && echo "ACTIONLAY_SAMPLES=$GITHUB_WORKSPACE/samples/synthetic" >> "$GITHUB_ENV"
 
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
