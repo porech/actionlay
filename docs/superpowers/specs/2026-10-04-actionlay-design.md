@@ -1,7 +1,7 @@
 # ActionLay — Design
 
 - **Data**: 2026-10-04
-- **Stato**: bozza da rivedere
+- **Stato**: approvata (2026-10-04)
 - **Nome**: ActionLay (provvisorio; libero su GitHub e crates.io alla data)
 - **Licenza**: GPL-3.0-or-later
 
@@ -193,7 +193,7 @@ Video e capitoli, riferimento al layout, GPX/FIT, scarti di sincronizzazione, mo
 - End-to-end CLI: export di 3 s, verifica tracce con ffprobe, confronto di frame campione.
 - CI GitHub Actions su macOS, Windows x64, Linux x64.
 
-**Campioni grandi**: fuori dal repo (`samples/`, ignorati da git), scaricati da uno script. Il primo campione (`GX013370.MP4`, HERO7) è documentato in `samples/README.md`. Contiene posizioni GPS reali: va pubblicato (es. come asset di una release "test-fixtures") solo con il consenso del proprietario.
+**Campioni grandi**: fuori dal repo (`samples/`, ignorati da git), scaricati da uno script. Il primo campione (`GX013370.MP4`, HERO7) è documentato in `samples/README.md`. Contiene posizioni GPS reali: **non va pubblicato** (decisione del proprietario). La CI usa solo la fixture GPMF già nel repo e campioni pubblicabili, da reperire.
 
 ## 9. Distribuzione e piattaforme
 

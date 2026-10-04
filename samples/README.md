@@ -9,5 +9,6 @@ Large sample videos live here but are not committed (see `.gitignore`).
 The GPMF track of `GX013370.MP4` is committed as a small fixture in
 `tests/fixtures/gpmf/hero7-GX013370.gpmd.bin`.
 
-Note: sample videos contain real GPS positions (and possibly faces). Do not
-publish them without the owner's consent.
+Note: sample videos contain real GPS positions (and possibly faces).
+`GX013370.MP4` must NOT be published anywhere (owner's decision, 2026-10-04).
+CI must use only the committed GPMF fixture or other, publishable samples.
