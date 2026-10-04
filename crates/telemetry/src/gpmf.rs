@@ -64,6 +64,8 @@ pub enum GpmfError {
     NotNumeric { key: FourCc },
     #[error("{key}: complex item needs a TYPE")]
     MissingType { key: FourCc },
+    #[error("{key}: SCAL contains a zero or non-finite value")]
+    BadScale { key: FourCc },
     #[error("{key}: SCAL has {scal} values for {elements} elements")]
     ScaleMismatch {
         key: FourCc,
@@ -112,6 +114,10 @@ fn parse_level(data: &[u8], base: usize, depth: usize) -> Result<Vec<Klv>, GpmfE
             });
         }
         let key = FourCc([rest[0], rest[1], rest[2], rest[3]]);
+        // A null key is padding: end of data at this level.
+        if key.0 == [0; 4] {
+            break;
+        }
         let type_char = rest[4];
         let struct_size = rest[5];
         let repeat = u16::from_be_bytes([rest[6], rest[7]]);
@@ -272,8 +278,13 @@ impl Klv {
 }
 
 /// Divides decoded rows by SCAL: one value for every element, or one per
-/// element of a row.
+/// element of a row. A zero or non-finite scale (damaged file) is an error
+/// and leaves `rows` untouched; callers should skip that stream's payload
+/// rather than fail the whole file.
 pub fn apply_scale(key: FourCc, rows: &mut [Vec<f64>], scal: &[f64]) -> Result<(), GpmfError> {
+    if scal.iter().any(|s| *s == 0.0 || !s.is_finite()) {
+        return Err(GpmfError::BadScale { key });
+    }
     for row in rows.iter_mut() {
         if scal.len() == 1 {
             row.iter_mut().for_each(|v| *v /= scal[0]);
@@ -464,5 +475,25 @@ mod tests {
                 key: FourCc::new(b"STNM")
             })
         );
+    }
+
+    #[test]
+    fn rejects_zero_and_non_finite_scale() {
+        let key = FourCc::new(b"GPS5");
+        let mut rows = vec![vec![10.0, 20.0]];
+        for scal in [&[0.0][..], &[1.0, 0.0], &[f64::NAN], &[f64::INFINITY]] {
+            assert_eq!(
+                apply_scale(key, &mut rows, scal),
+                Err(GpmfError::BadScale { key })
+            );
+        }
+        assert_eq!(rows, vec![vec![10.0, 20.0]]);
+    }
+
+    #[test]
+    fn null_key_ends_the_level() {
+        let mut data = item(b"TSMP", b'L', 4, 1, &1u32.to_be_bytes());
+        data.extend([0u8; 16]);
+        assert_eq!(parse(&data).unwrap().len(), 1);
     }
 }
