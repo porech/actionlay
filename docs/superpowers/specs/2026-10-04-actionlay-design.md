@@ -1,227 +1,227 @@
 # ActionLay — Design
 
-- **Data**: 2026-10-04
-- **Stato**: approvata (2026-10-04)
-- **Nome**: ActionLay (provvisorio; libero su GitHub e crates.io alla data)
-- **Licenza**: GPL-3.0-or-later
+- **Date**: 2026-10-04
+- **Status**: approved (2026-10-04)
+- **Name**: ActionLay (provisional; available on GitHub and crates.io as of this date)
+- **License**: GPL-3.0-or-later
 
-## 0. Obiettivo e criteri di successo
+## 0. Goal and success criteria
 
-Applicazione desktop **open source e multipiattaforma** (Windows, macOS, Linux) per:
+**Open source, cross-platform** desktop application (Windows, macOS, Linux) to:
 
-1. **riprodurre** video di action camera con un dashboard di telemetria sovrapposto e sincronizzato in tempo reale;
-2. **creare e modificare** il dashboard in un editor visuale (aggiungere, posizionare, ridimensionare, configurare elementi);
-3. **esportare** il video con l'overlay, oppure il solo overlay trasparente.
+1. **play back** action camera videos with a telemetry dashboard overlaid and synchronized in real time;
+2. **create and edit** the dashboard in a visual editor (add, position, resize, configure elements);
+3. **export** the video with the overlay, or just the transparent overlay.
 
-È ispirata a [gopro-dashboard-overlay](https://github.com/time4tea/gopro-dashboard-overlay) (time4tea, GPL-3.0), che viene citato nei credits come fonte di ispirazione e know-how; i suoi layout vengono importati e convertiti nel formato di ActionLay. Non c'è compatibilità diretta con il formato XML originale.
+It is inspired by [gopro-dashboard-overlay](https://github.com/time4tea/gopro-dashboard-overlay) (time4tea, GPL-3.0), which is credited as a source of inspiration and know-how; its layouts are imported and converted to the ActionLay format. There is no direct compatibility with the original XML format.
 
-**Vincoli**
-- Scritto in **Rust**.
-- Distribuito come **singolo eseguibile** per piattaforma, senza dipendenze da installare (eccezioni: driver GPU del sistema; su macOS un bundle `.app`).
+**Constraints**
+- Written in **Rust**.
+- Distributed as a **single executable** per platform, with no dependencies to install (exceptions: system GPU drivers; on macOS a `.app` bundle).
 
-**Criteri di successo**
-- Ogni layout dell'originale, importato, viene renderizzato **quasi identico** all'originale (misurato con immagini di riferimento, §8).
-- Un video GoPro 4K/H.265 (e il campione 1920×1440 a 100 fps) si riproduce **fluido** con overlay su un portatile recente, su macOS e Windows.
-- Anteprima ed export sono **identici** (stesso motore di render).
+**Success criteria**
+- Every layout of the original, once imported, is rendered **almost identically** to the original (measured with reference images, §8).
+- A GoPro 4K/H.265 video (and the 1920×1440 sample at 100 fps) plays **smoothly** with the overlay on a recent laptop, on macOS and Windows.
+- Preview and export are **identical** (same render engine).
 
-## 1. Ambito della v1
+## 1. v1 scope
 
-### Incluso
-- Player con overlay in tempo reale, seek preciso, frame avanti/indietro, velocità variabile.
-- Editor visuale completo (§5).
-- **Tutti i tipi di widget** dell'originale (§4.3) — elenco preso dal registro dei componenti di `layout_xml.py`, non solo dalla documentazione.
-- Fonti dati: GPMF GoPro; GPX e FIT esterni sincronizzati sull'orario; altre camere (DJI, Insta360, …) tramite telemetry-parser.
-- Capitoli GoPro riconosciuti e uniti automaticamente; ogni file resta apribile da solo.
-- Export: video finale (H.264/H.265) e solo overlay (ProRes 4444 / sequenza PNG con alpha); esportazione di un intervallo (punti in/out).
-- Riga di comando per l'export (stessi crate dell'app).
-- Zone di privacy (come nell'originale: i widget mappa non disegnano punti dentro le zone).
-- Memoria delle preferenze e dello stato per video (§6); registrazione in "Apri con" su Windows (§6.3).
+### Included
+- Player with real-time overlay, precise seek, frame step forward/back, variable speed.
+- Full visual editor (§5).
+- **All widget types** of the original (§4.3) — list taken from the component registry in `layout_xml.py`, not only from the documentation.
+- Data sources: GoPro GPMF; external GPX and FIT synchronized by time of day; other cameras (DJI, Insta360, …) via telemetry-parser.
+- GoPro chapters recognized and merged automatically; each file remains openable on its own.
+- Export: final video (H.264/H.265) and overlay only (ProRes 4444 / PNG sequence with alpha); export of a range (in/out points).
+- Command line for export (same crates as the app).
+- Privacy zones (as in the original: map widgets do not draw points inside the zones).
+- Remembering preferences and per-video state (§6); registration in "Open with" on Windows (§6.3).
 
-### Escluso dalla v1 (scelte esplicite)
-- Posizionamento in percentuale nei layout (bastano ancore + scala uniforme).
-- Audio a velocità ≠ 1x (viene silenziato).
-- Timeline multi-clip / montaggio.
-- Coda di export, scelta di bitrate/risoluzione di output avanzata.
-- Firma del codice (macOS/Windows) e aggiornamento automatico (solo avviso di nuova versione).
-- Video 360° a doppio flusso (GoPro MAX `.360`).
-- Lettura/scrittura del formato XML originale oltre all'importazione una tantum.
+### Excluded from v1 (explicit choices)
+- Percentage-based positioning in layouts (anchors + uniform scale are enough).
+- Audio at speed ≠ 1x (it is muted).
+- Multi-clip timeline / editing.
+- Export queue, advanced output bitrate/resolution selection.
+- Code signing (macOS/Windows) and automatic updates (only a new-version notice).
+- 360° dual-stream video (GoPro MAX `.360`).
+- Reading/writing the original XML format beyond the one-time import.
 
-## 2. Architettura
+## 2. Architecture
 
-Workspace Cargo con crate a responsabilità singola:
+Cargo workspace with single-responsibility crates:
 
-| Crate | Responsabilità | Dipende da |
+| Crate | Responsibility | Depends on |
 |---|---|---|
-| `telemetry` | Lettura GPMF/DJI/Insta360 (telemetry-parser), GPX, FIT. Serie temporale unificata con interpolazione e metriche derivate. Allineamento al tempo del video; unione dei file esterni per orario UTC con scarto regolabile; conversione tempo-file ↔ tempo-reale per timelapse/TimeWarp. Zone di privacy. | — |
-| `layout` | Modello del layout (albero di nodi), schema dei widget, (de)serializzazione JSON, validazione, importatore XML dell'originale. | — |
-| `maps` | Provider di tile, download, cache su disco, prefetch dell'area del percorso. | rete (rustls) |
-| `render` | Funzione pura: (layout, istante t, telemetria, dimensioni, scala) → immagine RGBA premoltiplicata. Calcola anche i riquadri di ogni nodo per l'editor. Motore unico per anteprima ed export. | `layout`, `telemetry`, `maps` |
-| `media` | ffmpeg statico: apertura file e capitoli, decodifica HW, audio, codifica export. | ffmpeg |
-| `app` | UI egui + wgpu: player, editor, export, preferenze. Include la CLI di export. | tutti |
+| `telemetry` | Reading GPMF/DJI/Insta360 (telemetry-parser), GPX, FIT. Unified time series with interpolation and derived metrics. Alignment to video time; merging of external files by UTC time with adjustable offset; file-time ↔ real-time conversion for timelapse/TimeWarp. Privacy zones. | — |
+| `layout` | Layout model (tree of nodes), widget schema, JSON (de)serialization, validation, importer for the original XML. | — |
+| `maps` | Tile providers, download, disk cache, prefetch of the route area. | network (rustls) |
+| `render` | Pure function: (layout, instant t, telemetry, size, scale) → premultiplied RGBA image. Also computes the bounding boxes of each node for the editor. Single engine for preview and export. | `layout`, `telemetry`, `maps` |
+| `media` | Static ffmpeg: file and chapter opening, HW decoding, audio, export encoding. | ffmpeg |
+| `app` | egui + wgpu UI: player, editor, export, preferences. Includes the export CLI. | all |
 
-**Flusso in riproduzione**: orologio del player → t → `telemetry` (valori in t) → `render` (overlay) → texture GPU → composizione nello shader sopra il frame video.
+**Playback flow**: player clock → t → `telemetry` (values at t) → `render` (overlay) → GPU texture → compositing in the shader over the video frame.
 
-**Flusso in export**: per ogni frame decodificato → `render` dell'overlay al suo timestamp → composizione (o solo overlay) → encoder.
+**Export flow**: for each decoded frame → `render` of the overlay at its timestamp → compositing (or overlay only) → encoder.
 
-## 3. Player e sincronizzazione
+## 3. Player and synchronization
 
-**Thread**
-- *Decodifica video*: ffmpeg demux + decodifica HW (VideoToolbox / D3D11VA / VA-API), fallback software multi-thread con avviso. Coda corta (~8 frame). Upload come texture YUV (NV12, P010 per 10 bit); conversione in RGB nello shader con matrice colore (BT.709/BT.2020) e range corretti (es. `yuvj420p` = full range).
-- *Audio*: decodifica AAC → `cpal`. **L'audio è l'orologio master**. Senza audio o a velocità ≠ 1x: orologio di sistema, audio silenziato.
-- *Presentazione*: a ogni vsync si mostra il frame con pts ≤ orologio più recente; i frame in ritardo si scartano (es. 100 fps su 60 Hz).
-- *Render overlay*: thread separato dalla UI, ~25 Hz in riproduzione, immediato in pausa/dopo seek; doppio buffer. In anteprima si renderizza alla risoluzione di visualizzazione (scalando il layout), in export alla risoluzione piena.
+**Threads**
+- *Video decoding*: ffmpeg demux + HW decoding (VideoToolbox / D3D11VA / VA-API), multi-threaded software fallback with a warning. Short queue (~8 frames). Upload as YUV textures (NV12, P010 for 10 bit); conversion to RGB in the shader with a color matrix (BT.709/BT.2020) and correct ranges (e.g. `yuvj420p` = full range).
+- *Audio*: AAC decoding → `cpal`. **Audio is the master clock**. Without audio or at speed ≠ 1x: system clock, audio muted.
+- *Presentation*: at each vsync the frame with pts ≤ the latest clock value is shown; late frames are dropped (e.g. 100 fps on 60 Hz).
+- *Overlay render*: thread separate from the UI, ~25 Hz during playback, immediate when paused/after a seek; double buffer. In preview it renders at display resolution (scaling the layout), in export at full resolution.
 
-**Tempo**
-- Tutto è indicizzato sul **tempo del file** (pts). La telemetria GPMF è allineata ai pts video.
-- **Capitoli**: timeline virtuale che concatena i file (offset dei pts); la telemetria è concatenata allo stesso modo. Aprendo `GX01xxxx` si caricano i capitoli successivi; aprendo un capitolo intermedio il file funziona da solo e si propone di caricare la sequenza dal primo.
-- **Seek**: durante il trascinamento solo keyframe; al rilascio seek preciso al frame (decodifica dal keyframe precedente scartando gli intermedi). Frame ±1.
+**Time**
+- Everything is indexed on **file time** (pts). GPMF telemetry is aligned to the video pts.
+- **Chapters**: virtual timeline concatenating the files (pts offsets); telemetry is concatenated in the same way. Opening `GX01xxxx` loads the following chapters; opening an intermediate chapter, the file works on its own and the user is offered to load the sequence from the first one.
+- **Seek**: while dragging, keyframes only; on release, frame-accurate seek (decode from the previous keyframe, discarding intermediate frames). Frame ±1.
 
-**Errori**: senza decodifica HW → software + avviso; senza telemetria → video normale, widget con "nessun dato"; file corrotti letti fin dove possibile.
+**Errors**: without HW decoding → software + warning; without telemetry → normal video, widgets show "no data"; corrupted files are read as far as possible.
 
-## 4. Layout e render
+## 4. Layout and render
 
-### 4.1 Formato del layout (`*.ovl.json`)
+### 4.1 Layout format (`*.ovl.json`)
 
-JSON versionato con JSON Schema pubblicato.
+Versioned JSON with a published JSON Schema.
 
-- **Unità**: 1 unità = 1/1080 dell'altezza del video. I valori dei layout 1080p dell'originale si trasferiscono 1:1.
-- **Intestazione**: `version`, `name`, `design_aspect` (es. `16:9`), sistema di unità predefinito (metrico/imperiale), font predefinito, colori di base.
-- **Nodo**: `id`, `name`, `type`, `anchor` (9 valori: `top-left` … `bottom-right`), `offset` [x, y] dall'ancora, dimensione propria del widget, `opacity`, `visible`, parametri specifici.
-- **Gruppi**: con dimensione esplicita i figli possono ancorarsi dentro il gruppo; senza dimensione i figli sono posizionati relativamente all'origine del gruppo (come i `composite` originali).
-- **Dati e testo**: `metric`, `units`, `format` con sintassi propria (`"{value:.0}"`, `"{unit}"`, date con `strftime`).
+- **Units**: 1 unit = 1/1080 of the video height. Values of the original's 1080p layouts transfer 1:1.
+- **Header**: `version`, `name`, `design_aspect` (e.g. `16:9`), default unit system (metric/imperial), default font, base colors.
+- **Node**: `id`, `name`, `type`, `anchor` (9 values: `top-left` … `bottom-right`), `offset` [x, y] from the anchor, the widget's own size, `opacity`, `visible`, specific parameters.
+- **Groups**: with an explicit size, children can anchor inside the group; without a size, children are positioned relative to the group's origin (like the original `composite`s).
+- **Data and text**: `metric`, `units`, `format` with its own syntax (`"{value:.0}"`, `"{unit}"`, dates with `strftime`).
 
-Esempio:
+Example:
 ```json
 { "id": "speed-main", "type": "metric", "anchor": "bottom-left", "offset": [16, -120],
   "metric": "speed", "units": "kmh", "format": "{value:.0}", "size": 160, "color": "#ffffff" }
 ```
 
-### 4.2 Adattamento alla risoluzione
-- Fattore di scala unico per tutte le misure. **Modalità `height` (default)**: `H / 1080`. **Modalità `fit`**: `min(H / 1080, W / (1080 × design_aspect))`, per video verticali o più stretti del layout. La modalità si sceglie nel progetto.
-- Le posizioni seguono l'ancora (un gruppo in basso a destra resta in basso a destra su 4:3, 16:9, 4K).
-- L'editor avvisa se qualche elemento esce dal fotogramma.
+### 4.2 Adapting to the resolution
+- A single scale factor for all measurements. **`height` mode (default)**: `H / 1080`. **`fit` mode**: `min(H / 1080, W / (1080 × design_aspect))`, for vertical videos or videos narrower than the layout. The mode is chosen in the project.
+- Positions follow the anchor (a bottom-right group stays bottom-right on 4:3, 16:9, 4K).
+- The editor warns if any element falls outside the frame.
 
-### 4.3 Widget
+### 4.3 Widgets
 
-Ogni tipo di widget dichiara uno **schema dei parametri** (tipo, default, intervallo) che genera il pannello proprietà, la validazione e i default dei nuovi widget. Tipi di parametro: scelta da elenco, numero (intervallo/passo), colore RGBA, font+dimensione, booleano, testo/formato, metrica (filtrata per compatibilità), immagine/icona.
+Each widget type declares a **parameter schema** (type, default, range) that generates the properties panel, the validation, and the defaults of new widgets. Parameter types: choice from a list, number (range/step), RGBA color, font+size, boolean, text/format, metric (filtered by compatibility), image/icon.
 
-Tipi di widget da supportare in v1 (registro di `layout_xml.py` dell'originale):
+Widget types to support in v1 (registry of the original's `layout_xml.py`):
 
-- **Contenitori**: `composite`/`translate` (gruppo), `frame` (gruppo con sfondo, bordo, raggio, opacità, dissolvenza).
-- **Testo e dati**: `text`, `metric`, `metric_unit`, `datetime`, `icon`, `gps_lock_icon`.
-- **Mappe**: `moving_map`, `journey_map`, `moving_journey_map`, `circuit_map`, `cairo_circuit_map`.
-- **Grafici**: `chart`, `gradient_chart`.
-- **Indicatori**: `bar`, `zone_bar`, `compass`, `compass_arrow`, `asi` (air speed), `msi`, `msi2` (motor speed), `cairo_gauge_marker`, `cairo_gauge_round_annotated`, `cairo_gauge_arc_annotated`, `cairo_gauge_donut`.
+- **Containers**: `composite`/`translate` (group), `frame` (group with background, border, radius, opacity, fade).
+- **Text and data**: `text`, `metric`, `metric_unit`, `datetime`, `icon`, `gps_lock_icon`.
+- **Maps**: `moving_map`, `journey_map`, `moving_journey_map`, `circuit_map`, `cairo_circuit_map`.
+- **Charts**: `chart`, `gradient_chart`.
+- **Indicators**: `bar`, `zone_bar`, `compass`, `compass_arrow`, `asi` (air speed), `msi`, `msi2` (motor speed), `cairo_gauge_marker`, `cairo_gauge_round_annotated`, `cairo_gauge_arc_annotated`, `cairo_gauge_donut`.
 
-Nel nostro formato i nomi possono essere razionalizzati (es. eliminare il prefisso `cairo_`); l'importatore mappa i nomi originali.
+In our format the names may be rationalized (e.g. dropping the `cairo_` prefix); the importer maps the original names.
 
-### 4.4 Metriche e unità
+### 4.4 Metrics and units
 
-Metriche (dall'originale): `speed`, `cspeed`, `accel`, `gradient`, `cgrad`, `alt`, `odo`, `codo`, `dist`, `azi`, `cog`, `lat`, `lon`, `timestamp`, `gps-dop`, `gps-lock`, `gps-packet`, `gps-packet-index`, `accl.x/y/z`, `grav.x/y/z`, `ori.pitch/roll/yaw`, `hr`, `cadence`, `power`, `temp`, `respiration`, `gear.front`, `gear.rear`, `sdps`.
-Le metriche derivate (`cspeed`, `cgrad`, `codo`, `accel`, `azi`, `cog`, …) si calcolano come nell'originale, filtrando i punti con DOP alto. Le metriche non disponibili per una fonte risultano assenti (il widget mostra "--" o l'ultimo valore in grigio, a scelta).
+Metrics (from the original): `speed`, `cspeed`, `accel`, `gradient`, `cgrad`, `alt`, `odo`, `codo`, `dist`, `azi`, `cog`, `lat`, `lon`, `timestamp`, `gps-dop`, `gps-lock`, `gps-packet`, `gps-packet-index`, `accl.x/y/z`, `grav.x/y/z`, `ori.pitch/roll/yaw`, `hr`, `cadence`, `power`, `temp`, `respiration`, `gear.front`, `gear.rear`, `sdps`.
+Derived metrics (`cspeed`, `cgrad`, `codo`, `accel`, `azi`, `cog`, …) are computed as in the original, filtering out points with high DOP. Metrics not available from a source are absent (the widget shows "--" or the last value in grey, as chosen).
 
-Unità legate alla grandezza fisica:
-- velocità: km/h, mph, nodi, m/s, passo (min/km, min/mi, min/nm), spm;
-- distanza: km, mi, mn, m;
-- altitudine: m, ft;
-- temperatura: °C, °F;
-- accelerazione: G, m/s².
+Units tied to the physical quantity:
+- speed: km/h, mph, knots, m/s, pace (min/km, min/mi, min/nm), spm;
+- distance: km, mi, nmi, m;
+- altitude: m, ft;
+- temperature: °C, °F;
+- acceleration: G, m/s².
 
-Ogni widget eredita il sistema di unità del layout e può sovrascriverlo.
+Each widget inherits the layout's unit system and can override it.
 
-### 4.5 Motore di render
-- **tiny-skia** (CPU, antialiasing, path): copre anche gli indicatori in stile Cairo.
-- Testo con **cosmic-text / rustybuzz** (shaping completo, sostituisce libraqm). Font incorporati (Roboto, Apache-2.0).
-- Le parti statiche (sfondi, scale, icone, percorso mappa) si renderizzano una volta e si tengono in cache; per ogni t si ridisegnano solo valori, lancette, marcatori.
-- **Icone**: le icone dell'originale vengono da Flaticon e non hanno una licenza libera → **non vengono portate**. Si usa un set con licenza libera (es. Tabler Icons, MIT) con equivalenti semantici (montagna, pendenza, termometro, cuore, contagiri, GPS…); l'importatore mappa i file originali sui nomi semantici.
+### 4.5 Render engine
+- **tiny-skia** (CPU, antialiasing, paths): also covers the Cairo-style indicators.
+- Text with **cosmic-text / rustybuzz** (full shaping, replaces libraqm). Embedded fonts (Roboto, Apache-2.0).
+- Static parts (backgrounds, scales, icons, map route) are rendered once and cached; for each t only values, needles, and markers are redrawn.
+- **Icons**: the original's icons come from Flaticon and have no free license → **they are not carried over**. A freely licensed set is used (e.g. Tabler Icons, MIT) with semantic equivalents (mountain, gradient, thermometer, heart, tachometer, GPS…); the importer maps the original files to semantic names.
 
-### 4.6 Importatore dei layout originali
-- XML originale → `*.ovl.json`. Risoluzione di riferimento dal nome del file (`default-1920x1080.xml`) o chiesta all'utente.
-- Ancoraggio automatico di ogni gruppo di primo livello all'angolo/bordo più vicino; conversione delle stringhe di formato Python e dei nomi di unità; mappatura delle icone.
-- Rapporto degli elementi non convertibili (mai scartati in silenzio).
-- I 13 layout inclusi nell'originale vengono convertiti una volta e distribuiti con l'app (già ancorati), con avviso di copyright/provenienza.
+### 4.6 Importer for the original layouts
+- Original XML → `*.ovl.json`. Reference resolution taken from the file name (`default-1920x1080.xml`) or asked of the user.
+- Automatic anchoring of each top-level group to the nearest corner/edge; conversion of Python format strings and unit names; icon mapping.
+- Report of non-convertible elements (never silently dropped).
+- The 13 layouts included in the original are converted once and shipped with the app (already anchored), with a copyright/provenance notice.
 
 ## 5. Editor
 
-- Selezione dal video o dall'albero dei livelli; riquadri di selezione calcolati da `render` all'istante corrente.
-- Spostamento: modifica `offset` (spostare un gruppo sposta i figli). Opzione: aggiornamento automatico dell'ancora in base al quadrante di rilascio.
-- Ridimensionamento sul parametro proprio del widget: `size` a proporzioni bloccate (testi, icone, mappe, indicatori) o larghezza/altezza (frame, grafici, barre).
-- Selettore d'ancora a 9 punti; linea guida verso il bordo di ancoraggio durante il trascinamento.
-- Guide e aggancio, selezione multipla, copia/incolla, annulla/ripeti, palette dei widget.
-- Anteprima a più risoluzioni (16:9, 4:3, 9:16, 4K) senza cambiare video.
-- Pannello proprietà generato dallo schema (§4.3).
+- Selection from the video or from the layer tree; selection boxes computed by `render` at the current instant.
+- Moving: edits `offset` (moving a group moves its children). Option: automatic anchor update based on the quadrant where the node is dropped.
+- Resizing on the widget's own parameter: `size` with locked proportions (text, icons, maps, indicators) or width/height (frames, charts, bars).
+- 9-point anchor selector; guide line toward the anchoring edge while dragging.
+- Guides and snapping, multiple selection, copy/paste, undo/redo, widget palette.
+- Preview at multiple resolutions (16:9, 4:3, 9:16, 4K) without changing video.
+- Properties panel generated from the schema (§4.3).
 
-## 6. Progetto, preferenze, integrazione col sistema
+## 6. Project, preferences, system integration
 
-### 6.1 File di progetto (facoltativo, `*.ovp.json`)
-Video e capitoli, riferimento al layout, GPX/FIT, scarti di sincronizzazione, modalità di scala, zone di privacy, impostazioni di export. Serve solo per spostare/condividere un lavoro.
+### 6.1 Project file (optional, `*.ovp.json`)
+Video and chapters, layout reference, GPX/FIT, sync offsets, scale mode, privacy zones, export settings. Only meant for moving/sharing a piece of work.
 
-### 6.2 Preferenze e stato
-- **Preferenze globali** nella cartella di configurazione del sistema: ultimo layout usato (applicato ai nuovi video e preselezionato nell'export), ultime impostazioni di export, file recenti, finestra/pannelli, sistema di unità, provider mappe e chiavi API, zone di privacy globali.
-- **Stato per video** in un archivio interno dell'app (chiave: identità del file): GPX/FIT collegati, scarto di sincronizzazione, layout scelto, posizione di riproduzione. Nessun file creato accanto ai video.
-- Apertura per trascinamento nella finestra o da "Apri con".
+### 6.2 Preferences and state
+- **Global preferences** in the system configuration folder: last layout used (applied to new videos and preselected in export), last export settings, recent files, window/panels, unit system, map provider and API keys, global privacy zones.
+- **Per-video state** in an internal app store (key: file identity): linked GPX/FIT, sync offset, chosen layout, playback position. No files are created next to the videos.
+- Opening by dragging into the window or from "Open with".
 
-### 6.3 Associazione ai formati
-- **Windows**: all'avvio, se l'app non è registrata, chiede (con opzione **"Non chiedere più"**) di aggiungersi al menu **"Apri con"** per i formati comuni delle action camera: `.mp4`, `.mov`, `.lrv`, `.insv`. Registrazione solo per l'utente corrente (`HKCU\Software\Classes`, senza privilegi di amministratore) tramite `OpenWithProgids`; non si tenta di diventare l'app predefinita (Windows lo impedisce per programma). Se l'eseguibile è stato spostato, il percorso registrato viene aggiornato in silenzio all'avvio. Nelle preferenze: voce per rimuovere la registrazione.
-- **macOS**: tipi di documento dichiarati nell'`Info.plist` del bundle (nessuna richiesta all'utente).
-- **Linux**: azione facoltativa "Integra nel sistema" che installa un file `.desktop` con i tipi MIME in `~/.local/share/applications`.
+### 6.3 File association
+- **Windows**: at startup, if the app is not registered, it asks (with a **"Don't ask again"** option) to add itself to the **"Open with"** menu for the common action camera formats: `.mp4`, `.mov`, `.lrv`, `.insv`. Registration for the current user only (`HKCU\Software\Classes`, without administrator privileges) via `OpenWithProgids`; no attempt is made to become the default app (Windows prevents this programmatically). If the executable has been moved, the registered path is updated silently at startup. In preferences: an entry to remove the registration.
+- **macOS**: document types declared in the bundle's `Info.plist` (no prompt to the user).
+- **Linux**: optional "Integrate with system" action that installs a `.desktop` file with the MIME types in `~/.local/share/applications`.
 
-## 7. Export e mappe
+## 7. Export and maps
 
 **Export**
-- Pipeline a stadi in parallelo: decodifica HW → render overlay multi-thread (frame indipendenti) → composizione → codifica.
-- **Video finale**: H.264/H.265 con encoder HW (VideoToolbox, NVENC/QSV/AMF, VA-API), fallback x264/x265. Audio copiato. Frame rate e risoluzione dell'originale.
-- **Solo overlay**: ProRes 4444 con alpha, oppure sequenza PNG.
-- Intervallo esportabile (in/out), avanzamento con tempo stimato, annullamento che lascia un file valido.
-- CLI: `actionlay export --layout L --out O VIDEO…` con gli stessi crate.
+- Pipeline with parallel stages: HW decoding → multi-threaded overlay render (independent frames) → compositing → encoding.
+- **Final video**: H.264/H.265 with HW encoder (VideoToolbox, NVENC/QSV/AMF, VA-API), x264/x265 fallback. Audio copied. Frame rate and resolution of the original.
+- **Overlay only**: ProRes 4444 with alpha, or PNG sequence.
+- Exportable range (in/out), progress with estimated time, cancellation that leaves a valid file.
+- CLI: `actionlay export --layout L --out O VIDEO…` with the same crates.
 
-**Mappe**
-- Provider configurabili (OSM e gli altri dell'originale), chiavi API nelle preferenze.
-- Cache su disco condivisa; prefetch in background dei tile dell'area del percorso all'apertura del video.
-- Rispetto delle regole d'uso OSM (user-agent identificativo, rate limit, niente download massivi) e attribuzione visibile.
-- Offline: si usano i tile in cache, riquadri grigi dove mancano, nessun errore bloccante.
+**Maps**
+- Configurable providers (OSM and the others from the original), API keys in preferences.
+- Shared disk cache; background prefetch of the tiles of the route area when the video is opened.
+- Compliance with the OSM usage policy (identifying user-agent, rate limit, no bulk downloads) and visible attribution.
+- Offline: cached tiles are used, grey tiles where missing, no blocking errors.
 
-## 8. Errori e test
+## 8. Errors and tests
 
-**Errori**: log su file a rotazione (`tracing`) nella cartella dell'app, indicato all'utente in caso di crash. Messaggi non bloccanti per problemi non fatali (HW assente, tile, GPX fuori intervallo). Buchi di telemetria gestiti come in §4.4.
+**Errors**: rotating log file (`tracing`) in the app folder, pointed out to the user in case of a crash. Non-blocking messages for non-fatal problems (missing HW, tiles, GPX out of range). Telemetry gaps handled as in §4.4.
 
-**Test**
-- `telemetry`: tracce GPMF reali (in locale `samples/hero7-GX013370.gpmd.bin`, 840 KB, non committata; in CI tracce pubblicabili da reperire) confrontate con i valori prodotti dall'originale; unione GPX/FIT; GPSU; timelapse.
-- `layout`: round-trip JSON, validazione schema, importazione di **tutti i 13 layout** senza errori.
-- `render`: **immagini di riferimento** generate con l'originale (Python, solo strumento di sviluppo, non distribuito) per ogni widget e layout, confrontate con tolleranza misurata; snapshot propri per le regressioni.
-- `media`: spezzoni di 2–3 s tagliati dai campioni reali per seek preciso, passaggio tra capitoli, allineamento A/V.
-- End-to-end CLI: export di 3 s, verifica tracce con ffprobe, confronto di frame campione.
-- CI GitHub Actions su macOS, Windows x64, Linux x64.
+**Tests**
+- `telemetry`: real GPMF tracks (locally `samples/hero7-GX013370.gpmd.bin`, 840 KB, not committed; in CI, publishable tracks to be found) compared with the values produced by the original; GPX/FIT merging; GPSU; timelapse.
+- `layout`: JSON round-trip, schema validation, import of **all 13 layouts** without errors.
+- `render`: **reference images** generated with the original (Python, development tool only, not distributed) for each widget and layout, compared with a measured tolerance; own snapshots for regressions.
+- `media`: 2–3 s clips cut from the real samples for precise seek, chapter transitions, A/V alignment.
+- End-to-end CLI: 3 s export, track verification with ffprobe, comparison of sample frames.
+- GitHub Actions CI on macOS, Windows x64, Linux x64.
 
-**Campioni grandi**: fuori dal repo (`samples/`, ignorati da git), scaricati da uno script. Il primo campione (`GX013370.MP4`, HERO7) è documentato in `samples/README.md`. Contiene posizioni GPS reali: **non va pubblicato** (decisione del proprietario). Né il video né la telemetria estratta vanno committati; la CI usa solo campioni sintetici o pubblicabili.
+**Large samples**: outside the repo (`samples/`, ignored by git), downloaded by a script. The first sample (`GX013370.MP4`, HERO7) is documented in `samples/README.md`. It contains real GPS positions: **it must not be published** (owner's decision). Neither the video nor the extracted telemetry may be committed; CI uses only synthetic or publishable samples.
 
-## 9. Distribuzione e piattaforme
+## 9. Distribution and platforms
 
-- **ffmpeg**: release stabile fissata (all'avvio: **n9.0.2**, allineata ai binding `ffmpeg-next`/`ffmpeg-sys-next` 9.0); compilato statico da script nel repo con `--enable-gpl`, **mai `--enable-nonfree`**, solo codec/formati necessari. Compilarlo staticamente in CI su tre piattaforme è il **secondo rischio infrastrutturale** dopo il player.
-- Font, icone e layout predefiniti incorporati nel binario.
-- **Windows** 10 1809+ x64: un `.exe` con runtime C statico.
-- **macOS** 12+: bundle `.app` universale (arm64 + x86_64) in `.dmg`.
-- **Linux** x64: un AppImage, baseline glibc 2.31 (Ubuntu 20.04); Vulkan o OpenGL dal sistema.
-- Peso atteso: 40–70 MB per piattaforma.
-- Rust edition 2024, toolchain stabile fissata con `rust-toolchain.toml`.
-- Rilasci su GitHub Releases costruiti dalla CI. **Nessuna firma del codice** per ora (istruzioni nel README per Gatekeeper/SmartScreen); CI predisposta per aggiungerla.
-- Licenze: tutto compatibile con GPL-3 (ffmpeg GPL-2.0-or-later, x264/x265 GPL-2.0-or-later, telemetry-parser Apache-2.0, crate MIT/Apache, Roboto Apache-2.0, Tabler MIT). Ogni release include `THIRD_PARTY_LICENSES` (visibile anche in "Informazioni") e l'archivio dei sorgenti di ffmpeg e delle librerie collegate con le opzioni di build. Brevetti H.264/H.265: con encoder/decoder HW il problema è del produttore; x264/x265 software sono distribuiti come fanno VLC/HandBrake/Shotcut.
-- Lingua del repo: README, commenti e messaggi di commit in **inglese** (convenzione dei progetti Rust open source); i documenti di design restano in italiano finché il progetto è privato; interfaccia localizzabile (inglese + italiano in v1).
+- **ffmpeg**: pinned stable release (at start: **n9.0.2**, aligned with the `ffmpeg-next`/`ffmpeg-sys-next` 9.0 bindings); statically built from a script in the repo with `--enable-gpl`, **never `--enable-nonfree`**, only the necessary codecs/formats. Building it statically in CI on three platforms is the **second infrastructure risk** after the player.
+- Fonts, icons, and default layouts embedded in the binary.
+- **Windows** 10 1809+ x64: a single `.exe` with static C runtime.
+- **macOS** 12+: universal `.app` bundle (arm64 + x86_64) in a `.dmg`.
+- **Linux** x64: an AppImage, glibc 2.31 baseline (Ubuntu 20.04); Vulkan or OpenGL from the system.
+- Expected size: 40–70 MB per platform.
+- Rust edition 2024, stable toolchain pinned with `rust-toolchain.toml`.
+- Releases on GitHub Releases built by CI. **No code signing** for now (instructions in the README for Gatekeeper/SmartScreen); CI set up to add it.
+- Licenses: everything compatible with GPL-3 (ffmpeg GPL-2.0-or-later, x264/x265 GPL-2.0-or-later, telemetry-parser Apache-2.0, MIT/Apache crates, Roboto Apache-2.0, Tabler MIT). Every release includes `THIRD_PARTY_LICENSES` (also visible in "About") and the source archive of ffmpeg and the linked libraries with the build options. H.264/H.265 patents: with HW encoders/decoders the issue lies with the manufacturer; software x264/x265 are distributed the way VLC/HandBrake/Shotcut do.
+- Repository language: all repository documentation (README, design docs, code comments, and commit messages) is in **English** (the convention of open source Rust projects); the interface is localizable (English + Italian in v1).
 
-## 10. Fasi interne (ordine di sviluppo)
+## 10. Internal phases (development order)
 
-Ogni fase ha il suo piano di implementazione. Il rilascio pubblico avviene solo al completamento di tutte.
+Each phase has its own implementation plan. The public release happens only when all are complete.
 
-1. **M0 – Prototipo player (riduzione rischio)**: egui + wgpu + ffmpeg statico, decodifica HW, audio, su macOS e Windows, con il campione HERO7 a 100 fps e un 4K H.265 10 bit. Criterio: riproduzione fluida e A/V allineati. Se fallisce: ripiego su **libmpv statico** (GPL, compatibile) per la riproduzione, senza cambiare il resto dell'architettura. Include la build statica di ffmpeg in CI.
-2. **M1 – Telemetria**: crate `telemetry` + CLI di dump; confronto con l'originale.
-3. **M2 – Layout e render di base**: formato JSON, schema, widget testo/metrica/icona/data/frame, overlay nel player.
-4. **M3 – Importatore e tutti i widget**: mappe incluse, immagini di riferimento.
+1. **M0 – Player prototype (risk reduction)**: egui + wgpu + static ffmpeg, HW decoding, audio, on macOS and Windows, with the HERO7 sample at 100 fps and a 10-bit 4K H.265. Criterion: smooth playback and aligned A/V. If it fails: fall back to **static libmpv** (GPL, compatible) for playback, without changing the rest of the architecture. Includes the static ffmpeg build in CI.
+2. **M1 – Telemetry**: `telemetry` crate + dump CLI; comparison with the original.
+3. **M2 – Layout and basic render**: JSON format, schema, text/metric/icon/date/frame widgets, overlay in the player.
+4. **M3 – Importer and all widgets**: maps included, reference images.
 5. **M4 – Editor**.
 6. **M5 – Export** (app + CLI).
-7. **M6 – Fonti esterne e capitoli**: GPX/FIT, altre camere, capitoli, zone di privacy.
-8. **M7 – Rifinitura e distribuzione**: preferenze, "Apri con", pacchetti, licenze, v1.0.
+7. **M6 – External sources and chapters**: GPX/FIT, other cameras, chapters, privacy zones.
+8. **M7 – Polish and distribution**: preferences, "Open with", packages, licenses, v1.0.
 
 ## 11. Credits
 
-- [gopro-dashboard-overlay](https://github.com/time4tea/gopro-dashboard-overlay) di time4tea — ispirazione, know-how su GPMF, metriche e widget; layout originali convertiti.
-- [telemetry-parser](https://github.com/AdrianEddy/telemetry-parser), [Gyroflow](https://github.com/gyroflow/gyroflow) (riferimento architetturale), FFmpeg, OpenStreetMap contributors.
+- [gopro-dashboard-overlay](https://github.com/time4tea/gopro-dashboard-overlay) by time4tea — inspiration, know-how on GPMF, metrics, and widgets; original layouts converted.
+- [telemetry-parser](https://github.com/AdrianEddy/telemetry-parser), [Gyroflow](https://github.com/gyroflow/gyroflow) (architectural reference), FFmpeg, OpenStreetMap contributors.
