@@ -2,3 +2,4 @@
 /samples/*
 !/samples/README.md
 .DS_Store
+/.superpowers/
