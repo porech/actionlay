@@ -90,6 +90,31 @@ impl Snapshot {
     pub fn is_available(&self, m: Metric) -> bool {
         self.available[m.index()]
     }
+
+    /// Snapshot with the given values; every other metric is `Value::Absent`
+    /// and the listed metrics are marked available. Only for tests of
+    /// downstream crates (feature `test-util`).
+    #[cfg(feature = "test-util")]
+    pub fn for_test(
+        t: f64,
+        utc: Option<DateTime<Utc>>,
+        gps_lock: GpsLock,
+        values: &[(Metric, Value)],
+    ) -> Snapshot {
+        let mut storage = [Value::Absent; Metric::COUNT];
+        let mut available = [false; Metric::COUNT];
+        for &(m, v) in values {
+            storage[m.index()] = v;
+            available[m.index()] = true;
+        }
+        Snapshot {
+            t,
+            utc,
+            gps_lock,
+            values: storage,
+            available,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

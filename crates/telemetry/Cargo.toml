@@ -15,3 +15,11 @@ log.workspace = true
 # Only the integration tests read real MP4 files; the library itself never
 # links FFmpeg (checked by `cargo tree -e normal` in CI).
 actionlay-media = { path = "../media" }
+
+[features]
+# Public constructors used by other crates' tests (render goldens). Never enabled in release builds.
+test-util = []
+
+[[test]]
+name = "contract_additions"
+required-features = ["test-util"]
