@@ -15,3 +15,25 @@ pub fn sample(name: &str) -> Option<PathBuf> {
     }
     found
 }
+
+/// A public GoPro sample (scripts/fetch-gopro-samples.sh). None, and the
+/// test is skipped, when it was not downloaded — unless
+/// ACTIONLAY_REQUIRE_GOPRO_SAMPLES is set, as in CI.
+#[allow(dead_code)]
+pub fn gopro_sample(name: &str) -> Option<PathBuf> {
+    let dir = std::env::var_os("ACTIONLAY_GOPRO_SAMPLES")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/gopro"));
+    let path = dir.join(name);
+    if path.exists() {
+        return Some(path);
+    }
+    if std::env::var_os("ACTIONLAY_REQUIRE_GOPRO_SAMPLES").is_some() {
+        panic!(
+            "{} is missing: run scripts/fetch-gopro-samples.sh",
+            path.display()
+        );
+    }
+    eprintln!("sample {name} not found, skipping (run scripts/fetch-gopro-samples.sh)");
+    None
+}

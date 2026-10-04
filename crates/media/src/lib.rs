@@ -5,6 +5,7 @@ pub mod color;
 mod error;
 pub mod ffmpeg_info;
 pub mod frame;
+pub mod gpmf;
 pub mod hw;
 pub mod player;
 pub mod present;
