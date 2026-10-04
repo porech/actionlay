@@ -17,6 +17,10 @@ const GPMD_TAG: u32 = u32::from_le_bytes(*b"gpmd");
 
 /// Reads every packet of the GoPro metadata stream (codec tag `gpmd`,
 /// handler "GoPro MET"). `Ok(vec![])` when the file has no such stream.
+///
+/// Corrupt packets are skipped. A read error in the middle of the file (e.g.
+/// a truncated recording) is logged and the packets read so far are returned
+/// instead of an error: partial telemetry is better than none.
 pub fn read_gpmf_packets(path: &Path) -> Result<Vec<GpmfPacket>, MediaError> {
     ffmpeg_info::init();
     let mut input = ffmpeg::format::input(path)?;
@@ -41,8 +45,21 @@ pub fn read_gpmf_packets(path: &Path) -> Result<Vec<GpmfPacket>, MediaError> {
         }
     }
     let mut packets = Vec::new();
-    for (stream, packet) in input.packets() {
-        if stream.index() != index {
+    let mut packet = ffmpeg::Packet::empty();
+    loop {
+        match packet.read(&mut input) {
+            Ok(()) => {}
+            Err(ffmpeg::Error::Eof) => break,
+            Err(ffmpeg::Error::InvalidData) => continue,
+            Err(e) => {
+                log::warn!(
+                    "gpmd read stopped by error after {} packets, returning them: {e}",
+                    packets.len()
+                );
+                break;
+            }
+        }
+        if packet.stream() != index {
             continue;
         }
         let (Some(ts), Some(data)) = (packet.pts().or(packet.dts()), packet.data()) else {
