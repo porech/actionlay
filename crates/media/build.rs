@@ -9,8 +9,8 @@ fn main() {
         .expect("FFMPEG_DIR is not set: run scripts/build-ffmpeg.sh, then `source scripts/env.sh`");
     let path = PathBuf::from(dir).join("extralibs.txt");
     println!("cargo:rerun-if-changed={}", path.display());
-    let text = fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
+    let text =
+        fs::read_to_string(&path).unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
 
     let mut seen = BTreeSet::new();
     let mut tokens = text.split_whitespace();
@@ -22,10 +22,10 @@ fn main() {
         } else {
             token.strip_suffix(".lib").map(str::to_string)
         };
-        if let Some(d) = directive {
-            if seen.insert(d.clone()) {
-                println!("cargo:rustc-link-lib={d}");
-            }
+        if let Some(d) = directive
+            && seen.insert(d.clone())
+        {
+            println!("cargo:rustc-link-lib={d}");
         }
     }
 }

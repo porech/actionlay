@@ -54,17 +54,20 @@ make distclean >/dev/null 2>&1 || true
 make -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
 make install
 
-# FFmpeg's own system-library requirements (frameworks, -lm, -lva, ...),
-# consumed by crates/media/build.rs.
-grep '^EXTRALIBS' ffbuild/config.mak | cut -d= -f2- > "$PREFIX/extralibs.txt"
-
 case "$TARGET" in
   *windows-msvc)
     # rustc looks for avcodec.lib, FFmpeg's MSVC build installs libavcodec.a
+    shopt -s nullglob
     for f in "$PREFIX"/lib/lib*.a; do
       base="$(basename "$f" .a)"
       mv "$f" "$PREFIX/lib/${base#lib}.lib"
-    done ;;
+    done
+    shopt -u nullglob ;;
 esac
+
+# FFmpeg's own system-library requirements (frameworks, -lm, -lva, ...),
+# consumed by crates/media/build.rs. Written last: it doubles as the
+# "build complete" marker checked at the top of this script.
+grep '^EXTRALIBS' ffbuild/config.mak | cut -d= -f2- > "$PREFIX/extralibs.txt"
 
 echo "FFmpeg $FFMPEG_TAG installed in $PREFIX"
