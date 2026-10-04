@@ -33,8 +33,8 @@ as a single executable for Windows, macOS and Linux.
 | **M0** ✅ | Video player with hardware decoding and synced audio |
 | M1 | Telemetry from GoPro files (GPS, speed, altitude, accelerometer, …) |
 | M2 | Dashboard overlay drawn live on the video |
-| M3 | All dashboard widgets: gauges, charts, compasses, moving and journey maps. Layouts from gopro-dashboard-overlay can be imported |
-| M4 | Visual layout editor: add, move, resize and configure widgets, with anchors that adapt to any resolution or aspect ratio |
+| M3 | All dashboard widgets: gauges, charts, compasses, moving and journey maps, plus a G-meter. Every widget is deeply customisable, with good defaults and a polished look when data is missing. Layouts from gopro-dashboard-overlay can be imported |
+| M4 | Visual layout editor: add, move, resize and style widgets, with anchors that adapt to any resolution or aspect ratio. It warns you when a widget can't work with the data in your video, and layouts can be shared as files |
 | M5 | Export: the final video, or a transparent overlay-only track (ProRes 4444 / PNG) for your video editor |
 | M6 | GPX/FIT files from bike computers and watches, other cameras (DJI, Insta360, …), and GoPro chapters joined automatically |
 | M7 | Polished releases for Windows, macOS and Linux |
