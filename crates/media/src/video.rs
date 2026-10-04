@@ -4,7 +4,7 @@ use ffmpeg_next::{format::Pixel, frame, software::scaling};
 
 use crate::{
     MediaError,
-    frame::{Nv12Frame, p010_to_nv12, pack_nv12},
+    frame::{Nv12Frame, p010_to_nv12, pack_nv12, yuv420p_to_nv12, yuv420p10_to_nv12},
     hw::{self, HwKind},
 };
 
@@ -13,7 +13,8 @@ pub struct VideoDecoder {
     time_base: f64,
     hw: Option<HwKind>,
     backend: &'static str,
-    scaler: Option<(Pixel, scaling::Context)>,
+    scaler: Option<((Pixel, u32, u32), scaling::Context)>,
+    warned_sw_fallback: bool,
 }
 
 impl VideoDecoder {
@@ -32,6 +33,7 @@ impl VideoDecoder {
                         hw: Some(kind),
                         backend: "unknown",
                         scaler: None,
+                        warned_sw_fallback: false,
                     });
                 }
                 Err(e) => log::warn!("hardware decoding unavailable, using software: {e}"),
@@ -48,6 +50,7 @@ impl VideoDecoder {
             hw: None,
             backend: "software",
             scaler: None,
+            warned_sw_fallback: false,
         })
     }
 
@@ -94,6 +97,15 @@ impl VideoDecoder {
             hw::download(&decoded).map_err(MediaError::Hw)?
         } else {
             self.backend = "software";
+            if let Some(kind) = self.hw
+                && !self.warned_sw_fallback
+            {
+                self.warned_sw_fallback = true;
+                log::warn!(
+                    "{} hwaccel attached but the stream is being decoded in software (get_format fell back)",
+                    kind.name()
+                );
+            }
             decoded
         };
         Ok(Some(self.convert_to_nv12(&sw, pts)?))
@@ -104,9 +116,30 @@ impl VideoDecoder {
         let (y, uv) = match f.format() {
             Pixel::NV12 => pack_nv12(w, h, f.data(0), f.stride(0), f.data(1), f.stride(1)),
             Pixel::P010LE => p010_to_nv12(w, h, f.data(0), f.stride(0), f.data(1), f.stride(1)),
+            Pixel::YUV420P | Pixel::YUVJ420P => yuv420p_to_nv12(
+                w,
+                h,
+                f.data(0),
+                f.stride(0),
+                f.data(1),
+                f.stride(1),
+                f.data(2),
+                f.stride(2),
+            ),
+            Pixel::YUV420P10LE => yuv420p10_to_nv12(
+                w,
+                h,
+                f.data(0),
+                f.stride(0),
+                f.data(1),
+                f.stride(1),
+                f.data(2),
+                f.stride(2),
+            ),
             other => {
+                let key = (other, w, h);
                 let scaler = match &mut self.scaler {
-                    Some((fmt, s)) if *fmt == other => s,
+                    Some((k, s)) if *k == key => s,
                     slot => {
                         let s = scaling::Context::get(
                             other,
@@ -117,7 +150,7 @@ impl VideoDecoder {
                             h,
                             scaling::Flags::BILINEAR,
                         )?;
-                        &mut slot.insert((other, s)).1
+                        &mut slot.insert((key, s)).1
                     }
                 };
                 let mut out = frame::Video::new(Pixel::NV12, w, h);

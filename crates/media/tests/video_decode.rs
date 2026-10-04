@@ -67,3 +67,47 @@ fn falls_back_to_software_when_hw_disabled() {
     assert_eq!(pts.len(), 3);
     assert_eq!(backend, "software");
 }
+
+fn first_frame_mean_luma(path: &std::path::Path, prefer_hw: bool) -> f64 {
+    let info = probe(path).unwrap();
+    let mut input = ffmpeg::format::input(path).unwrap();
+    let params = input.stream(info.video.stream_index).unwrap().parameters();
+    let mut dec = VideoDecoder::open(params, info.video.time_base, prefer_hw).unwrap();
+    for (stream, packet) in input.packets() {
+        if stream.index() != info.video.stream_index {
+            continue;
+        }
+        dec.send(&packet).unwrap();
+        if let Some(f) = dec.receive().unwrap() {
+            let sum: u64 = f.y.iter().map(|&v| u64::from(v)).sum();
+            return sum as f64 / f.y.len() as f64;
+        }
+    }
+    panic!("no frame decoded");
+}
+
+#[test]
+fn full_range_white_flash_is_preserved_on_both_paths() {
+    let Some(path) = common::sample("hevc8-1440p100-sync.mp4") else {
+        return;
+    };
+    let hw = first_frame_mean_luma(&path, true);
+    let sw = first_frame_mean_luma(&path, false);
+    eprintln!("full range white: hw={hw} sw={sw}");
+    assert!(hw >= 250.0, "hw luma {hw}");
+    assert!(sw >= 250.0, "sw luma {sw}");
+    assert!((hw - sw).abs() <= 2.0, "hw {hw} vs sw {sw}");
+}
+
+#[test]
+fn limited_range_ten_bit_white_flash_matches_on_both_paths() {
+    let Some(path) = common::sample("hevc10-2160p60-sync.mp4") else {
+        return;
+    };
+    let hw = first_frame_mean_luma(&path, true);
+    let sw = first_frame_mean_luma(&path, false);
+    eprintln!("limited range white: hw={hw} sw={sw}");
+    assert!((hw - 235.0).abs() <= 2.0, "hw luma {hw}");
+    assert!((sw - 235.0).abs() <= 2.0, "sw luma {sw}");
+    assert!((hw - sw).abs() <= 2.0, "hw {hw} vs sw {sw}");
+}
