@@ -65,6 +65,16 @@ jobs:
         if: runner.os == 'Windows'
         run: echo "LIBCLANG_PATH=C:\\Program Files\\LLVM\\bin" >> "$GITHUB_ENV"
 
+      # Git Bash puts its own /usr/bin/link.exe (coreutils) ahead of MSVC's
+      # linker, so point cargo at MSVC's link.exe explicitly.
+      - name: MSVC linker for cargo (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $link = (Get-Command link.exe -CommandType Application | Where-Object { $_.Source -like '*MSVC*' } | Select-Object -First 1).Source
+          if (-not $link) { throw "MSVC link.exe not found on PATH" }
+          "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=$link" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Synthetic samples (macOS/Linux)
         if: runner.os != 'Windows'
         run: ./scripts/make-synthetic-samples.sh && echo "ACTIONLAY_SAMPLES=$GITHUB_WORKSPACE/samples/synthetic" >> "$GITHUB_ENV"
