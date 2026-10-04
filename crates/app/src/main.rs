@@ -40,7 +40,7 @@ impl eframe::App for App {
             && let Some(frame) = p.poll_frame()
         {
             let color = p.info().video.color;
-            self.view.upload(&frame, color);
+            self.view.upload(frame, color);
         }
 
         egui::Panel::bottom("transport").show(ui, |ui| {
@@ -60,8 +60,14 @@ impl eframe::App for App {
         });
 
         // keep repainting while playing; when paused, egui repaints on input
-        if self.player.as_ref().is_some_and(|p| !p.is_paused()) {
-            ui.ctx().request_repaint();
+        if let Some(p) = &self.player {
+            if !p.is_paused() {
+                ui.ctx().request_repaint();
+            } else if p.is_awaiting_frame() {
+                // paused but a frame (open/seek/step) is still being decoded
+                ui.ctx()
+                    .request_repaint_after(std::time::Duration::from_millis(16));
+            }
         }
     }
 }

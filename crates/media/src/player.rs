@@ -218,6 +218,11 @@ impl Player {
         self.clock.is_paused()
     }
 
+    /// True while a frame requested by open/seek/step has not been delivered yet.
+    pub fn is_awaiting_frame(&self) -> bool {
+        self.awaiting_seek_frame
+    }
+
     pub fn play(&mut self) {
         if !self.is_paused() {
             return;

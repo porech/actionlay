@@ -148,9 +148,9 @@ impl VideoView {
         }
     }
 
-    pub fn upload(&mut self, frame: &Nv12Frame, color: ColorInfo) {
+    pub fn upload(&mut self, frame: Nv12Frame, color: ColorInfo) {
         self.size = Some((frame.width, frame.height));
-        *self.pending.lock().unwrap() = Some((frame.clone(), color));
+        *self.pending.lock().unwrap() = Some((frame, color));
     }
 
     pub fn show(&mut self, ui: &mut egui::Ui, rect: egui::Rect) {
