@@ -1,0 +1,18 @@
+[workspace]
+resolver = "3"
+members = ["crates/media", "crates/app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+[workspace.dependencies]
+ffmpeg-next = { version = "9.0", default-features = false, features = ["codec", "format", "software-resampling", "software-scaling", "static"] }
+crossbeam-channel = "0.5"
+cpal = "0.18"
+ringbuf = "0.5"
+thiserror = "2"
+log = "0.4"
+anyhow = "1"

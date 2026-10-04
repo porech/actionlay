@@ -1,0 +1,93 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools (macOS)
+        if: runner.os == 'macOS'
+        run: brew install nasm ffmpeg
+
+      - name: Install build tools (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y nasm libva-dev libasound2-dev ffmpeg
+
+      - name: MSVC environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: MSYS2 tools (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          path-type: inherit
+          install: make nasm diffutils git
+
+      - name: Cache FFmpeg
+        uses: actions/cache@v4
+        with:
+          path: third_party/ffmpeg
+          key: ffmpeg-${{ matrix.target }}-${{ hashFiles('scripts/ffmpeg-version.env', 'scripts/build-ffmpeg.sh') }}
+
+      - name: Build FFmpeg (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: ./scripts/build-ffmpeg.sh ${{ matrix.target }}
+
+      - name: Build FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          if [ -f /usr/bin/link.exe ]; then mv /usr/bin/link.exe /usr/bin/link.exe.bak; fi
+          ./scripts/build-ffmpeg.sh ${{ matrix.target }}
+
+      - name: Export FFMPEG_DIR
+        run: echo "FFMPEG_DIR=$GITHUB_WORKSPACE/third_party/ffmpeg/${{ matrix.target }}" >> "$GITHUB_ENV"
+
+      - name: libclang for bindgen (Windows)
+        if: runner.os == 'Windows'
+        run: echo "LIBCLANG_PATH=C:\\Program Files\\LLVM\\bin" >> "$GITHUB_ENV"
+
+      - name: Synthetic samples (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: ./scripts/make-synthetic-samples.sh && echo "ACTIONLAY_SAMPLES=$GITHUB_WORKSPACE/samples/synthetic" >> "$GITHUB_ENV"
+
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      # Player tests open the audio device and are timing-sensitive, so they
+      # must not run concurrently. Every other test is fast; running the whole
+      # workspace single-threaded keeps each test running exactly once (a
+      # per-target split cannot exclude only tests/player.rs, and
+      # `--exclude actionlay-media` fails while it is the only member).
+      - run: cargo test --workspace -- --test-threads=1
+
+      - name: Build release binaries
+        run: cargo build --release -p actionlay-app -p actionlay-media --bins
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: actionlay-${{ matrix.target }}
+          path: |
+            target/release/actionlay
+            target/release/actionlay.exe
+            target/release/decode-bench
+            target/release/decode-bench.exe
+          if-no-files-found: error
