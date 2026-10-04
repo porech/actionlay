@@ -1,4 +1,5 @@
 //! Media layer of ActionLay: FFmpeg access, decoding, audio output, playback.
+pub mod audio;
 pub mod clock;
 pub mod color;
 mod error;
