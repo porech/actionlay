@@ -91,7 +91,9 @@ const UNKNOWN_DOP: f64 = 99.99;
 pub(crate) fn extract(packets: &[RawPacket]) -> Extracted {
     let mut out = Extracted::default();
     let mut gps9 = Vec::new();
-    let mut warned = std::collections::HashSet::new();
+    let mut totals = std::collections::BTreeMap::<&'static str, usize>::new();
+    let mut tally = Tally::default();
+    let mut notes = Vec::new();
     for (k, p) in packets.iter().enumerate() {
         out.duration = out.duration.max(p.pts + p.duration);
         let items = match gpmf::parse(&p.data) {
@@ -125,7 +127,7 @@ pub(crate) fn extract(packets: &[RawPacket]) -> Extracted {
                 } else if s.has(b"GPS5") {
                     ("GPS5", s.gps5(k, p, &mut out.gps))
                 } else if s.has(b"ACCL") {
-                    ("ACCL", s.accl(p, &mut out.accl, &mut out.warnings))
+                    ("ACCL", s.accl(p, &mut out.accl, &mut notes))
                 } else if s.has(b"GRAV") {
                     ("GRAV", s.grav(p, &mut out.grav))
                 } else if s.has(b"CORI") {
@@ -133,18 +135,21 @@ pub(crate) fn extract(packets: &[RawPacket]) -> Extracted {
                 } else {
                     ("", Ok(()))
                 };
-                // A bad item skips that stream in this payload only; warn
-                // once per stream kind, not once per packet.
-                if let Err(e) = r
-                    && warned.insert(kind)
-                {
-                    let msg = format!("gpmd packet {k}: {kind} stream skipped: {e}");
-                    log::warn!("{msg}");
-                    out.warnings.push(msg);
+                // A bad item skips that stream in this payload only; the
+                // losses are tallied and reported once per kind below.
+                if !kind.is_empty() {
+                    *totals.entry(kind).or_default() += 1;
+                }
+                if let Err(e) = r {
+                    tally.note(kind, "skipped", k, e.to_string());
+                }
+                for (key, action, reason) in notes.drain(..) {
+                    tally.note(key, action, k, reason);
                 }
             }
         }
     }
+    tally.report(&totals, &mut out.warnings);
     // Cameras that write GPS9 (HERO11+) may also write GPS5: prefer GPS9.
     if !gps9.is_empty() {
         out.gps = gps9;
@@ -155,6 +160,51 @@ pub(crate) fn extract(packets: &[RawPacket]) -> Extracted {
     }
     out.temp.sort_by(|a, b| a.t.total_cmp(&b.t));
     out
+}
+
+/// (key, what happened, why): a problem found in one payload.
+type Note = (&'static str, &'static str, String);
+
+struct Loss {
+    action: &'static str,
+    count: usize,
+    first_packet: usize,
+    reason: String,
+}
+
+/// Payloads lost or degraded, per kind, reported once after the loop.
+#[derive(Default)]
+struct Tally(std::collections::BTreeMap<&'static str, Loss>);
+
+impl Tally {
+    fn note(&mut self, key: &'static str, action: &'static str, packet: usize, reason: String) {
+        self.0
+            .entry(key)
+            .and_modify(|l| l.count += 1)
+            .or_insert(Loss {
+                action,
+                count: 1,
+                first_packet: packet,
+                reason,
+            });
+    }
+
+    fn report(
+        &self,
+        totals: &std::collections::BTreeMap<&'static str, usize>,
+        out: &mut Vec<String>,
+    ) {
+        for (key, l) in &self.0 {
+            let base = key.split(' ').next().unwrap_or(key);
+            let total = totals.get(base).copied().unwrap_or(l.count);
+            let msg = format!(
+                "{key}: {} of {total} payloads {} ({}); first at packet {}",
+                l.count, l.action, l.reason, l.first_packet
+            );
+            log::warn!("{msg}");
+            out.push(msg);
+        }
+    }
 }
 
 /// Sample i of n in packet p: `(start, end)`.
@@ -280,19 +330,23 @@ impl<'a> Stream<'a> {
         &self,
         p: &RawPacket,
         out: &mut Vec<Sample<3>>,
-        warnings: &mut Vec<String>,
+        notes: &mut Vec<Note>,
     ) -> Result<(), GpmfError> {
         if let Some(unit) = self.get(b"SIUN").and_then(Klv::text)
             && unit != "m/s²"
         {
-            warnings.push(format!("ACCL in unsupported unit {unit:?}, ignored"));
+            notes.push(("ACCL unit", "skipped", format!("unsupported unit {unit:?}")));
             return Ok(());
         }
         let orin = self.get(b"ORIN").and_then(Klv::text);
         let orin = match orin.as_deref() {
             Some(o) if orient(o, &[0.0; 3]).is_some() => o.to_string(),
             Some(o) => {
-                warnings.push(format!("unknown ORIN {o:?}, using {DEFAULT_ORIN}"));
+                notes.push((
+                    "ACCL ORIN",
+                    "read with the default orientation",
+                    format!("unknown ORIN {o:?}, using {DEFAULT_ORIN}"),
+                ));
                 DEFAULT_ORIN.to_string()
             }
             None => DEFAULT_ORIN.to_string(),
@@ -618,7 +672,63 @@ mod tests {
         assert_eq!(ex.accl.len(), 2);
         assert_eq!(ex.temp.len(), 2);
         assert_eq!(ex.warnings.len(), 1, "{:?}", ex.warnings);
-        assert!(ex.warnings[0].contains("GPS5"));
+        assert!(ex.warnings[0].starts_with("GPS5: 2 of 2 payloads skipped"));
+        assert!(ex.warnings[0].contains("first at packet 0"));
         assert!(ex.first_error.is_none());
+    }
+
+    #[test]
+    fn later_good_payloads_survive_a_bad_one() {
+        let bad = nested(
+            b"STRM",
+            &[
+                item(b"SCAL", b'l', 4, 1, &i32s(&[0])),
+                item(b"GPS5", b'l', 20, 1, &i32s(&[45, 7, 100, 1, 1])),
+            ],
+        );
+        let good = |pts| {
+            packet(
+                pts,
+                1.0,
+                &[gps5_stream("170417173103.500", 3, 100, &[[1.0; 5]])],
+            )
+        };
+        let ex = extract(&[packet(0.0, 1.0, &[bad]), good(1.0), good(2.0)]);
+        assert_eq!(ex.gps.len(), 2);
+        assert_eq!(ex.gps[0].packet, 1);
+        assert_eq!(ex.warnings.len(), 1, "{:?}", ex.warnings);
+        assert!(ex.warnings[0].starts_with("GPS5: 1 of 3 payloads skipped"));
+    }
+
+    #[test]
+    fn accl_unit_and_orin_warnings_are_summarised_once() {
+        let strm = |siun: &[u8; 4], orin: &str| {
+            nested(
+                b"STRM",
+                &[
+                    item(b"SIUN", b'c', 4, 1, siun),
+                    item(b"SCAL", b's', 2, 1, &1i16.to_be_bytes()),
+                    item(b"ORIN", b'c', 1, 3, orin.as_bytes()),
+                    item(b"ACCL", b's', 6, 1, &i16s(&[1, 2, 3])),
+                ],
+            )
+        };
+        let bad_unit = [
+            packet(0.0, 1.0, &[strm(b"rpm\0", "ZXY")]),
+            packet(1.0, 1.0, &[strm(b"rpm\0", "ZXY")]),
+        ];
+        let ex = extract(&bad_unit);
+        assert!(ex.accl.is_empty());
+        assert_eq!(ex.warnings.len(), 1, "{:?}", ex.warnings);
+        assert!(ex.warnings[0].starts_with("ACCL unit: 2 of 2 payloads skipped"));
+
+        let bad_orin = [
+            packet(0.0, 1.0, &[strm(b"m/s\xb2", "QQQ")]),
+            packet(1.0, 1.0, &[strm(b"m/s\xb2", "QQQ")]),
+        ];
+        let ex = extract(&bad_orin);
+        assert_eq!(ex.accl.len(), 2);
+        assert_eq!(ex.warnings.len(), 1, "{:?}", ex.warnings);
+        assert!(ex.warnings[0].starts_with("ACCL ORIN: 2 of 2 payloads"));
     }
 }
