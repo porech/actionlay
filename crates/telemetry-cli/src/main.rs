@@ -30,13 +30,13 @@ enum Cmd {
     Dump {
         video: PathBuf,
         /// Seconds between rows
-        #[arg(long, default_value_t = 1.0)]
+        #[arg(long, default_value_t = 1.0, value_parser = parse_every, allow_negative_numbers = true)]
         every: f64,
         #[arg(long, value_enum, default_value_t = Format::Csv)]
         format: Format,
-        /// One CSV row per GPS sample; the first nine columns match
-        /// gopro-to-csv's
-        #[arg(long)]
+        /// One CSV row per GPS sample, always CSV; eight of the first nine
+        /// columns match gopro-to-csv's (the date is not compared)
+        #[arg(long, conflicts_with_all = ["format", "every"])]
         points: bool,
         #[command(flatten)]
         lock: LockArgs,
@@ -47,6 +47,26 @@ enum Cmd {
         #[command(flatten)]
         lock: LockArgs,
     },
+}
+
+fn parse_every(s: &str) -> Result<f64, String> {
+    let v: f64 = s.parse().map_err(|_| format!("`{s}` is not a number"))?;
+    if v > 0.0 && v.is_finite() {
+        Ok(v)
+    } else {
+        Err("must be a positive, finite number of seconds".into())
+    }
+}
+
+/// A float for CSV/JSON output: non-finite values have no representation.
+fn num(v: f64) -> Option<String> {
+    v.is_finite().then(|| v.to_string())
+}
+
+/// `t` rounded to milliseconds, without float noise (0.30000000000000004).
+fn t_text(t: f64) -> String {
+    let s = format!("{t:.3}");
+    s.trim_end_matches('0').trim_end_matches('.').to_string()
 }
 
 #[derive(Args)]
@@ -78,8 +98,6 @@ fn main() -> ExitCode {
             let mut out = BufWriter::new(io::stdout().lock());
             let r = if *points {
                 dump_points(&tel, &mut out)
-            } else if *every <= 0.0 {
-                return Err("--every must be positive".into());
             } else {
                 match format {
                     Format::Csv => dump_csv(&tel, *every, &mut out),
@@ -171,16 +189,12 @@ fn dump_csv(tel: &Telemetry, every: f64, out: &mut impl Write) -> io::Result<()>
         let s = tel.sample(t);
         let values: Vec<String> = metrics
             .iter()
-            .map(|&m| {
-                s.get(m)
-                    .present()
-                    .map(|v| v.to_string())
-                    .unwrap_or_default()
-            })
+            .map(|&m| s.get(m).present().and_then(num).unwrap_or_default())
             .collect();
         writeln!(
             out,
-            "{t},{},{:?},{}",
+            "{},{},{:?},{}",
+            t_text(t),
             utc_text(s.utc),
             s.gps_lock,
             values.join(",")
@@ -197,10 +211,12 @@ fn dump_json(tel: &Telemetry, every: f64, out: &mut impl Write) -> io::Result<()
         let values: Vec<String> = metrics
             .iter()
             .filter_map(|&m| match s.get(m) {
-                Value::Present(v) => Some(format!("\"{}\":{{\"present\":{v}}}", m.id())),
+                Value::Present(v) => Some(format!("\"{}\":{{\"present\":{}}}", m.id(), json(v))),
                 Value::Stale { value, age } => Some(format!(
-                    "\"{}\":{{\"stale\":{value},\"age\":{age}}}",
-                    m.id()
+                    "\"{}\":{{\"stale\":{},\"age\":{}}}",
+                    m.id(),
+                    json(value),
+                    json(age)
                 )),
                 Value::Absent => None,
             })
@@ -212,12 +228,17 @@ fn dump_json(tel: &Telemetry, every: f64, out: &mut impl Write) -> io::Result<()
         let sep = if i == 0 { "" } else { "," };
         writeln!(
             out,
-            "{sep}{{\"t\":{t},\"utc\":{utc},\"gps_lock\":\"{:?}\",\"values\":{{{}}}}}",
+            "{sep}{{\"t\":{},\"utc\":{utc},\"gps_lock\":\"{:?}\",\"values\":{{{}}}}}",
+            t_text(t),
             s.gps_lock,
             values.join(",")
         )?;
     }
     writeln!(out, "]")
+}
+
+fn json(v: f64) -> String {
+    num(v).unwrap_or_else(|| "null".into())
 }
 
 /// Python's `str(datetime)` for a UTC time, as gopro-to-csv prints it.
@@ -234,12 +255,11 @@ fn python_date(u: DateTime<Utc>) -> String {
 /// A float as Python's `repr` prints it (`-20.0`, not `-20`), so the
 /// columns shared with gopro-to-csv compare as text.
 fn py(v: f64) -> String {
-    let s = v.to_string();
-    if v.is_finite() && !s.contains('.') {
-        s + ".0"
-    } else {
-        s
+    if !v.is_finite() {
+        return String::new();
     }
+    let s = v.to_string();
+    if s.contains('.') { s } else { s + ".0" }
 }
 
 fn opt(v: Option<f64>) -> String {

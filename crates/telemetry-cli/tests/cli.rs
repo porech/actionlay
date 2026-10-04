@@ -126,7 +126,7 @@ fn video_without_metadata_fails_cleanly() {
         "ACTIONLAY_SAMPLES",
         "../../samples/synthetic",
         "hevc8-1080p30-noaudio.mp4",
-        "ACTIONLAY_REQUIRE_SYNTHETIC_SAMPLES",
+        "ACTIONLAY_SAMPLES", // CI sets it wherever synthetic samples exist
     ) else {
         return;
     };
@@ -134,4 +134,65 @@ fn video_without_metadata_fails_cleanly() {
     assert!(!out.status.success());
     let err = String::from_utf8_lossy(&out.stderr);
     assert!(err.contains("no GoPro metadata (gpmd) stream"), "{err}");
+}
+
+fn run_args(args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_actionlay-telemetry"))
+        .args(args)
+        .output()
+        .unwrap()
+}
+
+#[test]
+fn json_output_parses() {
+    let Some(video) = gopro("hero6.mp4") else {
+        return;
+    };
+    let out = stdout(&run(
+        &["dump", "--format", "json", "--every", "0.5"],
+        &video,
+    ));
+    let v: serde_json::Value = serde_json::from_str(&out).expect("valid JSON");
+    let rows = v.as_array().unwrap();
+    assert_eq!(rows.len(), 47); // t = 0, 0.5 ..= 23
+    assert_eq!(rows[1]["t"], 0.5);
+}
+
+#[test]
+fn invalid_every_is_rejected_before_reading() {
+    for bad in ["0", "-1", "NaN", "inf", "abc"] {
+        let out = run_args(&["dump", "--every", bad, "missing.mp4"]);
+        assert!(!out.status.success(), "{bad}");
+        let err = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            err.contains("--every") && !err.contains("missing.mp4:"),
+            "{bad}: {err}"
+        );
+    }
+}
+
+#[test]
+fn points_conflicts_with_format_and_every() {
+    for flag in [["--format", "json"], ["--every", "2"]] {
+        let out = run_args(&["dump", "--points", flag[0], flag[1], "x.mp4"]);
+        assert!(!out.status.success());
+        assert!(String::from_utf8_lossy(&out.stderr).contains("cannot be used with"));
+    }
+}
+
+#[test]
+fn invalid_format_is_rejected() {
+    let out = run_args(&["dump", "--format", "xml", "x.mp4"]);
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("invalid value"));
+}
+
+#[test]
+fn missing_file_fails_with_message() {
+    let out = run_args(&["info", "/nonexistent/video.mp4"]);
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("actionlay-telemetry:"), "{err}");
+    assert!(err.contains("/nonexistent/video.mp4"), "{err}");
 }

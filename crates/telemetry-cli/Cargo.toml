@@ -14,3 +14,6 @@ actionlay-media = { path = "../media" }
 actionlay-telemetry = { path = "../telemetry" }
 chrono.workspace = true
 clap.workspace = true
+
+[dev-dependencies]
+serde_json = "1.0.151"

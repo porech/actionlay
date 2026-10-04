@@ -30,6 +30,8 @@ as a single executable for Windows, macOS and Linux.
   orientation, camera temperature) and computes the same derived values as
   gopro-dashboard-overlay. `actionlay-telemetry dump VIDEO` prints them as
   CSV or JSON; `actionlay-telemetry info VIDEO` shows where data is missing.
+  The tool ships in the same download as `actionlay`; run it from a terminal,
+  or from source with `cargo run -p actionlay-telemetry-cli -- dump VIDEO`.
 
 ## Roadmap
 
