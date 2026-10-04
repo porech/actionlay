@@ -197,7 +197,7 @@ Video e capitoli, riferimento al layout, GPX/FIT, scarti di sincronizzazione, mo
 
 ## 9. Distribuzione e piattaforme
 
-- **ffmpeg**: ultima release stabile 8.x, versione fissata all'avvio; compilato statico da script nel repo con `--enable-gpl`, **mai `--enable-nonfree`**, solo codec/formati necessari. Compilarlo staticamente in CI su tre piattaforme è il **secondo rischio infrastrutturale** dopo il player.
+- **ffmpeg**: release stabile fissata (all'avvio: **n9.0.2**, allineata ai binding `ffmpeg-next`/`ffmpeg-sys-next` 9.0); compilato statico da script nel repo con `--enable-gpl`, **mai `--enable-nonfree`**, solo codec/formati necessari. Compilarlo staticamente in CI su tre piattaforme è il **secondo rischio infrastrutturale** dopo il player.
 - Font, icone e layout predefiniti incorporati nel binario.
 - **Windows** 10 1809+ x64: un `.exe` con runtime C statico.
 - **macOS** 12+: bundle `.app` universale (arm64 + x86_64) in `.dmg`.
