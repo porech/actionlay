@@ -10,6 +10,8 @@ pub mod gpmf;
 mod lock;
 pub mod metric;
 #[allow(dead_code)] // used by telemetry.rs (Task 9)
+mod series;
+#[allow(dead_code)] // used by telemetry.rs (Task 9)
 mod smoothing;
 #[cfg(test)]
 mod test_support;
