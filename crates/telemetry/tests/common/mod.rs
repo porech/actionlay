@@ -57,11 +57,9 @@ pub fn reference(file: &str) -> Vec<HashMap<String, String>> {
     lines
         .filter(|l| !l.is_empty())
         .map(|l| {
-            header
-                .iter()
-                .cloned()
-                .zip(l.split(',').map(String::from))
-                .collect()
+            let cells: Vec<String> = l.split(',').map(String::from).collect();
+            assert_eq!(cells.len(), header.len(), "{file}: malformed row {l}");
+            header.iter().cloned().zip(cells).collect()
         })
         .collect()
 }
@@ -86,4 +84,10 @@ pub fn stats(mut errors: Vec<f64>) -> (f64, f64) {
     let mean = errors.iter().sum::<f64>() / errors.len() as f64;
     let p95 = errors[(errors.len() as f64 * 0.95) as usize];
     (mean, p95)
+}
+
+/// Angle difference in degrees, wrapped to [0, 180].
+pub fn angle_diff(a: f64, b: f64) -> f64 {
+    let d = (a - b).abs().rem_euclid(360.0);
+    d.min(360.0 - d)
 }
