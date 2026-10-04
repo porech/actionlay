@@ -155,6 +155,7 @@ dependencies = [
 name = "actionlay-telemetry"
 version = "0.1.0"
 dependencies = [
+ "actionlay-media",
  "chrono",
  "geographiclib-rs",
  "log",

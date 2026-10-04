@@ -10,3 +10,8 @@ chrono.workspace = true
 geographiclib-rs.workspace = true
 thiserror.workspace = true
 log.workspace = true
+
+[dev-dependencies]
+# Only the integration tests read real MP4 files; the library itself never
+# links FFmpeg (checked by `cargo tree -e normal` in CI).
+actionlay-media = { path = "../media" }
