@@ -2,12 +2,14 @@
 //! and sampling at any file time. Pure Rust; packets come from the caller
 //! (the media crate demuxes them), so this crate never links FFmpeg.
 #[allow(dead_code)] // used by telemetry.rs (Task 9)
+mod derive;
+#[allow(dead_code)] // used by telemetry.rs (Task 9)
 mod extract;
 pub mod gpmf;
 #[allow(dead_code)] // used by telemetry.rs (Task 9)
 mod lock;
 pub mod metric;
-#[allow(dead_code)] // used by derive.rs (Task 7)
+#[allow(dead_code)] // used by telemetry.rs (Task 9)
 mod smoothing;
 #[cfg(test)]
 mod test_support;
