@@ -41,7 +41,13 @@ pub(crate) fn apply(points: &mut [GpsPoint], opts: &LockOptions) {
             }
             _ => last = Some((recorded, p.lat, p.lon, p.speed2d)),
         }
-        if p.dop > opts.dop_max || opts.speed_max.is_some_and(|max| p.speed2d > max) {
+        // Written as `!(x <= max)` so that a NaN DOP or speed (damaged
+        // sample) counts as unlocked, whatever the limits.
+        #[allow(clippy::neg_cmp_op_on_partial_ord)]
+        let bad = !(p.dop <= opts.dop_max)
+            || p.speed2d.is_nan()
+            || opts.speed_max.is_some_and(|max| !(p.speed2d <= max));
+        if bad {
             lock = GpsLock::NoLock;
         }
         p.lock = lock;
@@ -102,6 +108,27 @@ mod tests {
             ..LockOptions::default()
         };
         assert_eq!(locks(&mut pts, opts), vec![GpsLock::NoLock]);
+    }
+
+    #[test]
+    fn nan_dop_or_speed_is_not_locked() {
+        let mut pts = [
+            point(3, f64::NAN, 45.0, 1.0),
+            point(3, 1.0, 45.1, f64::NAN),
+            point(3, 1.0, 45.2, 2.0),
+        ];
+        assert_eq!(
+            locks(&mut pts, LockOptions::default()),
+            vec![GpsLock::NoLock, GpsLock::NoLock, GpsLock::Lock3d]
+        );
+        let opts = LockOptions {
+            speed_max: Some(10.0),
+            ..LockOptions::default()
+        };
+        assert_eq!(
+            locks(&mut pts, opts),
+            vec![GpsLock::NoLock, GpsLock::NoLock, GpsLock::Lock3d]
+        );
     }
 
     #[test]

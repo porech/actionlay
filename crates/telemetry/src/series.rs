@@ -15,8 +15,9 @@ pub(crate) enum Interp {
     /// normalised to [0, 360). For `cog`. Exactly opposite angles (180 apart)
     /// take the negative direction (0 -> 180 passes through 270).
     Angle360,
-    /// Same interpolation, result normalised to (-180, 180]. For `azi` and
-    /// `ori.yaw`. Hold and Stale values are never altered by either variant.
+    /// Same interpolation, result normalised to (-180, 180]. For `azi`,
+    /// `lon`, `ori.pitch` and `ori.yaw`. Hold and Stale values are never
+    /// altered by either variant.
     Angle180,
 }
 
@@ -118,6 +119,18 @@ impl Series {
         }
     }
 
+    /// When the last sample is valid and ends at most `max_gap` before
+    /// `until`, holds its value (Present) until `until`. A series whose last
+    /// sample is invalid (e.g. lost fix) is left alone: it stays Stale.
+    pub fn hold_last_until(&mut self, until: f64, max_gap: f64) {
+        if let (Some(Some(_)), Some(end)) = (self.v.last(), self.end.last_mut())
+            && *end < until
+            && until - *end <= max_gap
+        {
+            *end = until;
+        }
+    }
+
     /// Merged intervals where `sample` is Present.
     pub fn covered(&self) -> Vec<(f64, f64)> {
         let mut out: Vec<(f64, f64)> = Vec::new();
@@ -189,6 +202,26 @@ mod tests {
             &[(0.0, 1.0, Some(0.0)), (1.0, 2.0, Some(10.0))],
         );
         assert_eq!(step.sample(0.9), Value::Present(0.0));
+    }
+
+    #[test]
+    fn hold_last_until_extends_only_a_valid_final_sample() {
+        let mut ser = s(
+            Interp::Linear,
+            &[(0.0, 1.0, Some(0.0)), (1.0, 2.0, Some(10.0))],
+        );
+        ser.hold_last_until(3.5, MAX_BRIDGE);
+        assert_eq!(ser.sample(3.4), Value::Present(10.0));
+        assert_eq!(ser.covered(), vec![(0.0, 3.5)]);
+        // too far: unchanged
+        let mut far = s(Interp::Linear, &[(0.0, 1.0, Some(1.0))]);
+        far.hold_last_until(3.5, MAX_BRIDGE);
+        assert_eq!(far.covered(), vec![(0.0, 1.0)]);
+        // last sample invalid: unchanged
+        let mut lost = s(Interp::Linear, &[(0.0, 1.0, Some(1.0)), (1.0, 2.0, None)]);
+        lost.hold_last_until(2.5, MAX_BRIDGE);
+        assert_eq!(lost.covered(), vec![(0.0, 1.0)]);
+        assert!(matches!(lost.sample(2.2), Value::Stale { .. }));
     }
 
     #[test]

@@ -85,7 +85,7 @@ fn dump_csv_every_second() {
     assert!(!lines[0].contains("hr"));
     assert_eq!(lines.len(), 1 + 35); // t = 0..=34
     assert!(
-        lines[1].starts_with("0,2017-04-17T17:31:03.000Z,Lock3d,0.167,"),
+        lines[1].starts_with("0,2017-04-17T17:31:02.978Z,Lock3d,0.167,"),
         "{}",
         lines[1]
     );
@@ -169,6 +169,30 @@ fn invalid_every_is_rejected_before_reading() {
             "{bad}: {err}"
         );
     }
+}
+
+#[test]
+fn invalid_dop_max_is_rejected_before_reading() {
+    for bad in ["0", "-1", "NaN", "inf", "abc"] {
+        let out = run_args(&["info", "--dop-max", bad, "missing.mp4"]);
+        assert!(!out.status.success(), "{bad}");
+        let err = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            err.contains("--dop-max") && !err.contains("missing.mp4:"),
+            "{bad}: {err}"
+        );
+    }
+}
+
+#[test]
+fn ffmpeg_open_warnings_are_silenced() {
+    let Some(video) = gopro("hero5.mp4") else {
+        return;
+    };
+    let out = run(&["info"], &video);
+    assert!(out.status.success());
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(!err.contains("zero duration"), "{err}");
 }
 
 #[test]

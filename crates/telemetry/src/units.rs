@@ -46,8 +46,10 @@ pub enum Unit {
     DegF,
     Deg,
     Percent,
-    /// Dimensionless values (DOP, lock state, gravity in g).
-    None,
+    /// Dimensionless values (DOP, lock state, gravity in g). Its id stays
+    /// "none" (layouts store ids); the variant is not called `None` so that
+    /// `use Unit::*` does not shadow `Option::None`.
+    Plain,
 }
 
 const ALL_UNITS: [Unit; 19] = [
@@ -69,7 +71,7 @@ const ALL_UNITS: [Unit; 19] = [
     Unit::DegF,
     Unit::Deg,
     Unit::Percent,
-    Unit::None,
+    Unit::Plain,
 ];
 
 /// Standard gravity, m/s².
@@ -99,7 +101,7 @@ impl Unit {
             Unit::DegF => "degf",
             Unit::Deg => "deg",
             Unit::Percent => "percent",
-            Unit::None => "none",
+            Unit::Plain => "none",
         }
     }
 
@@ -126,7 +128,7 @@ pub fn units_for(q: Quantity) -> &'static [Unit] {
         Quantity::Temperature => &[Unit::DegC, Unit::DegF],
         Quantity::Angle | Quantity::Coordinate => &[Unit::Deg],
         Quantity::Ratio => &[Unit::Percent],
-        Quantity::Dimensionless => &[Unit::None],
+        Quantity::Dimensionless => &[Unit::Plain],
     }
 }
 
@@ -144,7 +146,7 @@ pub fn default_unit(q: Quantity, system: UnitSystem) -> Unit {
         Quantity::Acceleration => Unit::Mps2,
         Quantity::Angle | Quantity::Coordinate => Unit::Deg,
         Quantity::Ratio => Unit::Percent,
-        Quantity::Dimensionless => Unit::None,
+        Quantity::Dimensionless => Unit::Plain,
     }
 }
 
@@ -170,7 +172,7 @@ pub fn convert(si: f64, unit: Unit) -> f64 {
         Unit::Ft => si / FOOT_M,
         Unit::G => si / STANDARD_GRAVITY,
         Unit::DegF => si * 9.0 / 5.0 + 32.0,
-        Unit::Mps | Unit::M | Unit::Mps2 | Unit::DegC | Unit::Deg | Unit::Percent | Unit::None => {
+        Unit::Mps | Unit::M | Unit::Mps2 | Unit::DegC | Unit::Deg | Unit::Percent | Unit::Plain => {
             si
         }
     }
@@ -196,7 +198,7 @@ pub fn symbol(unit: Unit) -> &'static str {
         Unit::DegF => "°F",
         Unit::Deg => "°",
         Unit::Percent => "%",
-        Unit::None => "",
+        Unit::Plain => "",
     }
 }
 #[cfg(test)]

@@ -72,6 +72,14 @@ pub enum GpmfError {
         scal: usize,
         elements: usize,
     },
+    #[error("{key}: rows have {have} elements, {need} needed")]
+    ShortRow {
+        key: FourCc,
+        need: usize,
+        have: usize,
+    },
+    #[error("{key}: time out of range")]
+    BadTime { key: FourCc },
 }
 
 #[derive(Debug, Clone, PartialEq)]

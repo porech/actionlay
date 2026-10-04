@@ -213,8 +213,16 @@ fn slot(p: &RawPacket, i: usize, n: usize) -> (f64, f64) {
     (at(i), at(i + 1))
 }
 
-fn add_seconds(t: DateTime<Utc>, s: f64) -> DateTime<Utc> {
-    t + TimeDelta::microseconds((s * 1e6).round() as i64)
+/// `t` plus `s` seconds, rounded to the microsecond. None when `s` is not
+/// finite or the result falls outside chrono's range (a damaged packet or an
+/// absurd sampling time), never a panic.
+pub(crate) fn add_seconds(t: DateTime<Utc>, s: f64) -> Option<DateTime<Utc>> {
+    let us = (s * 1e6).round();
+    // `as i64` would saturate silently: reject anything i64 cannot hold.
+    if !us.is_finite() || us.abs() >= i64::MAX as f64 {
+        return None;
+    }
+    t.checked_add_signed(TimeDelta::microseconds(us as i64))
 }
 
 /// The items of one STRM, with its sticky metadata.
@@ -256,10 +264,10 @@ impl<'a> Stream<'a> {
             let mut rows = item.numbers(complex)?;
             gpmf::apply_scale(item.key, &mut rows, &scal)?;
             if let Some(r) = rows.iter().find(|r| r.len() < width) {
-                return Err(GpmfError::ScaleMismatch {
+                return Err(GpmfError::ShortRow {
                     key: item.key,
-                    scal: width,
-                    elements: r.len(),
+                    need: width,
+                    have: r.len(),
                 });
             }
             all.extend(rows);
@@ -280,7 +288,7 @@ impl<'a> Stream<'a> {
                 index: i,
                 t,
                 end,
-                utc: base.map(|b| add_seconds(b, t - p.pts)),
+                utc: base.and_then(|b| add_seconds(b, t - p.pts)),
                 lat: r[0],
                 lon: r[1],
                 alt: r[2],
@@ -303,15 +311,26 @@ impl<'a> Stream<'a> {
             .and_then(|d| d.and_hms_opt(0, 0, 0))
             .map(|n| n.and_utc());
         let n = rows.len();
+        let mut points = Vec::with_capacity(n);
         for (i, r) in rows.into_iter().enumerate() {
             let (t, end) = slot(p, i, n);
             let fix = r[8] as u32;
-            out.push(GpsPoint {
+            // A time chrono cannot represent means the payload is damaged:
+            // skip it (reported by the caller) rather than keep bad points.
+            let utc = match epoch {
+                Some(e) => Some(add_seconds(e, r[5] * 86_400.0 + r[6]).ok_or(
+                    GpmfError::BadTime {
+                        key: FourCc::new(b"GPS9"),
+                    },
+                )?),
+                None => None,
+            };
+            points.push(GpsPoint {
                 packet: k,
                 index: i,
                 t,
                 end,
-                utc: epoch.map(|e| add_seconds(e, r[5] * 86_400.0 + r[6])),
+                utc,
                 lat: r[0],
                 lon: r[1],
                 alt: r[2],
@@ -323,6 +342,7 @@ impl<'a> Stream<'a> {
                 derived: Derived::default(),
             });
         }
+        out.extend(points);
         Ok(())
     }
 
@@ -626,6 +646,70 @@ mod tests {
         assert!(matches!(ex.first_error, Some(GpmfError::Truncated { .. })));
         assert_eq!(ex.warnings.len(), 1);
         assert!((ex.duration - 2.0).abs() < 1e-12);
+
+        // A GPS9 payload whose days field is i32::MAX cannot be dated:
+        // that payload is skipped and reported, the good one is kept.
+        let gps9 = |days: i32| {
+            let mut raw = i32s(&[450_000_000, 70_000_000, 0, 0, 0, days, 0]);
+            raw.extend([0, 100, 0, 3]);
+            nested(
+                b"STRM",
+                &[
+                    item(b"TYPE", b'c', 1, 9, b"lllllllSS"),
+                    item(
+                        b"SCAL",
+                        b'l',
+                        4,
+                        9,
+                        &i32s(&[10_000_000, 10_000_000, 1, 1, 1, 1, 1, 100, 1]),
+                    ),
+                    item(b"GPS9", b'?', 32, 1, &raw),
+                ],
+            )
+        };
+        let ex = extract(&[
+            packet(0.0, 1.0, &[gps9(i32::MAX)]),
+            packet(1.0, 1.0, &[gps9(8_871)]),
+        ]);
+        assert_eq!(ex.parsed_packets, 2);
+        assert_eq!(ex.gps.len(), 1);
+        assert_eq!(ex.gps[0].packet, 1);
+        assert_eq!(ex.warnings.len(), 1, "{:?}", ex.warnings);
+        assert!(
+            ex.warnings[0].starts_with("GPS9: 1 of 2 payloads skipped (GPS9: time out of range)"),
+            "{:?}",
+            ex.warnings
+        );
+    }
+
+    #[test]
+    fn short_rows_are_reported_as_such() {
+        // GPS5 with 3 elements per row: too short for lat..speed3d.
+        let strm = nested(b"STRM", &[item(b"GPS5", b'l', 12, 1, &i32s(&[45, 7, 100]))]);
+        let ex = extract(&[packet(0.0, 1.0, &[strm])]);
+        assert!(ex.gps.is_empty());
+        assert_eq!(ex.warnings.len(), 1, "{:?}", ex.warnings);
+        assert!(
+            ex.warnings[0].contains("rows have 3 elements, 5 needed"),
+            "{:?}",
+            ex.warnings
+        );
+    }
+
+    #[test]
+    fn add_seconds_is_checked() {
+        let t = DateTime::from_timestamp(0, 0).unwrap();
+        assert_eq!(add_seconds(t, 1.5).unwrap().timestamp_micros(), 1_500_000);
+        for s in [
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+            1e13,
+            -1e13,
+            1e300,
+        ] {
+            assert_eq!(add_seconds(t, s), None, "{s}");
+        }
     }
 
     #[test]

@@ -27,7 +27,7 @@ as a single executable for Windows, macOS and Linux.
 - No installation and nothing else to download: FFmpeg is built into the
   executable.
 - Reads GoPro telemetry (GPS, speed, altitude, accelerometer, gravity,
-  orientation, camera temperature) and computes the same derived values as
+  orientation, camera temperature) and computes the same derived metrics as
   gopro-dashboard-overlay. `actionlay-telemetry dump VIDEO` prints them as
   CSV or JSON; `actionlay-telemetry info VIDEO` shows where data is missing.
   The tool ships in the same download as `actionlay`; run it from a terminal,

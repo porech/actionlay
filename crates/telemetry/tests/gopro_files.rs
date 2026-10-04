@@ -2,7 +2,7 @@
 //! damaged packets.
 mod common;
 
-use actionlay_telemetry::{GpsLock, Metric, Telemetry, Value};
+use actionlay_telemetry::{GpsLock, Metric, Telemetry, TelemetryOptions, Value};
 
 #[test]
 fn hero5_locked_throughout() {
@@ -12,9 +12,11 @@ fn hero5_locked_throughout() {
     assert!((tel.duration() - 34.034).abs() < 1e-9);
     assert_eq!(tel.gps_points().len(), 618);
     assert_eq!(tel.track().len(), 618);
+    // median of GPSU − t over the 618 locked points; the first packet
+    // alone said 17:31:03.000
     assert_eq!(
         tel.start_utc().unwrap().to_rfc3339(),
-        "2017-04-17T17:31:03+00:00"
+        "2017-04-17T17:31:02.978+00:00"
     );
     let a = tel.availability();
     for m in [
@@ -34,6 +36,34 @@ fn hero5_locked_throughout() {
     assert_eq!(snap.gps_lock, GpsLock::Lock3d);
     assert!((snap.get(Metric::AcclZ).present().unwrap() - 9.8).abs() < 1.5);
     assert!(tel.warnings().is_empty());
+}
+
+#[test]
+fn hero5_video_duration_covers_the_tail() {
+    let Some(path) = common::gopro_sample("hero5.mp4") else {
+        return;
+    };
+    let packets = common::raw_packets(&path);
+    let plain = Telemetry::from_gpmf_packets(&packets).unwrap();
+    assert!(matches!(
+        plain.sample(34.5).get(Metric::Speed),
+        Value::Stale { .. }
+    ));
+    // the video track is 34.576 s, the metadata track 34.034 s
+    let opts = TelemetryOptions {
+        video_duration: Some(34.576),
+        ..TelemetryOptions::default()
+    };
+    let tel = Telemetry::from_gpmf_packets_with(&packets, &opts).unwrap();
+    assert!((tel.duration() - 34.034).abs() < 1e-9);
+    for m in [Metric::Speed, Metric::Lat, Metric::AcclZ, Metric::Temp] {
+        assert!(tel.sample(34.5).get(m).present().is_some(), "{}", m.id());
+    }
+    let a = tel.availability();
+    assert!((a.coverage(Metric::Lat) - 1.0).abs() < 1e-9);
+    assert!(a.gaps(Metric::Lat).is_empty());
+    assert!((a.gaps(Metric::Accel)[0].1 - 3.003).abs() < 1e-9);
+    assert!((a.coverage(Metric::Accel) - (34.576 - 3.003) / 34.576).abs() < 1e-9);
 }
 
 #[test]
@@ -110,6 +140,23 @@ fn max_short_final_packet_stays_inside_the_file() {
     for m in [Metric::GravX, Metric::OriPitch, Metric::Lat] {
         assert_eq!(a.coverage(m), 1.0, "{}", m.id());
     }
+}
+
+#[test]
+fn max_start_utc_ignores_the_gpsu_step() {
+    let Some(tel) = common::load("max-heromode.mp4") else {
+        return;
+    };
+    // GPSU − t (dump --points): packet 0 says 23:45:14.000; packets 1–10
+    // say 23:45:15.392–15.469 (GPSU jumps +2.47 s after packet 0, then
+    // tracks file time). The median over the 191 locked points is packet
+    // 5's 23:45:15.425; the first packet would be 1.425 s off.
+    assert_eq!(
+        tel.start_utc().unwrap().to_rfc3339(),
+        "2019-11-18T23:45:15.425+00:00"
+    );
+    let utc = tel.sample(5.005).utc.unwrap();
+    assert_eq!(utc.to_rfc3339(), "2019-11-18T23:45:20.430+00:00");
 }
 
 #[test]

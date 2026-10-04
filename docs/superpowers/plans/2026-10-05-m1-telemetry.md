@@ -14,11 +14,11 @@
 
 Every name and signature of the contract is implemented as written. This plan **adds**:
 
-- `Telemetry::from_gpmf_packets_with(&[RawPacket], &TelemetryOptions)`, `TelemetryOptions { lock: LockOptions }`, `LockOptions { dop_max: f64, speed_max: Option<f64> }`.
+- `Telemetry::from_gpmf_packets_with(&[RawPacket], &TelemetryOptions)`, `TelemetryOptions { lock: LockOptions, video_duration: Option<f64> }` (video_duration added in the final fix wave: availability timeline and tail hold; `duration()` stays the telemetry's end), `LockOptions { dop_max: f64, speed_max: Option<f64> }`.
 - `Telemetry::gps_points() -> &[GpsPoint]` (raw + derived values per GPS sample, used by the dump CLI and the reference tests), `Telemetry::warnings() -> &[String]`, `GpsPoint`, `Derived`.
 - `TrackPoint { t, lat, lon, alt }` (the contract left its fields open).
 - `Availability::is_available(m)`, `Metric::COUNT`, `Metric::ALL`, `Metric::index()`, `Metric::is_external()`, `Value::present()`, `Value::last_known()`, `GpsLock::{from_fix, is_locked, code, original_name}`.
-- `units::Unit::None` (id `none`, symbol `""`) for dimensionless metrics (`gps-dop`, `gps-lock`, `grav.*`), `Unit::{id, from_id}`, `units::units_for(Quantity)`, `units::STANDARD_GRAVITY`.
+- `units::Unit::Plain` (id `none`, symbol `""`) for dimensionless metrics (`gps-dop`, `gps-lock`, `grav.*`), `Unit::{id, from_id}`, `units::units_for(Quantity)`, `units::STANDARD_GRAVITY`.
 - `actionlay_media::gpmf::fill_missing_durations` (public helper next to `read_gpmf_packets`).
 
 It **clarifies**:
@@ -39,7 +39,7 @@ It **clarifies**:
 2. **Speed limit off by default**: the original marks points faster than 60 km/h as unlocked by default, which blanks every car or motorbike video. `LockOptions::speed_max` defaults to `None` (the dump CLI exposes `--speed-max-kmh`). The samples never exceed 27 km/h, so this does not affect the comparison.
 3. **Collided samples kept**: on HERO8/MAX the original drops ~2 samples per file whose timestamps fall out of order; we keep them.
 4. **Short tracks**: with fewer than 108 GPS samples (6 s) the original pairs samples with negative (wrapped-around) indices; we skip those pairs.
-5. **Sampling between GPS points**: `sample(t)` interpolates linearly between neighbouring valid samples (the original holds the previous one); azimuth, course, orientation, DOP and lock are held.
+5. **Sampling between GPS points**: `sample(t)` interpolates between neighbouring valid samples (the original holds the previous one): linearly for most metrics, along the shortest arc for azimuth, course, longitude, `ori.pitch` and `ori.yaw` (ruling R9 and the final fix wave); `ori.roll` is linear; DOP and lock are held.
 6. **Unlocked positions** are not shown: lat/lon become Stale/Absent where the original keeps drawing the raw position.
 7. **GPS records without a valid GPSU** keep their positions with `utc: None` (the original drops the whole record).
 
@@ -778,7 +778,7 @@ pub enum Unit {
     Deg,
     Percent,
     /// Dimensionless values (DOP, lock state, gravity in g).
-    None,
+    Plain,
 }
 
 const ALL_UNITS: [Unit; 19] = [
@@ -800,7 +800,7 @@ const ALL_UNITS: [Unit; 19] = [
     Unit::DegF,
     Unit::Deg,
     Unit::Percent,
-    Unit::None,
+    Unit::Plain,
 ];
 
 /// Standard gravity, m/s².
@@ -830,7 +830,7 @@ impl Unit {
             Unit::DegF => "degf",
             Unit::Deg => "deg",
             Unit::Percent => "percent",
-            Unit::None => "none",
+            Unit::Plain => "none",
         }
     }
 
@@ -857,7 +857,7 @@ pub fn units_for(q: Quantity) -> &'static [Unit] {
         Quantity::Temperature => &[Unit::DegC, Unit::DegF],
         Quantity::Angle | Quantity::Coordinate => &[Unit::Deg],
         Quantity::Ratio => &[Unit::Percent],
-        Quantity::Dimensionless => &[Unit::None],
+        Quantity::Dimensionless => &[Unit::Plain],
     }
 }
 
@@ -875,7 +875,7 @@ pub fn default_unit(q: Quantity, system: UnitSystem) -> Unit {
         Quantity::Acceleration => Unit::Mps2,
         Quantity::Angle | Quantity::Coordinate => Unit::Deg,
         Quantity::Ratio => Unit::Percent,
-        Quantity::Dimensionless => Unit::None,
+        Quantity::Dimensionless => Unit::Plain,
     }
 }
 
@@ -901,7 +901,7 @@ pub fn convert(si: f64, unit: Unit) -> f64 {
         Unit::Ft => si / FOOT_M,
         Unit::G => si / STANDARD_GRAVITY,
         Unit::DegF => si * 9.0 / 5.0 + 32.0,
-        Unit::Mps | Unit::M | Unit::Mps2 | Unit::DegC | Unit::Deg | Unit::Percent | Unit::None => {
+        Unit::Mps | Unit::M | Unit::Mps2 | Unit::DegC | Unit::Deg | Unit::Percent | Unit::Plain => {
             si
         }
     }
@@ -927,7 +927,7 @@ pub fn symbol(unit: Unit) -> &'static str {
         Unit::DegF => "°F",
         Unit::Deg => "°",
         Unit::Percent => "%",
-        Unit::None => "",
+        Unit::Plain => "",
     }
 }
 ```
@@ -3519,7 +3519,7 @@ git commit -m "feat(telemetry): time series with stale gaps and coverage"
 - Consumes: everything of Tasks 3–8.
 - Produces (contract): `Telemetry::{from_gpmf_packets(&[RawPacket]) -> Result<Telemetry, TelemetryError>, empty(duration: f64) -> Telemetry, duration() -> f64, start_utc() -> Option<DateTime<Utc>>, availability() -> &Availability, sample(t: f64) -> Snapshot, track() -> &[TrackPoint]}`; `Snapshot { pub t, pub utc, pub gps_lock, values (private) }` with `get(Metric) -> Value`; `Availability::{coverage(Metric) -> f64, gaps(Metric) -> &[(f64, f64)]}`. Additions: `from_gpmf_packets_with`, `TelemetryOptions`, `gps_points()`, `warnings()`, `Availability::is_available`, `TrackPoint { t, lat, lon, alt }`, `TelemetryError::Unreadable { packets, first }`.
 
-Assembly: extract → lock filter → derive → accelerometer through a per-axis Kalman (as the original displays it) → one `Series` per metric (`Linear` for continuous values; `Step` for `azi`, `cog`, `gps-dop`, `gps-lock`, `ori.*`); external metrics (`hr`, `cadence`, …) have no series. `start_utc` = UTC of the first locked GPS sample minus its file time, else of the first sample with a GPSU (the receiver's clock is usually right before a fix: hero7/hero8). `Snapshot::utc = start_utc + t`; `Snapshot::gps_lock` = last known `gps-lock`, `Unknown` without GPS. No packets → `empty(0.0)`; packets but none parseable → `Err(Unreadable)`.
+Assembly: extract → lock filter → derive → accelerometer through a per-axis Kalman (as the original displays it) → one `Series` per metric (`Linear` for continuous values; `Step` for `azi`, `cog`, `gps-dop`, `gps-lock`, `ori.*` — superseded: since R9 and the final fix wave `azi`, `lon`, `ori.pitch`, `ori.yaw` are `Angle180`, `cog` is `Angle360`, `ori.roll` is `Linear`); external metrics (`hr`, `cadence`, …) have no series. `start_utc` = UTC of the first locked GPS sample minus its file time (superseded in the final fix wave: median of `utc − t` over locked samples, because GPSU can step after packet 0), else of the first sample with a GPSU (the receiver's clock is usually right before a fix: hero7/hero8). `Snapshot::utc = start_utc + t`; `Snapshot::gps_lock` = last known `gps-lock`, `Unknown` without GPS. No packets → `empty(0.0)`; packets but none parseable → `Err(Unreadable)`.
 
 - [ ] **Step 1: Write the failing tests**
 

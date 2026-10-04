@@ -15,14 +15,46 @@ pub struct GpmfPacket {
 
 const GPMD_TAG: u32 = u32::from_le_bytes(*b"gpmd");
 
+/// Consecutive unreadable packets after which the read gives up.
+const MAX_INVALID_IN_A_ROW: usize = 1000;
+
+/// Lowers FFmpeg's log level to Error while alive and restores the previous
+/// level on drop. Opening a GoPro file makes FFmpeg warn about the zero
+/// duration of the `fdsc` stream, which is harmless.
+///
+/// FFmpeg's log level is a single process-wide global: another thread that
+/// sets it (or logs) while this guard is alive sees Error, and two
+/// overlapping guards may restore in the wrong order. ActionLay only changes
+/// the level here and in `ffmpeg_info::init`, so the worst case is a hidden
+/// warning or a briefly wrong level, never a crash.
+struct QuietLog(ffmpeg::util::log::Level);
+
+impl QuietLog {
+    fn new() -> Self {
+        use ffmpeg::util::log;
+        // get_level fails only for a level FFmpeg itself never sets.
+        let previous = log::get_level().unwrap_or(log::Level::Warning);
+        log::set_level(log::Level::Error);
+        QuietLog(previous)
+    }
+}
+
+impl Drop for QuietLog {
+    fn drop(&mut self) {
+        ffmpeg::util::log::set_level(self.0);
+    }
+}
+
 /// Reads every packet of the GoPro metadata stream (codec tag `gpmd`,
 /// handler "GoPro MET"). `Ok(vec![])` when the file has no such stream.
 ///
-/// Corrupt packets are skipped. A read error in the middle of the file (e.g.
+/// Corrupt packets are skipped (up to 1000 in a row, then the read stops
+/// with what it has). A read error in the middle of the file (e.g.
 /// a truncated recording) is logged and the packets read so far are returned
 /// instead of an error: partial telemetry is better than none.
 pub fn read_gpmf_packets(path: &Path) -> Result<Vec<GpmfPacket>, MediaError> {
     ffmpeg_info::init();
+    let _quiet = QuietLog::new();
     let mut input = ffmpeg::format::input(path)?;
     let Some(index) = input.streams().find(is_gpmd).map(|s| s.index()) else {
         return Ok(Vec::new());
@@ -46,11 +78,23 @@ pub fn read_gpmf_packets(path: &Path) -> Result<Vec<GpmfPacket>, MediaError> {
     }
     let mut packets = Vec::new();
     let mut packet = ffmpeg::Packet::empty();
+    let mut invalid_in_a_row = 0;
     loop {
         match packet.read(&mut input) {
-            Ok(()) => {}
+            Ok(()) => invalid_in_a_row = 0,
             Err(ffmpeg::Error::Eof) => break,
-            Err(ffmpeg::Error::InvalidData) => continue,
+            Err(ffmpeg::Error::InvalidData) => {
+                invalid_in_a_row += 1;
+                if invalid_in_a_row >= MAX_INVALID_IN_A_ROW {
+                    log::warn!(
+                        "gpmd read stopped after {invalid_in_a_row} unreadable packets in a row, \
+                         returning the {} read",
+                        packets.len()
+                    );
+                    break;
+                }
+                continue;
+            }
             Err(e) => {
                 log::warn!(
                     "gpmd read stopped by error after {} packets, returning them: {e}",

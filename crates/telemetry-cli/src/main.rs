@@ -30,7 +30,7 @@ enum Cmd {
     Dump {
         video: PathBuf,
         /// Seconds between rows
-        #[arg(long, default_value_t = 1.0, value_parser = parse_every, allow_negative_numbers = true)]
+        #[arg(long, default_value_t = 1.0, value_parser = positive_finite, allow_negative_numbers = true)]
         every: f64,
         #[arg(long, value_enum, default_value_t = Format::Csv)]
         format: Format,
@@ -49,12 +49,12 @@ enum Cmd {
     },
 }
 
-fn parse_every(s: &str) -> Result<f64, String> {
+fn positive_finite(s: &str) -> Result<f64, String> {
     let v: f64 = s.parse().map_err(|_| format!("`{s}` is not a number"))?;
     if v > 0.0 && v.is_finite() {
         Ok(v)
     } else {
-        Err("must be a positive, finite number of seconds".into())
+        Err("must be a positive, finite number".into())
     }
 }
 
@@ -72,7 +72,7 @@ fn t_text(t: f64) -> String {
 #[derive(Args)]
 struct LockArgs {
     /// GPS points with a higher DOP count as unlocked
-    #[arg(long, default_value_t = 10.0)]
+    #[arg(long, default_value_t = 10.0, value_parser = positive_finite, allow_negative_numbers = true)]
     dop_max: f64,
     /// GPS points faster than this (km/h) count as unlocked
     #[arg(long)]
@@ -153,6 +153,7 @@ fn load(video: &Path, lock: &LockArgs) -> Result<Telemetry, String> {
             dop_max: lock.dop_max,
             speed_max: lock.speed_max_kmh.map(|k| k / 3.6),
         },
+        ..TelemetryOptions::default()
     };
     let tel = Telemetry::from_gpmf_packets_with(&raw, &opts).map_err(|e| e.to_string())?;
     for w in tel.warnings() {

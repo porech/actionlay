@@ -1,13 +1,13 @@
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::{DateTime, Utc};
 
 use crate::{
     RawPacket,
     derive::derive,
-    extract::{Extracted, GpsPoint, Sample, extract},
+    extract::{Extracted, GpsPoint, Sample, add_seconds, extract},
     gpmf::GpmfError,
     lock::{self, LockOptions},
     metric::Metric,
-    series::{Interp, Series, gaps_and_coverage},
+    series::{Interp, MAX_BRIDGE, Series, gaps_and_coverage},
     smoothing::Kalman,
     value::{GpsLock, Value},
 };
@@ -21,6 +21,15 @@ pub enum TelemetryError {
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct TelemetryOptions {
     pub lock: LockOptions,
+    /// Duration of the video, seconds. GoPro files end their metadata track
+    /// 0.5–0.7 s before the video; when this is set (finite and > 0):
+    /// - availability (coverage, gaps) is measured on `[0, video_duration]`;
+    /// - in each series, the last valid sample is held to `video_duration`
+    ///   when that is no more than 2 s (the bridging limit) after its end,
+    ///   so values stay Present to the last frame, like the original.
+    ///
+    /// `Telemetry::duration` still reports the telemetry's own end.
+    pub video_duration: Option<f64>,
 }
 
 /// A locked GPS point as displayed (smoothed position), for maps.
@@ -40,12 +49,14 @@ pub struct Availability {
 }
 
 impl Availability {
-    /// Share of `[0, duration]` where the metric is Present, 0.0..=1.0.
+    /// Share of the timeline where the metric is Present, 0.0..=1.0. The
+    /// timeline is `[0, video_duration]` when `TelemetryOptions` gives one,
+    /// else `[0, Telemetry::duration()]`.
     pub fn coverage(&self, m: Metric) -> f64 {
         self.per_metric[m.index()].0
     }
 
-    /// Intervals of `[0, duration]` where the metric is not Present.
+    /// Intervals of the timeline where the metric is not Present.
     pub fn gaps(&self, m: Metric) -> &[(f64, f64)] {
         &self.per_metric[m.index()].1
     }
@@ -93,10 +104,6 @@ pub struct Telemetry {
     warnings: Vec<String>,
 }
 
-fn shift(t: DateTime<Utc>, seconds: f64) -> DateTime<Utc> {
-    t + TimeDelta::microseconds((seconds * 1e6).round() as i64)
-}
-
 fn gps_series(gps: &[GpsPoint], interp: Interp, f: impl Fn(&GpsPoint) -> Option<f64>) -> Series {
     Series::new(interp, gps.iter().map(|p| (p.t, p.end, f(p))))
 }
@@ -125,16 +132,20 @@ impl Telemetry {
                     first,
                 });
             }
-            return Ok(Telemetry::empty(ex.duration));
+            let mut tel = Telemetry::empty(ex.duration);
+            if let Some(v) = valid_duration(opts.video_duration) {
+                tel.availability = availability(&tel.series, v);
+            }
+            return Ok(tel);
         }
         lock::apply(&mut ex.gps, &opts.lock);
         derive(&mut ex.gps);
-        Ok(Self::assemble(ex))
+        Ok(Self::assemble(ex, opts.video_duration))
     }
 
     /// Builds the telemetry from extracted data whose GPS points are already
-    /// lock-filtered and derived.
-    fn assemble(mut ex: Extracted) -> Telemetry {
+    /// lock-filtered and derived. See `TelemetryOptions::video_duration`.
+    fn assemble(mut ex: Extracted, video_duration: Option<f64>) -> Telemetry {
         // The original shows the accelerometer through a per-axis Kalman.
         let mut k = [Kalman::default(), Kalman::default(), Kalman::default()];
         for s in &mut ex.accl {
@@ -149,7 +160,8 @@ impl Telemetry {
         if !g.is_empty() {
             use Interp::{Angle180, Angle360, Linear, Step};
             set(Metric::Lat, gps_series(g, Linear, |p| p.derived.lat));
-            set(Metric::Lon, gps_series(g, Linear, |p| p.derived.lon));
+            // a track crossing the antimeridian goes through ±180, not 0
+            set(Metric::Lon, gps_series(g, Angle180, |p| p.derived.lon));
             set(Metric::Alt, gps_series(g, Linear, |p| p.derived.alt));
             set(Metric::Speed, gps_series(g, Linear, |p| p.derived.speed));
             set(Metric::CSpeed, gps_series(g, Linear, |p| p.derived.cspeed));
@@ -180,8 +192,11 @@ impl Telemetry {
             set(Metric::GravZ, axis_series(&ex.grav, 2, Interp::Linear));
         }
         if !ex.ori.is_empty() {
-            set(Metric::OriPitch, axis_series(&ex.ori, 0, Interp::Step));
-            set(Metric::OriRoll, axis_series(&ex.ori, 1, Interp::Step));
+            // ori.pitch comes from an atan2, in (-180, 180] (the original
+            // swaps the names): it wraps when the camera is upside down.
+            // ori.roll is an asin, in [-90, 90], and never wraps.
+            set(Metric::OriPitch, axis_series(&ex.ori, 0, Interp::Angle180));
+            set(Metric::OriRoll, axis_series(&ex.ori, 1, Interp::Linear));
             set(Metric::OriYaw, axis_series(&ex.ori, 2, Interp::Angle180));
         }
         if !ex.temp.is_empty() {
@@ -189,13 +204,7 @@ impl Telemetry {
             set(Metric::Temp, Series::new(Interp::Linear, temp));
         }
 
-        // UTC at file time 0: from the first locked point, else from any
-        // GPSU (receivers usually know the time before they get a fix).
-        let start_utc = g
-            .iter()
-            .filter(|p| p.lock.is_locked())
-            .chain(g.iter())
-            .find_map(|p| p.utc.map(|u| shift(u, -p.t)));
+        let start_utc = start_utc(g);
         let track = g
             .iter()
             .filter_map(|p| {
@@ -207,7 +216,13 @@ impl Telemetry {
                 })
             })
             .collect();
-        let availability = availability(&series, ex.duration);
+        let timeline = valid_duration(video_duration).unwrap_or(ex.duration);
+        if timeline > ex.duration {
+            for s in series.iter_mut().flatten() {
+                s.hold_last_until(timeline, MAX_BRIDGE);
+            }
+        }
+        let availability = availability(&series, timeline);
         Telemetry {
             duration: ex.duration,
             start_utc,
@@ -258,7 +273,7 @@ impl Telemetry {
             .map_or(GpsLock::Unknown, |code| GpsLock::from_fix(code as u32));
         Snapshot {
             t,
-            utc: self.start_utc.map(|u| shift(u, t)),
+            utc: self.start_utc.and_then(|u| add_seconds(u, t)),
             gps_lock,
             values,
             available: std::array::from_fn(|i| self.availability.is_available(Metric::ALL[i])),
@@ -279,6 +294,33 @@ impl Telemetry {
     pub fn warnings(&self) -> &[String] {
         &self.warnings
     }
+}
+
+/// A usable video duration: finite and positive.
+fn valid_duration(d: Option<f64>) -> Option<f64> {
+    d.filter(|d| d.is_finite() && *d > 0.0)
+}
+
+/// UTC at file time 0. GPSU can step after the first packet (max-heromode:
+/// +2.47 s between packets 0 and 1, then steady), so this is the median of
+/// `utc − t` over locked points, in whole microseconds (the lower middle
+/// value for an even count). `utc − t` is constant within a packet, so this
+/// is in effect the median packet, weighted by points. Without locked points
+/// it falls back to the first point with a UTC (receivers usually know the
+/// time before they get a fix).
+fn start_utc(g: &[GpsPoint]) -> Option<DateTime<Utc>> {
+    let at_zero = |p: &GpsPoint| p.utc.and_then(|u| add_seconds(u, -p.t));
+    let mut offsets: Vec<i64> = g
+        .iter()
+        .filter(|p| p.lock.is_locked())
+        .filter_map(at_zero)
+        .map(|u| u.timestamp_micros())
+        .collect();
+    if offsets.is_empty() {
+        return g.iter().find_map(at_zero);
+    }
+    offsets.sort_unstable();
+    DateTime::from_timestamp_micros(offsets[(offsets.len() - 1) / 2])
 }
 
 fn availability(series: &[Option<Series>], duration: f64) -> Availability {
@@ -461,6 +503,7 @@ mod tests {
                 dop_max: 1.0,
                 speed_max: None,
             },
+            ..TelemetryOptions::default()
         };
         let tel = Telemetry::from_gpmf_packets_with(&gps_packets(&[3, 3]), &opts).unwrap();
         assert_eq!(tel.sample(0.5).gps_lock, GpsLock::NoLock);
@@ -480,6 +523,161 @@ mod tests {
         // also outside the video and for the clone
         assert!(tel.sample(100.0).clone().is_available(Metric::Lat));
         assert!(!Telemetry::empty(5.0).sample(1.0).is_available(Metric::Lat));
+    }
+
+    #[test]
+    fn absurd_times_have_no_utc_and_never_panic() {
+        let tel = Telemetry::from_gpmf_packets(&gps_packets(&[3; 2])).unwrap();
+        assert!(tel.start_utc().is_some());
+        for t in [
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+            1e13,
+            -1e13,
+            1e300,
+        ] {
+            let snap = tel.sample(t);
+            assert_eq!(snap.utc, None, "t={t}");
+        }
+        assert!(tel.sample(1.0).utc.is_some());
+    }
+
+    #[test]
+    fn start_utc_follows_the_median_offset_not_the_first_packet() {
+        // GPSU of packet 0 is 2 s early; packets 1–4 agree with each other.
+        let mut packets = gps_packets(&[3; 5]);
+        packets[0] = gps_packets(&[3])[0].clone();
+        let early = devc(&[gps5_stream(
+            "240501095958.000",
+            3,
+            150,
+            &(0..18)
+                .map(|i| {
+                    let v = 1.0 + 0.01 * f64::from(i);
+                    [45.0, 7.0, 100.0, v, v]
+                })
+                .collect::<Vec<_>>(),
+        )]);
+        packets[0].data = early;
+        let tel = Telemetry::from_gpmf_packets(&packets).unwrap();
+        assert_eq!(
+            tel.start_utc().unwrap().to_rfc3339(),
+            "2024-05-01T10:00:00+00:00"
+        );
+    }
+
+    #[test]
+    fn video_duration_holds_the_last_values_through_the_tail() {
+        let packets = gps_packets(&[3; 4]);
+        let plain = Telemetry::from_gpmf_packets(&packets).unwrap();
+        assert!(matches!(
+            plain.sample(4.5).get(Metric::Speed),
+            Value::Stale { .. }
+        ));
+        let opts = |d| TelemetryOptions {
+            video_duration: Some(d),
+            ..TelemetryOptions::default()
+        };
+        let tel = Telemetry::from_gpmf_packets_with(&packets, &opts(5.0)).unwrap();
+        assert_eq!(tel.duration(), 4.0);
+        let last = plain.sample(3.99).get(Metric::Lat).present().unwrap();
+        assert_eq!(tel.sample(4.5).get(Metric::Lat), Value::Present(last));
+        assert!(tel.sample(4.99).get(Metric::Speed).present().is_some());
+        assert_eq!(tel.availability().coverage(Metric::Lat), 1.0);
+        assert!(tel.availability().gaps(Metric::Lat).is_empty());
+        // coverage is measured on the video: an absent metric is a gap of it
+        assert_eq!(tel.availability().gaps(Metric::AcclX), &[(0.0, 5.0)]);
+
+        // a tail longer than the bridging limit is not held
+        let tel = Telemetry::from_gpmf_packets_with(&packets, &opts(6.5)).unwrap();
+        assert!(matches!(
+            tel.sample(5.0).get(Metric::Lat),
+            Value::Stale { .. }
+        ));
+        assert!((tel.availability().coverage(Metric::Lat) - 4.0 / 6.5).abs() < 1e-12);
+        assert_eq!(tel.availability().gaps(Metric::Lat), &[(4.0, 6.5)]);
+
+        // a fix lost before the end stays lost
+        let lost = gps_packets(&[3, 3, 3, 0]);
+        let tel = Telemetry::from_gpmf_packets_with(&lost, &opts(4.5)).unwrap();
+        assert!(matches!(
+            tel.sample(4.2).get(Metric::Lat),
+            Value::Stale { .. }
+        ));
+        assert_eq!(tel.availability().gaps(Metric::Lat), &[(3.0, 4.5)]);
+
+        // without telemetry the timeline is still the video
+        let tel = Telemetry::from_gpmf_packets_with(&[], &opts(5.0)).unwrap();
+        assert_eq!(tel.availability().gaps(Metric::Lat), &[(0.0, 5.0)]);
+    }
+
+    #[test]
+    fn longitude_crosses_the_antimeridian_through_180() {
+        use crate::extract::Derived;
+        let point = |t: f64, lon: f64| GpsPoint {
+            packet: 0,
+            index: 0,
+            t,
+            end: t + 1.0,
+            utc: None,
+            lat: 0.0,
+            lon,
+            alt: 0.0,
+            speed2d: 5.0,
+            speed3d: 5.0,
+            fix: 3,
+            dop: 1.5,
+            lock: GpsLock::Lock3d,
+            derived: Derived {
+                lat: Some(0.0),
+                lon: Some(lon),
+                alt: Some(0.0),
+                ..Derived::default()
+            },
+        };
+        let ex = Extracted {
+            gps: vec![point(0.0, 179.9), point(1.0, -179.9)],
+            duration: 2.0,
+            parsed_packets: 1,
+            ..Extracted::default()
+        };
+        let tel = Telemetry::assemble(ex, None);
+        for i in 0..=100 {
+            let lon = tel
+                .sample(f64::from(i) * 0.01)
+                .get(Metric::Lon)
+                .present()
+                .unwrap();
+            assert!(lon.abs() >= 179.9 - 1e-9, "lon {lon}");
+        }
+        assert_eq!(tel.sample(0.5).get(Metric::Lon), Value::Present(180.0));
+    }
+
+    #[test]
+    fn orientation_interpolates() {
+        let ex = Extracted {
+            ori: vec![
+                Sample {
+                    t: 0.0,
+                    end: 1.0,
+                    v: [170.0, 10.0, 0.0],
+                },
+                Sample {
+                    t: 1.0,
+                    end: 2.0,
+                    v: [-170.0, 20.0, 0.0],
+                },
+            ],
+            duration: 2.0,
+            parsed_packets: 1,
+            ..Extracted::default()
+        };
+        let tel = Telemetry::assemble(ex, None);
+        let snap = tel.sample(0.5);
+        // pitch wraps through 180, roll is linear
+        assert_eq!(snap.get(Metric::OriPitch), Value::Present(180.0));
+        assert_eq!(snap.get(Metric::OriRoll), Value::Present(15.0));
     }
 
     #[test]
@@ -514,7 +712,7 @@ mod tests {
             parsed_packets: 1,
             ..Extracted::default()
         };
-        let tel = Telemetry::assemble(ex);
+        let tel = Telemetry::assemble(ex, None);
         let mut saw_cross = false;
         for i in 0..=100 {
             let snap = tel.sample(f64::from(i) * 0.01);
