@@ -3,6 +3,8 @@
 #[allow(dead_code)]
 mod layouts;
 #[allow(dead_code)]
+mod overlay;
+#[allow(dead_code)]
 mod prefs;
 #[allow(dead_code)]
 mod telemetry_load;
