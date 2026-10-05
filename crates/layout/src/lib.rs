@@ -6,6 +6,7 @@ pub mod format;
 pub mod geom;
 pub mod import;
 pub mod model;
+pub mod package;
 pub mod scale;
 pub mod style;
 pub mod validate;
@@ -31,6 +32,10 @@ pub const CURRENT_VERSION: u32 = 1;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[schemars(title = "ActionLay overlay layout")]
 pub struct Layout {
+    /// Assets scoped to this document, never installed or serialized as bytes.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub loaded_assets: std::collections::BTreeMap<String, std::sync::Arc<Vec<u8>>>,
     #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
     /// Format version, 1 or higher.
@@ -92,7 +97,12 @@ impl Layout {
     }
 
     pub fn load(path: &Path) -> Result<Loaded, LayoutError> {
-        Self::from_json(&std::fs::read_to_string(path)?)
+        if package::is_package(path) {
+            return package::load(path);
+        }
+        let mut loaded = Self::from_json(&std::fs::read_to_string(path)?)?;
+        package::load_loose_assets(&mut loaded.layout, path.parent().unwrap_or(Path::new(".")))?;
+        Ok(loaded)
     }
 
     /// The layout as pretty JSON. A layout with errors is refused, so that nothing is
@@ -107,6 +117,16 @@ impl Layout {
 
     /// Writes the layout; refuses a layout with errors (see [`Layout::to_json`]).
     pub fn save(&self, path: &Path) -> Result<(), LayoutError> {
+        if package::is_package(path) {
+            return package::save(self, path);
+        }
+        if !self.loaded_assets.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Save asset-bearing layouts as .actionlay-layout",
+            )
+            .into());
+        }
         std::fs::write(path, self.to_json()? + "\n")?;
         Ok(())
     }

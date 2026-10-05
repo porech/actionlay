@@ -218,7 +218,9 @@ pub(crate) fn draw_nodes(p: &mut Painter, nodes: &[Node], parent: Rect, opacity:
 pub(crate) fn draw_text(p: &mut Painter, style: &TextStyle, dim: bool, at: Placement, ctx: &Ctx) {
     let start = Instant::now();
     let s = ctx.scale;
-    let (w_px, h_px) = p.text.layout(p.scratch, style.size * s, style.weight);
+    let (w_px, h_px) = p
+        .text
+        .layout_family(p.scratch, style.size * s, style.weight, &style.font);
     if w_px > 0.0 {
         let r = place(at.parent, at.anchor, at.offset, [w_px / s, h_px / s]);
         p.record_box(r);

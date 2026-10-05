@@ -14,6 +14,8 @@ cosmic-text.workspace = true
 resvg.workspace = true
 chrono = { workspace = true, features = ["clock"] }
 log.workspace = true
+fontdb = { version = "0.23", default-features = false, features = ["fs", "fontconfig"] }
+serde_json.workspace = true
 
 [dev-dependencies]
 actionlay-telemetry = { path = "../telemetry", features = ["test-util"] }

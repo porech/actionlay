@@ -73,7 +73,13 @@ pub fn validate(layout: &Layout) -> Vec<Issue> {
             ),
         ));
     }
-    v.extra("layout", &layout.extra);
+    let mut extra = layout.extra.clone();
+    extra.remove("assets");
+    v.extra("layout", &extra);
+    if let Err(error) = crate::package::asset_names(layout) {
+        v.issues
+            .push(Issue::error("layout.assets", error.to_string()));
+    }
     if let Some(theme) = &layout.theme {
         v.theme(theme);
     }

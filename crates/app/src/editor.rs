@@ -10,10 +10,14 @@ use std::path::{Path, PathBuf};
 
 type NodePath = Vec<usize>;
 
+#[cfg(test)]
+mod m4_tests;
+
 #[derive(Clone, Copy, PartialEq)]
 pub enum Action {
     Save,
     SaveAs,
+    Export,
     Exit,
     New,
 }
@@ -25,24 +29,29 @@ struct Drag {
     rect: Rect,
     parent: Rect,
     resize: bool,
+    moving: Vec<actionlay_render::HitBox>,
 }
 
 pub struct Editor {
     pub draft: Layout,
     saved: Layout,
     pub path: Option<PathBuf>,
+    pub include_fonts: bool,
     is_new: bool,
     selection: Option<NodePath>,
+    additional_selection: Vec<NodePath>,
+    root: Rect,
     properties_buffer: Option<(NodePath, Value)>,
     invalid_properties: bool,
     property_error: Option<String>,
     undo: Vec<Layout>,
     redo: Vec<Layout>,
-    clipboard: Option<Node>,
+    clipboard: Vec<Node>,
     drag: Option<Drag>,
     pub video_background: bool,
     pub dimensions: [u32; 2],
     snap: bool,
+    automatic_anchor: bool,
     renderer: Renderer,
     offline_maps: actionlay_maps::TileStore,
     maps: actionlay_maps::TileStore,
@@ -51,6 +60,9 @@ pub struct Editor {
     last_preview: Option<String>,
     background: Option<egui::TextureHandle>,
     schema: Value,
+    font_key: Option<String>,
+    font_warnings: Vec<String>,
+    font_families: Vec<String>,
     pub error: Option<String>,
 }
 
@@ -65,18 +77,22 @@ impl Editor {
             saved: layout.clone(),
             draft: layout,
             path,
+            include_fonts: true,
             is_new,
             selection: None,
+            additional_selection: Vec::new(),
+            root: Rect::new(0.0, 0.0, 1920.0, 1080.0),
             properties_buffer: None,
             invalid_properties: false,
             property_error: None,
             undo: Vec::new(),
             redo: Vec::new(),
-            clipboard: None,
+            clipboard: Vec::new(),
             drag: None,
             video_background: video_size.is_some(),
             dimensions: video_size.unwrap_or([1920, 1080]),
             snap: true,
+            automatic_anchor: false,
             renderer: Renderer::new(),
             offline_maps: actionlay_maps::TileStore::offline(),
             maps: actionlay_maps::TileStore::offline(),
@@ -85,12 +101,16 @@ impl Editor {
             last_preview: None,
             background: None,
             schema: actionlay_layout::json_schema(),
+            font_key: None,
+            font_warnings: Vec::new(),
+            font_families: Vec::new(),
             error: None,
         }
     }
 
     pub fn blank() -> Layout {
         Layout {
+            loaded_assets: Default::default(),
             schema: None,
             version: actionlay_layout::CURRENT_VERSION,
             name: Some("Untitled".into()),
@@ -104,6 +124,10 @@ impl Editor {
 
     pub fn dirty(&self) -> bool {
         self.is_new || self.draft != self.saved || self.invalid_properties
+    }
+
+    pub fn invalid_parameters(&self) -> bool {
+        self.invalid_properties
     }
 
     pub fn is_system_copy(&self) -> bool {
@@ -131,13 +155,20 @@ impl Editor {
         // Validate first, then atomically replace the destination. Neither the
         // saved baseline nor the destination changes on validation/write errors.
         let text = self.draft.to_json().map_err(|e| e.to_string())?;
-        let mut file = tempfile::NamedTempFile::new_in(path.parent().unwrap_or(Path::new(".")))
-            .map_err(|e| e.to_string())?;
-        use std::io::Write;
-        file.write_all((text + "\n").as_bytes())
-            .and_then(|_| file.as_file().sync_all())
-            .map_err(|e| e.to_string())?;
-        file.persist(path).map_err(|e| e.to_string())?;
+        if actionlay_layout::package::is_package(path) {
+            actionlay_layout::package::save(&self.draft, path).map_err(|e| e.to_string())?;
+        } else {
+            if !self.draft.loaded_assets.is_empty() {
+                return Err("Save this layout as .actionlay-layout to preserve its assets".into());
+            }
+            let mut file = tempfile::NamedTempFile::new_in(path.parent().unwrap_or(Path::new(".")))
+                .map_err(|e| e.to_string())?;
+            use std::io::Write;
+            file.write_all((text + "\n").as_bytes())
+                .and_then(|_| file.as_file().sync_all())
+                .map_err(|e| e.to_string())?;
+            file.persist(path).map_err(|e| e.to_string())?;
+        }
         self.saved = self.draft.clone();
         self.path = Some(path.to_path_buf());
         self.is_new = false;
@@ -149,6 +180,7 @@ impl Editor {
         if let Some(layout) = self.undo.pop() {
             self.redo.push(std::mem::replace(&mut self.draft, layout));
             self.selection = None;
+            self.additional_selection.clear();
             self.properties_buffer = None;
             self.invalid_properties = false;
             self.property_error = None;
@@ -158,6 +190,7 @@ impl Editor {
         if let Some(layout) = self.redo.pop() {
             self.undo.push(std::mem::replace(&mut self.draft, layout));
             self.selection = None;
+            self.additional_selection.clear();
             self.properties_buffer = None;
             self.invalid_properties = false;
             self.property_error = None;
@@ -175,55 +208,63 @@ impl Editor {
         let index = self.draft.nodes.len();
         self.draft.nodes.push(node);
         self.selection = Some(vec![index]);
+        self.additional_selection.clear();
         self.commit(before);
     }
 
     fn duplicate(&mut self) {
-        if let Some(node) = self
-            .selection
-            .as_ref()
-            .and_then(|p| node_at(&self.draft.nodes, p))
-            .cloned()
-        {
-            self.insert_copy(node);
-        }
+        let copies = self.selected_copies();
+        self.insert_copies(copies);
     }
-    fn insert_copy(&mut self, mut node: Node) {
-        let before = self.draft.clone();
-        strip_ids(&mut node);
-        let mut v = serde_json::to_value(&node).unwrap();
-        let offset = v.get("offset").cloned().unwrap_or(json!([0.0, 0.0]));
-        v["offset"] = json!([
-            offset[0].as_f64().unwrap_or(0.0) + 24.0,
-            offset[1].as_f64().unwrap_or(0.0) + 24.0
-        ]);
-        node = serde_json::from_value(v).unwrap();
-        let path = self
+
+    fn selected_copies(&self) -> Vec<Node> {
+        let parent_path = self
             .selection
             .as_ref()
-            .map(|p| p[..p.len() - 1].to_vec())
+            .map(|path| path[..path.len() - 1].to_vec())
             .unwrap_or_default();
-        if let Some(nodes) = children_at_mut(&mut self.draft.nodes, &path) {
-            let index = nodes.len();
-            nodes.push(node);
-            self.selection = Some(path.into_iter().chain([index]).collect());
-            self.commit(before);
-        }
+        let parent = container_box(
+            &self.draft.nodes,
+            &parent_path,
+            self.renderer.hit_boxes(),
+            self.root,
+        );
+        self.selected_paths()
+            .iter()
+            .filter_map(|path| {
+                let mut node = node_at(&self.draft.nodes, path)?.clone();
+                if path[..path.len() - 1] != parent_path
+                    && let Some(parent) = parent
+                    && let Some(hit) = self
+                        .renderer
+                        .hit_boxes()
+                        .iter()
+                        .find(|hit| &hit.path == path)
+                {
+                    let rect = placement_rect(&node, hit);
+                    set_relative_position(&mut node, parent, rect);
+                }
+                Some(node)
+            })
+            .collect()
     }
     fn delete(&mut self) {
         self.properties_buffer = None;
         self.invalid_properties = false;
         self.property_error = None;
-        if let Some(path) = self.selection.take() {
-            let before = self.draft.clone();
-            if let Some(nodes) = children_at_mut(&mut self.draft.nodes, &path[..path.len() - 1]) {
-                nodes.remove(*path.last().unwrap());
-                self.commit(before);
-            }
-        }
+        let paths = self.selected_paths();
+        let before = self.draft.clone();
+        remove_paths(&mut self.draft.nodes, &paths);
+        self.selection = None;
+        self.additional_selection.clear();
+        self.commit(before);
     }
     fn reorder(&mut self, forward: bool) {
+        if self.selected_paths().len() > 1 {
+            return;
+        }
         if let Some(path) = &mut self.selection {
+            self.additional_selection.clear();
             let before = self.draft.clone();
             let i = *path.last().unwrap();
             if let Some(nodes) = children_at_mut(&mut self.draft.nodes, &path[..path.len() - 1]) {
@@ -235,6 +276,212 @@ impl Editor {
             }
             self.commit(before);
         }
+    }
+
+    fn selected_paths(&self) -> Vec<NodePath> {
+        normalized_paths(
+            self.selection
+                .iter()
+                .cloned()
+                .chain(self.additional_selection.iter().cloned())
+                .collect(),
+        )
+    }
+
+    fn insert_copies(&mut self, copies: Vec<Node>) {
+        if copies.is_empty() {
+            return;
+        }
+        let before = self.draft.clone();
+        let parent = self
+            .selection
+            .as_ref()
+            .map(|p| p[..p.len() - 1].to_vec())
+            .unwrap_or_default();
+        let mut selected = Vec::new();
+        if let Some(nodes) = children_at_mut(&mut self.draft.nodes, &parent) {
+            for mut node in copies {
+                strip_ids(&mut node);
+                let mut value = serde_json::to_value(&node).unwrap();
+                let offset = value.get("offset").cloned().unwrap_or(json!([0, 0]));
+                value["offset"] = json!([
+                    offset[0].as_f64().unwrap_or(0.0) + 24.0,
+                    offset[1].as_f64().unwrap_or(0.0) + 24.0
+                ]);
+                node = serde_json::from_value(value).unwrap();
+                selected.push(parent.iter().copied().chain([nodes.len()]).collect());
+                nodes.push(node);
+            }
+        }
+        self.selection = selected.last().cloned();
+        self.additional_selection = selected;
+        self.commit(before);
+    }
+
+    /// Move selected roots into a container while preserving their current boxes.
+    fn reparent(&mut self, target: NodePath) -> Result<(), String> {
+        let paths = self.selected_paths();
+        if paths.is_empty() {
+            return Ok(());
+        }
+        if paths.iter().any(|path| target.starts_with(path)) {
+            return Err("A widget cannot be moved into itself or its descendants".into());
+        }
+        let parent = container_box(
+            &self.draft.nodes,
+            &target,
+            self.renderer.hit_boxes(),
+            self.root,
+        )
+        .ok_or("Select a group or frame as the destination")?;
+        let mut moved = Vec::new();
+        for path in &paths {
+            let mut node = node_at(&self.draft.nodes, path)
+                .ok_or("Selection no longer exists")?
+                .clone();
+            let hit = self
+                .renderer
+                .hit_boxes()
+                .iter()
+                .find(|hit| &hit.path == path)
+                .ok_or("The selected widget has no visible preview geometry")?;
+            let rect = placement_rect(&node, hit);
+            set_relative_position(&mut node, parent, rect);
+            moved.push(node);
+        }
+        let before = self.draft.clone();
+        let mut draft = before.clone();
+        remove_paths(&mut draft.nodes, &paths);
+        let target = remap_path(&target, &paths);
+        let nodes =
+            children_at_mut(&mut draft.nodes, &target).ok_or("Destination no longer exists")?;
+        let selected: Vec<NodePath> = (nodes.len()..nodes.len() + moved.len())
+            .map(|index| target.iter().copied().chain([index]).collect())
+            .collect();
+        nodes.extend(moved);
+        draft.to_json().map_err(|e| e.to_string())?;
+        self.draft = draft;
+        self.selection = selected.last().cloned();
+        self.additional_selection = selected;
+        self.properties_buffer = None;
+        self.commit(before);
+        Ok(())
+    }
+
+    fn group_selection(&mut self) -> Result<(), String> {
+        let paths = self.selected_paths();
+        if paths.is_empty() {
+            return Ok(());
+        }
+        let boxes = self.renderer.hit_boxes();
+        let rects: Vec<_> = paths
+            .iter()
+            .filter_map(|path| {
+                boxes
+                    .iter()
+                    .find(|hit| &hit.path == path)
+                    .map(|hit| hit.rect)
+            })
+            .collect();
+        if rects.len() != paths.len() {
+            return Err("Selected widgets must be visible in the preview".into());
+        }
+        let bounds = union_rects(&rects).unwrap();
+        let parent_path = paths[0][..paths[0].len() - 1].to_vec();
+        let parent_path = if paths.iter().all(|p| p[..p.len() - 1] == parent_path) {
+            parent_path
+        } else {
+            Vec::new()
+        };
+        let parent = container_box(&self.draft.nodes, &parent_path, boxes, self.root)
+            .ok_or("Parent geometry unavailable")?;
+        let mut children = Vec::new();
+        for path in &paths {
+            let mut node = node_at(&self.draft.nodes, path).unwrap().clone();
+            let hit = boxes.iter().find(|hit| &hit.path == path).unwrap();
+            set_relative_position(
+                &mut node,
+                bounds,
+                placement_rect(node_at(&self.draft.nodes, path).unwrap(), hit),
+            );
+            let old_opacity = parent_opacity(&self.draft.nodes, &path[..path.len() - 1]);
+            let new_opacity = parent_opacity(&self.draft.nodes, &parent_path);
+            if old_opacity != new_opacity && new_opacity > 0.0 {
+                let mut value = serde_json::to_value(&node).unwrap();
+                value["opacity"] = json!(
+                    value["opacity"].as_f64().unwrap_or(1.0) * (old_opacity / new_opacity) as f64
+                );
+                node = serde_json::from_value(value).unwrap();
+            }
+            children.push(node);
+        }
+        let mut group: Node = serde_json::from_value(json!({"type":"group", "name":"Group", "size":[bounds.w.max(1.0),bounds.h.max(1.0)], "children":children})).unwrap();
+        set_relative_position(&mut group, parent, bounds);
+        let before = self.draft.clone();
+        remove_paths(&mut self.draft.nodes, &paths);
+        let parent_path = remap_path(&parent_path, &paths);
+        let nodes = children_at_mut(&mut self.draft.nodes, &parent_path).unwrap();
+        self.selection = Some(parent_path.into_iter().chain([nodes.len()]).collect());
+        nodes.push(group);
+        self.additional_selection.clear();
+        self.properties_buffer = None;
+        self.commit(before);
+        Ok(())
+    }
+
+    fn ungroup(&mut self) -> Result<(), String> {
+        let Some(path) = self.selection.clone() else {
+            return Ok(());
+        };
+        let Some(Node::Known(Widget::Group(group))) = node_at(&self.draft.nodes, &path) else {
+            return Err("Select a group to ungroup".into());
+        };
+        // Preserve opacity/visibility rather than silently changing the result.
+        let common = group.common.clone();
+        if !group.extra.is_empty() {
+            return Err(
+                "This group has fields from another version; ungrouping would discard them".into(),
+            );
+        }
+        let parent = self
+            .renderer
+            .hit_boxes()
+            .iter()
+            .find(|hit| hit.path == path)
+            .ok_or("Group geometry unavailable")?
+            .parent;
+        let mut children = group.children.clone();
+        for (index, child) in children.iter_mut().enumerate() {
+            let child_path: Vec<_> = path.iter().copied().chain([index]).collect();
+            let hit = self
+                .renderer
+                .hit_boxes()
+                .iter()
+                .find(|hit| hit.path == child_path)
+                .ok_or("All group children must be visible to ungroup")?;
+            let rect = placement_rect(child, hit);
+            set_relative_position(child, parent, rect);
+            let mut value = serde_json::to_value(&*child).unwrap();
+            if let Some(opacity) = common.opacity {
+                value["opacity"] = json!(opacity * value["opacity"].as_f64().unwrap_or(1.0) as f32);
+            }
+            if common.visible == Some(false) {
+                value["visible"] = json!(false);
+            }
+            *child = serde_json::from_value(value).unwrap();
+        }
+        let before = self.draft.clone();
+        let nodes = children_at_mut(&mut self.draft.nodes, &path[..path.len() - 1]).unwrap();
+        let index = *path.last().unwrap();
+        let selected: Vec<NodePath> = (index..index + children.len())
+            .map(|i| path[..path.len() - 1].iter().copied().chain([i]).collect())
+            .collect();
+        nodes.splice(index..=index, children);
+        self.selection = selected.last().cloned();
+        self.additional_selection = selected;
+        self.properties_buffer = None;
+        self.commit(before);
+        Ok(())
     }
 
     pub fn ui(
@@ -272,6 +519,10 @@ impl Editor {
                 if ui.button("Save as…").clicked() {
                     action = Some(Action::SaveAs);
                 }
+                if ui.button("Export package…").clicked() {
+                    action = Some(Action::Export);
+                }
+                ui.checkbox(&mut self.include_fonts, "Include fonts");
                 if ui.button("Exit editor").clicked() {
                     action = Some(Action::Exit);
                 }
@@ -313,6 +564,7 @@ impl Editor {
                     }
                 }
                 ui.checkbox(&mut self.snap, "Snap to guides");
+                ui.checkbox(&mut self.automatic_anchor, "Update anchor on drop");
             });
         });
         if ui.is_enabled() && !ctx.egui_wants_keyboard_input() {
@@ -342,16 +594,15 @@ impl Editor {
                     self.delete();
                 }
                 if i.consume_key(egui::Modifiers::COMMAND, egui::Key::C) {
-                    self.clipboard = self
-                        .selection
-                        .as_ref()
-                        .and_then(|p| node_at(&self.draft.nodes, p))
-                        .cloned();
+                    self.clipboard = self.selected_copies();
                 }
-                if i.consume_key(egui::Modifiers::COMMAND, egui::Key::V)
-                    && let Some(n) = self.clipboard.clone()
-                {
-                    self.insert_copy(n);
+                if i.consume_key(egui::Modifiers::COMMAND, egui::Key::V) {
+                    self.insert_copies(self.clipboard.clone());
+                }
+                if i.consume_key(egui::Modifiers::COMMAND, egui::Key::A) {
+                    self.additional_selection =
+                        (0..self.draft.nodes.len()).map(|i| vec![i]).collect();
+                    self.selection = self.additional_selection.last().cloned();
                 }
             });
         }
@@ -398,11 +649,13 @@ impl Editor {
                     }
                     ui.separator();
                     ui.heading("Layers");
+                    ui.small("Ctrl/⌘ or Shift-click to select several widgets.");
                     layer_tree(
                         ui,
                         &self.draft.nodes,
                         &mut Vec::new(),
                         &mut self.selection,
+                        &mut self.additional_selection,
                         warnings_telemetry,
                     );
                     ui.horizontal_wrapped(|ui| {
@@ -412,13 +665,65 @@ impl Editor {
                         if ui.button("Delete").clicked() {
                             self.delete();
                         }
-                        if ui.button("Forward").clicked() {
+                        if ui
+                            .add_enabled(
+                                self.selected_paths().len() == 1,
+                                egui::Button::new("Forward"),
+                            )
+                            .clicked()
+                        {
                             self.reorder(true);
                         }
-                        if ui.button("Backward").clicked() {
+                        if ui
+                            .add_enabled(
+                                self.selected_paths().len() == 1,
+                                egui::Button::new("Backward"),
+                            )
+                            .clicked()
+                        {
                             self.reorder(false);
                         }
                     });
+                    ui.horizontal_wrapped(|ui| {
+                        if ui.button("Group").clicked() {
+                            self.error = self.group_selection().err();
+                        }
+                        if ui.button("Ungroup").clicked() {
+                            self.error = self.ungroup().err();
+                        }
+                    });
+                    let mut destination = None;
+                    egui::ComboBox::from_id_salt("move-to-group")
+                        .selected_text("Move selection to…")
+                        .show_ui(ui, |ui| {
+                            if ui.button("Layout root").clicked() {
+                                destination = Some(Vec::new());
+                                ui.close();
+                            }
+                            for hit in self.renderer.hit_boxes() {
+                                if let Some(Node::Known(widget)) =
+                                    node_at(&self.draft.nodes, &hit.path)
+                                    && matches!(widget, Widget::Group(_) | Widget::Frame(_))
+                                    && !self
+                                        .selected_paths()
+                                        .iter()
+                                        .any(|path| hit.path.starts_with(path))
+                                    && ui
+                                        .button(format!(
+                                            "{} ({:?})",
+                                            widget.common().name.as_deref().unwrap_or("Group"),
+                                            hit.path
+                                        ))
+                                        .clicked()
+                                {
+                                    destination = Some(hit.path.clone());
+                                    ui.close();
+                                }
+                            }
+                        });
+                    if let Some(target) = destination {
+                        self.error = self.reparent(target).err();
+                    }
                 });
             });
         egui::Panel::right("editor-properties")
@@ -478,6 +783,7 @@ impl Editor {
                     .ratio(),
             );
             let root = geom::root_box(canvas.width(), canvas.height(), scale);
+            self.root = root;
             if self.video_background {
                 if let Some(video) = video {
                     video.show(ui, canvas, Some(canvas), false);
@@ -546,6 +852,31 @@ impl Editor {
                     egui::Color32::WHITE,
                 );
             }
+            for hit in self.renderer.hit_boxes() {
+                if let Some(node) = node_at(&self.draft.nodes, &hit.path) {
+                    let warnings = metric_warnings(node, warnings_telemetry);
+                    if !warnings.is_empty() {
+                        let pos = canvas.min
+                            + egui::vec2((hit.rect.x + hit.rect.w) * scale, hit.rect.y * scale);
+                        let badge = egui::Rect::from_center_size(pos, egui::vec2(20.0, 20.0));
+                        ui.painter()
+                            .rect_filled(badge, 3.0, egui::Color32::from_rgb(100, 75, 0));
+                        ui.painter().text(
+                            pos,
+                            egui::Align2::CENTER_CENTER,
+                            "!",
+                            egui::FontId::proportional(15.0),
+                            egui::Color32::YELLOW,
+                        );
+                        ui.interact(
+                            badge,
+                            egui::Id::new(("data-warning", &hit.path)),
+                            egui::Sense::hover(),
+                        )
+                        .on_hover_text(warnings.join("\n"));
+                    }
+                }
+            }
             self.canvas_input(ui, &response, canvas, root, scale);
         });
         action
@@ -577,8 +908,18 @@ impl Editor {
             .selection
             .as_ref()
             .and_then(|p| boxes.iter().find(|b| &b.path == p));
+        for path in self.selected_paths() {
+            if let Some(hit) = boxes.iter().find(|hit| hit.path == path) {
+                ui.painter().rect_stroke(
+                    screen(hit.rect),
+                    0.0,
+                    egui::Stroke::new(1.5, egui::Color32::LIGHT_BLUE),
+                    egui::StrokeKind::Outside,
+                );
+            }
+        }
         let mut resize_response = None;
-        if let Some(hit) = selected {
+        if let Some(hit) = selected.filter(|_| self.selected_paths().len() <= 1) {
             let rect = screen(hit.rect);
             ui.painter().rect_stroke(
                 rect,
@@ -622,8 +963,23 @@ impl Editor {
                 })
             };
             if let Some(hit) = hit {
-                self.selection = Some(hit.path.clone());
+                let additive = ctx.input(|i| i.modifiers.command || i.modifiers.shift);
+                let already_selected = self.selected_paths().contains(&hit.path);
+                if response.clicked() || !already_selected {
+                    select_path(
+                        &mut self.selection,
+                        &mut self.additional_selection,
+                        hit.path.clone(),
+                        additive,
+                    );
+                }
                 if resizing || response.drag_started() {
+                    let paths = self.selected_paths();
+                    let moving = boxes
+                        .iter()
+                        .filter(|hit| paths.contains(&hit.path))
+                        .cloned()
+                        .collect();
                     self.drag = Some(Drag {
                         start: ctx
                             .input(|i| i.pointer.press_origin())
@@ -633,10 +989,12 @@ impl Editor {
                         rect: hit.rect,
                         parent: hit.parent,
                         resize: resizing,
+                        moving,
                     });
                 }
             } else if response.clicked() {
                 self.selection = None;
+                self.additional_selection.clear();
             }
         }
         let delta = self
@@ -651,19 +1009,64 @@ impl Editor {
                 if drag.resize {
                     resize_node(node, drag.rect, delta / scale, drag.parent);
                 } else {
-                    let mut rect = drag.rect;
+                    let mut rect =
+                        union_rects(&drag.moving.iter().map(|hit| hit.rect).collect::<Vec<_>>())
+                            .unwrap_or(drag.rect);
+                    let original = rect;
                     rect.x += delta.x / scale;
                     rect.y += delta.y / scale;
                     if self.snap && !ctx.input(|i| i.modifiers.alt) {
-                        snap_rect(&mut rect, root, 8.0 / scale);
+                        let targets: Vec<_> = boxes
+                            .iter()
+                            .filter(|hit| {
+                                !drag.moving.iter().any(|moving| {
+                                    hit.path.starts_with(&moving.path)
+                                        || moving.path.starts_with(&hit.path)
+                                })
+                            })
+                            .map(|hit| hit.rect)
+                            .chain([root])
+                            .collect();
+                        let guides = snap_to_rects(&mut rect, &targets, 8.0 / scale);
+                        if let Some(x) = guides[0] {
+                            let x = canvas.min.x + x * scale;
+                            ui.painter().line_segment(
+                                [egui::pos2(x, canvas.top()), egui::pos2(x, canvas.bottom())],
+                                egui::Stroke::new(1.0, egui::Color32::YELLOW),
+                            );
+                        }
+                        if let Some(y) = guides[1] {
+                            let y = canvas.min.y + y * scale;
+                            ui.painter().line_segment(
+                                [egui::pos2(canvas.left(), y), egui::pos2(canvas.right(), y)],
+                                egui::Stroke::new(1.0, egui::Color32::YELLOW),
+                            );
+                        }
                     }
-                    set_relative_position(node, drag.parent, rect);
                     let point = anchor_point(node, drag.parent);
                     let anchor = canvas.min + egui::vec2(point[0] * scale, point[1] * scale);
                     ui.painter().line_segment(
                         [anchor, screen(rect).center()],
                         egui::Stroke::new(1.0, egui::Color32::from_rgb(80, 125, 160)),
                     );
+                    for moving in &drag.moving {
+                        if let Some(node) = node_at_mut(&mut layout.nodes, &moving.path) {
+                            let mut moved = placement_rect(node, moving);
+                            moved.x += rect.x - original.x;
+                            moved.y += rect.y - original.y;
+                            if self.automatic_anchor
+                                && moving.parent.w > 0.0
+                                && moving.parent.h > 0.0
+                            {
+                                let mut value = serde_json::to_value(&*node).unwrap();
+                                value["anchor"] =
+                                    serde_json::to_value(nearest_anchor(moved, moving.parent))
+                                        .unwrap();
+                                *node = serde_json::from_value(value).unwrap();
+                            }
+                            set_relative_position(node, moving.parent, moved);
+                        }
+                    }
                 }
             }
             if layout.to_json().is_ok() {
@@ -679,9 +1082,82 @@ impl Editor {
 
     fn properties(&mut self, ui: &mut egui::Ui, telemetry: Option<&Telemetry>) {
         let before = self.draft.clone();
+        if ui.button("Attach font or image…").clicked()
+            && let Some(path) = rfd::FileDialog::new()
+                .add_filter(
+                    "Layout assets",
+                    &["ttf", "otf", "ttc", "png", "jpg", "jpeg", "webp", "svg"],
+                )
+                .pick_file()
+        {
+            let result = (|| -> Result<(), String> {
+                let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+                if actionlay_render::fonts::is_font(&path.to_string_lossy())
+                    && !actionlay_render::fonts::valid_font(&bytes)
+                {
+                    return Err("This file is not a usable font".into());
+                }
+                let stem = path.file_name().unwrap_or_default().to_string_lossy();
+                let mut name = format!("assets/{stem}");
+                let mut index = 2;
+                while self.draft.loaded_assets.contains_key(&name) {
+                    name = format!("assets/{index}-{stem}");
+                    index += 1;
+                }
+                actionlay_layout::package::attach(&mut self.draft, name, bytes)
+                    .map_err(|e| e.to_string())
+            })();
+            self.error = result.err();
+        }
+        ui.small("Custom fonts are scoped to this layout. Set a font family in its theme or widget properties.");
+        let font_key = actionlay_render::fonts::configuration_key(&self.draft);
+        if self.font_key.as_ref() != Some(&font_key) {
+            self.font_warnings = actionlay_render::fonts::warnings(&self.draft);
+            self.font_families = actionlay_render::fonts::families(&self.draft);
+            self.font_key = Some(font_key);
+        }
+        let mut font = None;
+        egui::ComboBox::from_id_salt("editor-font-family")
+            .selected_text("Choose font family…")
+            .show_ui(ui, |ui| {
+                for family in &self.font_families {
+                    if ui.button(family).clicked() {
+                        font = Some(family.clone());
+                        ui.close();
+                    }
+                }
+            });
+        if let Some(font) = font {
+            if let Some(path) = &self.selection
+                && let Some(node) = node_at_mut(&mut self.draft.nodes, path)
+            {
+                let mut value = serde_json::to_value(&*node).unwrap();
+                if matches!(
+                    node.type_name(),
+                    "text" | "metric" | "metric_unit" | "datetime"
+                ) {
+                    value["font"] = json!(font);
+                    *node = serde_json::from_value(value).unwrap();
+                    self.properties_buffer = None;
+                } else {
+                    self.draft.theme.get_or_insert_default().font = Some(font);
+                }
+            } else {
+                self.draft.theme.get_or_insert_default().font = Some(font);
+            }
+        }
+        for warning in &self.font_warnings {
+            ui.colored_label(egui::Color32::YELLOW, warning);
+        }
         if let Some(path) = self.selection.clone()
             && let Some(node) = node_at(&self.draft.nodes, &path)
         {
+            if self.selected_paths().len() > 1 {
+                ui.small(format!(
+                    "{} widgets selected; properties apply to this widget",
+                    self.selected_paths().len()
+                ));
+            }
             ui.strong(node.type_name().replace('_', " "));
             for warning in metric_warnings(node, telemetry) {
                 ui.colored_label(egui::Color32::YELLOW, warning);
@@ -772,7 +1248,9 @@ impl Editor {
             if let Ok(layout) = serde_json::from_value::<Layout>(value)
                 && layout.to_json().is_ok()
             {
+                let assets = self.draft.loaded_assets.clone();
                 self.draft = layout;
+                self.draft.loaded_assets = assets;
             }
         }
         if before != self.draft {
@@ -916,23 +1394,6 @@ fn resize_node(node: &mut Node, rect: Rect, delta: egui::Vec2, parent: Rect) {
         *node = updated;
     }
 }
-fn snap_rect(rect: &mut Rect, root: Rect, tolerance: f32) {
-    for (pos, length, origin, total) in [
-        (&mut rect.x, rect.w, root.x, root.w),
-        (&mut rect.y, rect.h, root.y, root.h),
-    ] {
-        for target in [
-            origin,
-            origin + total / 2.0 - length / 2.0,
-            origin + total - length,
-        ] {
-            if (*pos - target).abs() < tolerance {
-                *pos = target;
-                break;
-            }
-        }
-    }
-}
 fn metric_warnings(node: &Node, telemetry: Option<&Telemetry>) -> Vec<String> {
     let (Node::Known(w), Some(t)) = (node, telemetry) else {
         return Vec::new();
@@ -966,6 +1427,7 @@ fn layer_tree(
     nodes: &[Node],
     path: &mut NodePath,
     selected: &mut Option<NodePath>,
+    additional: &mut Vec<NodePath>,
     telemetry: Option<&Telemetry>,
 ) {
     for (i, node) in nodes.iter().enumerate() {
@@ -982,21 +1444,203 @@ fn layer_tree(
         let warnings = metric_warnings(node, telemetry);
         let label = format!("{}{}", if warnings.is_empty() { "" } else { "⚠ " }, name);
         if ui
-            .selectable_label(selected.as_ref() == Some(path), label)
+            .selectable_label(
+                selected.as_ref() == Some(path) || additional.contains(path),
+                label,
+            )
             .on_hover_text(warnings.join("\n"))
             .clicked()
         {
-            *selected = Some(path.clone());
+            let additive = ui.input(|i| i.modifiers.command || i.modifiers.shift);
+            select_path(selected, additional, path.clone(), additive);
         }
         if let Node::Known(w) = node
             && !w.children().is_empty()
         {
             ui.indent(egui::Id::new(path.clone()), |ui| {
-                layer_tree(ui, w.children(), path, selected, telemetry)
+                layer_tree(ui, w.children(), path, selected, additional, telemetry)
             });
         }
         path.pop();
     }
+}
+
+fn normalized_paths(mut paths: Vec<NodePath>) -> Vec<NodePath> {
+    paths.sort();
+    paths.dedup();
+    let mut roots: Vec<NodePath> = Vec::new();
+    for path in paths {
+        if !path.is_empty() && !roots.iter().any(|root| path.starts_with(root)) {
+            roots.push(path);
+        }
+    }
+    roots
+}
+
+fn select_path(
+    primary: &mut Option<NodePath>,
+    additional: &mut Vec<NodePath>,
+    path: NodePath,
+    additive: bool,
+) {
+    if !additive {
+        additional.clear();
+        *primary = Some(path);
+        return;
+    }
+    if let Some(primary) = primary.as_ref()
+        && !additional.contains(primary)
+    {
+        additional.push(primary.clone());
+    }
+    if let Some(index) = additional.iter().position(|selected| selected == &path) {
+        additional.remove(index);
+        *primary = additional.last().cloned();
+    } else {
+        if let Some(ancestor) = additional
+            .iter()
+            .find(|selected| path.starts_with(selected))
+            .cloned()
+        {
+            *primary = Some(ancestor);
+            return;
+        }
+        additional.retain(|selected| !selected.starts_with(&path));
+        additional.push(path.clone());
+        *primary = Some(path);
+    }
+}
+
+fn remove_paths(nodes: &mut Vec<Node>, paths: &[NodePath]) {
+    for path in paths.iter().rev() {
+        if let Some(children) = children_at_mut(nodes, &path[..path.len() - 1]) {
+            children.remove(*path.last().unwrap());
+        }
+    }
+}
+
+fn remap_path(path: &[usize], removed: &[NodePath]) -> NodePath {
+    path.iter()
+        .enumerate()
+        .map(|(depth, index)| {
+            index
+                - removed
+                    .iter()
+                    .filter(|removed| {
+                        removed.len() == depth + 1
+                            && removed[..depth] == path[..depth]
+                            && removed[depth] < *index
+                    })
+                    .count()
+        })
+        .collect()
+}
+
+fn container_box(
+    nodes: &[Node],
+    path: &[usize],
+    boxes: &[actionlay_render::HitBox],
+    root: Rect,
+) -> Option<Rect> {
+    if path.is_empty() {
+        return Some(root);
+    }
+    let Node::Known(widget) = node_at(nodes, path)? else {
+        return None;
+    };
+    let size = match widget {
+        Widget::Group(group) => group.size.unwrap_or([0.0; 2]),
+        Widget::Frame(frame) => frame.size,
+        _ => return None,
+    };
+    let hit = boxes.iter().find(|hit| hit.path == path)?;
+    let common = widget.common();
+    Some(geom::place(
+        hit.parent,
+        common.anchor.unwrap_or_default(),
+        common.offset_in(hit.parent),
+        size,
+    ))
+}
+
+fn placement_rect(node: &Node, hit: &actionlay_render::HitBox) -> Rect {
+    if let Node::Known(Widget::Group(group)) = node {
+        let common = &group.common;
+        geom::place(
+            hit.parent,
+            common.anchor.unwrap_or_default(),
+            common.offset_in(hit.parent),
+            group.size.unwrap_or([0.0; 2]),
+        )
+    } else {
+        hit.rect
+    }
+}
+
+fn nearest_anchor(rect: Rect, parent: Rect) -> Anchor {
+    let x = ((rect.x + rect.w / 2.0 - parent.x) / parent.w.max(1.0) * 2.0)
+        .round()
+        .clamp(0.0, 2.0) as usize;
+    let y = ((rect.y + rect.h / 2.0 - parent.y) / parent.h.max(1.0) * 2.0)
+        .round()
+        .clamp(0.0, 2.0) as usize;
+    Anchor::ALL[y * 3 + x]
+}
+
+fn parent_opacity(nodes: &[Node], path: &[usize]) -> f32 {
+    (1..=path.len())
+        .filter_map(|length| node_at(nodes, &path[..length]))
+        .filter_map(|node| {
+            if let Node::Known(widget) = node {
+                Some(widget.common().opacity.unwrap_or(1.0))
+            } else {
+                None
+            }
+        })
+        .product()
+}
+
+fn union_rects(rects: &[Rect]) -> Option<Rect> {
+    let first = rects.first()?;
+    let mut left = first.x;
+    let mut top = first.y;
+    let mut right = first.x + first.w;
+    let mut bottom = first.y + first.h;
+    for rect in &rects[1..] {
+        left = left.min(rect.x);
+        top = top.min(rect.y);
+        right = right.max(rect.x + rect.w);
+        bottom = bottom.max(rect.y + rect.h);
+    }
+    Some(Rect::new(left, top, right - left, bottom - top))
+}
+
+/// Align the nearest pair of edges or centres on each axis. Return guide positions.
+fn snap_to_rects(rect: &mut Rect, targets: &[Rect], tolerance: f32) -> [Option<f32>; 2] {
+    let mut guides = [None; 2];
+    for (axis, pos, length) in [(0, &mut rect.x, rect.w), (1, &mut rect.y, rect.h)] {
+        let mut best = tolerance;
+        let mut correction = 0.0;
+        for target in targets {
+            let (origin, total) = if axis == 0 {
+                (target.x, target.w)
+            } else {
+                (target.y, target.h)
+            };
+            for point in [origin, origin + total / 2.0, origin + total] {
+                for offset in [0.0, length / 2.0, length] {
+                    let delta = point - (*pos + offset);
+                    if delta.abs() < best {
+                        best = delta.abs();
+                        correction = delta;
+                        guides[axis] = Some(point);
+                    }
+                }
+            }
+        }
+        *pos += correction;
+    }
+    guides
 }
 
 fn resolved_schema<'a>(schema: &'a Value, root: &'a Value) -> &'a Value {
@@ -1023,20 +1667,6 @@ fn property_object(
     };
     for (key, s) in properties {
         if matches!(key.as_str(), "type" | "children" | "id") {
-            continue;
-        }
-        if key == "font" {
-            ui.label("Font: Roboto");
-            if value
-                .get(key)
-                .and_then(Value::as_str)
-                .is_some_and(|font| font != "Roboto")
-            {
-                ui.colored_label(
-                    egui::Color32::YELLOW,
-                    "Using Roboto; the requested font reference is preserved.",
-                );
-            }
             continue;
         }
         ui.push_id(key, |ui| {

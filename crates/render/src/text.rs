@@ -1,6 +1,6 @@
 //! Text shaping (cosmic-text) and glyph outlines as tiny-skia paths.
-//! The font database holds only the embedded Roboto faces (Roboto v2.138, Apache-2.0,
-//! see assets/fonts/LICENSE) and the locale is fixed, so output is identical everywhere.
+//! Layout-scoped fonts precede installed fonts, with embedded Roboto fallback
+//! (Roboto v2.138, Apache-2.0, see assets/fonts/LICENSE). Locale is fixed.
 use actionlay_layout::style::FontWeight;
 use cosmic_text::{
     Attrs, Buffer, CacheKey, CacheKeyFlags, Command, Family, FontSystem, Metrics, Shaping,
@@ -8,7 +8,7 @@ use cosmic_text::{
 };
 use std::collections::HashMap;
 use tiny_skia::{Path, PathBuilder, Transform};
-type RunKey = (String, u32, u16);
+type RunKey = (String, String, u32, u16);
 #[derive(Clone)]
 struct ShapedRun {
     size: (f32, f32),
@@ -16,10 +16,10 @@ struct ShapedRun {
     missing: u64,
 }
 
-/// The only font family available to layouts in M2.
+/// Embedded fallback family, available on every machine.
 pub const FAMILY: &str = "Roboto";
 
-const FACES: [&[u8]; 3] = [
+pub(crate) const FACES: [&[u8]; 3] = [
     include_bytes!("../assets/fonts/Roboto-Regular.ttf"),
     include_bytes!("../assets/fonts/Roboto-Medium.ttf"),
     include_bytes!("../assets/fonts/Roboto-Bold.ttf"),
@@ -34,6 +34,8 @@ pub(crate) struct TextEngine {
     runs: HashMap<RunKey, ShapedRun>,
     current: Option<ShapedRun>,
     missing: u64,
+    asset_key: Option<Vec<(String, usize)>>,
+    warned: std::collections::HashSet<(String, u16)>,
 }
 
 impl TextEngine {
@@ -53,17 +55,83 @@ impl TextEngine {
             runs: HashMap::new(),
             current: None,
             missing: 0,
+            asset_key: None,
+            warned: Default::default(),
         }
     }
 
     /// Shapes `text` (one line per `\n`) at `px` pixels. Returns the box size in pixels:
     /// (advance of the longest line, px × lines). Sizes below 0.5 px lay out nothing.
+    #[cfg(test)]
     pub fn layout(&mut self, text: &str, px: f32, weight: FontWeight) -> (f32, f32) {
+        self.layout_family(text, px, weight, FAMILY)
+    }
+
+    pub fn configure(&mut self, layout: &actionlay_layout::Layout) -> bool {
+        let mut key: Vec<_> = layout
+            .loaded_assets
+            .iter()
+            .map(|(name, data)| (name.clone(), std::sync::Arc::as_ptr(data) as usize))
+            .collect();
+        let mut families = crate::fonts::requested(layout);
+        families.insert(FAMILY.into());
+        key.extend(families.iter().map(|name| (name.clone(), 0)));
+        if self.asset_key.as_ref() == Some(&key) {
+            return false;
+        }
+        let mut db = crate::fonts::database(layout);
+        let unused: Vec<_> = db
+            .faces()
+            .filter(|face| {
+                !face
+                    .families
+                    .iter()
+                    .any(|(name, _)| families.contains(name))
+            })
+            .map(|face| face.id)
+            .collect();
+        for id in unused {
+            db.remove_face(id);
+        }
+        self.fonts = FontSystem::new_with_locale_and_db("en-US".into(), db);
+        self.buffer = Buffer::new(&mut self.fonts, Metrics::new(16.0, 16.0));
+        self.buffer.set_wrap(Wrap::None);
+        self.reset_cache();
+        self.warned.clear();
+        self.asset_key = Some(key);
+        true
+    }
+
+    pub fn layout_family(
+        &mut self,
+        text: &str,
+        px: f32,
+        weight: FontWeight,
+        family: &str,
+    ) -> (f32, f32) {
         if !(px.is_finite() && px >= 0.5) {
             self.empty = true;
             return (0.0, 0.0);
         }
-        let key = (text.to_owned(), px.to_bits(), weight.value());
+        let face = crate::fonts::query(self.fonts.db(), family, weight.value())
+            .and_then(|id| self.fonts.db().face(id));
+        let resolved = if face.is_some_and(|face| face.weight.0 == weight.value()) {
+            family
+        } else {
+            if self.warned.insert((family.into(), weight.value())) {
+                log::warn!(
+                    "font {family} weight {} unavailable, using Roboto",
+                    weight.value()
+                );
+            }
+            FAMILY
+        };
+        let key = (
+            text.to_owned(),
+            resolved.to_owned(),
+            px.to_bits(),
+            weight.value(),
+        );
         if let Some(run) = self.runs.get(&key) {
             self.empty = false;
             self.current = Some(run.clone());
@@ -72,7 +140,7 @@ impl TextEngine {
         self.buffer
             .set_metrics_and_size(Metrics::new(px, px), None, None);
         let attrs = Attrs::new()
-            .family(Family::Name(FAMILY))
+            .family(Family::Name(resolved))
             .weight(Weight(weight.value()));
         self.buffer.set_text(text, &attrs, Shaping::Advanced, None);
         self.buffer.shape_until_scroll(&mut self.fonts, false);

@@ -11,7 +11,7 @@ as a single executable for Windows, macOS and Linux.
 > **Status: early prototype (milestones M1–M3 done).** ActionLay plays
 > GoPro footage with hardware decoding and a live telemetry dashboard, including
 > maps, charts, circular instruments and a G-meter. Upstream XML layouts can be
-> imported. M4 is in progress: a visual editor can create and save layouts,
+> imported. The M4 visual editor can create and save portable layouts,
 > with or without an open video. Video export comes next; see the
 > [roadmap](#roadmap). Expect rough edges.
 
@@ -49,7 +49,7 @@ as a single executable for Windows, macOS and Linux.
 - **Your own layout**: the dashboard is a JSON file. Drag a `.ovl.json` file
   onto the window to use it; ActionLay remembers the last one. The default
   layout is in `crates/layout/layouts/default.ovl.json`, and a JSON Schema for
-  editing it is in `crates/layout/schema`. The visual editor comes in M4.
+  editing it is in `crates/layout/schema`. The visual editor works with or without a video.
 - **Responsive telemetry presets**: Select Layout includes Default, Moto
   (braking/acceleration bars) and Training (heart-rate/power zones), inspired
   by the upstream dashboards. Widget sizes follow the video, and margins
@@ -75,6 +75,17 @@ as a single executable for Windows, macOS and Linux.
   pause state, speed and loaded telemetry. A failed switch keeps the current
   device and shows an error. On open, an unavailable output produces a visible
   notice and silent playback; it never redirects an explicit selection.
+
+- **Visual layout editing**: select multiple layers with Ctrl/Command or Shift,
+  or select all with Ctrl/Command+A. Group, ungroup and move selections between
+  containers while preserving their positions. Optional snapping aligns edges
+  and centres to other widgets and the preview; hold Alt to bypass it. Anchor
+  updates on drop are optional. Undo/redo covers each complete drag gesture.
+- **Fonts and portable layouts**: choose installed or attached fonts and export
+  `.actionlay-layout` packages containing the layout and declared assets. Fonts
+  remain scoped to that layout and are never installed. Export can omit fonts;
+  only include fonts whose licence permits redistribution. Preview background
+  images are editor aids. See [the editor report](docs/m4-editor-report.md).
 
 ## Roadmap
 

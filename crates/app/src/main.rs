@@ -131,8 +131,13 @@ impl App {
                     format!("{name}.ovl.json")
                 };
                 let mut dialog = rfd::FileDialog::new()
+                    .add_filter("Portable ActionLay layout", &["actionlay-layout"])
                     .add_filter("ActionLay layout", &["json"])
-                    .set_file_name(name);
+                    .set_file_name(if editor.draft.loaded_assets.is_empty() {
+                        name
+                    } else {
+                        name.replace(".ovl.json", ".actionlay-layout")
+                    });
                 if let Some(dirs) = directories::ProjectDirs::from("org", "ActionLay", "ActionLay")
                 {
                     let library = dirs.data_dir().join("layouts");
@@ -160,6 +165,71 @@ impl App {
         self.prefs.last_builtin = None;
         self.save_prefs();
         true
+    }
+
+    fn export_layout(&mut self) {
+        let Some(editor) = &mut self.editor else {
+            return;
+        };
+        let name = editor.draft.name.as_deref().unwrap_or("Untitled");
+        let name: String = name
+            .chars()
+            .map(|c| if "/\\:*?\"<>|".contains(c) { '_' } else { c })
+            .collect();
+        let Some(path) = rfd::FileDialog::new()
+            .set_title("Export layout package")
+            .add_filter("ActionLay layout package", &["actionlay-layout"])
+            .set_file_name(format!("{name}.actionlay-layout"))
+            .save_file()
+        else {
+            return;
+        };
+        if editor.invalid_parameters() {
+            editor.error = Some("Fix invalid widget parameters before exporting".into());
+            return;
+        }
+        if editor.include_fonts && !rfd::MessageDialog::new()
+            .set_title("Include custom fonts")
+            .set_description("Only share fonts you are licensed to redistribute. Including fonts embeds their files in the layout package; it does not install them.")
+            .set_buttons(rfd::MessageButtons::OkCancel)
+            .show().eq(&rfd::MessageDialogResult::Ok) { return; }
+        let mut layout = editor.draft.clone();
+        let result = (|| -> Result<(), String> {
+            if editor.include_fonts {
+                for warning in actionlay_render::fonts::embed_used(&mut layout)? {
+                    log::warn!("{warning}");
+                }
+            } else {
+                actionlay_render::fonts::omit_fonts(&mut layout)?;
+            }
+            let path = if path.extension().is_none() {
+                path.with_extension("actionlay-layout")
+            } else {
+                path
+            };
+            actionlay_layout::package::save(&layout, &path).map_err(|e| e.to_string())
+        })();
+        editor.error = result.err();
+    }
+
+    fn import_layout_file(&mut self) {
+        if let Some(path) = rfd::FileDialog::new()
+            .set_title("Import into layout library")
+            .add_filter("ActionLay layouts", &["actionlay-layout", "json", "xml"])
+            .pick_file()
+        {
+            if path
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("xml"))
+            {
+                self.open_layout(path);
+            } else {
+                match layouts::import_package(&path) {
+                    Ok(path) => self.open_layout(path),
+                    Err(error) => self.error = Some(error),
+                }
+            }
+        }
     }
 
     fn request_edit_action(&mut self, action: EditAction, ctx: &egui::Context) {
@@ -587,6 +657,7 @@ impl App {
         let mut builtin = None;
         let mut selected = None;
         let mut browse = false;
+        let mut import = false;
         egui::Window::new("Select Layout")
             .open(&mut visible)
             .collapsible(false)
@@ -640,7 +711,11 @@ impl App {
                                         .map(|e| e.path())
                                         .filter(|p| {
                                             p.is_file()
-                                                && p.to_string_lossy().ends_with(".ovl.json")
+                                                && (p
+                                                    .to_string_lossy()
+                                                    .to_ascii_lowercase()
+                                                    .ends_with(".ovl.json")
+                                                    || actionlay_layout::package::is_package(p))
                                         })
                                         .collect();
                                 files.sort();
@@ -684,6 +759,7 @@ impl App {
                             });
                         ui.separator();
                         browse = ui.button("Open layout from file…").clicked();
+                        import = ui.button("Import layout into library…").clicked();
                     });
             });
         self.select_layout = visible;
@@ -695,6 +771,8 @@ impl App {
             self.select_layout = self.error.is_some();
         } else if browse {
             self.command(menus::Command::OpenLayoutFile, ctx);
+        } else if import {
+            self.import_layout_file();
         }
     }
 
@@ -723,6 +801,7 @@ impl App {
             menus::Command::SaveLayoutAs => {
                 self.save_edit(true);
             }
+            menus::Command::ExportLayout => self.export_layout(),
             menus::Command::ExitEditor => self.request_edit_action(EditAction::Exit, ctx),
             menus::Command::SelectLayout => self.select_layout = true,
             menus::Command::AudioSettings => {
@@ -752,7 +831,7 @@ impl App {
                 let mut dialog = if layout {
                     rfd::FileDialog::new()
                         .set_title("Open Layout")
-                        .add_filter("Overlay layout (.ovl.json or XML)", &["json", "xml"])
+                        .add_filter("Overlay layout", &["actionlay-layout", "json", "xml"])
                 } else {
                     rfd::FileDialog::new().set_title("Open Video").add_filter(
                         "Video",
@@ -878,6 +957,17 @@ impl App {
 
         // remembered as an absolute path: the app may be started from anywhere
         let path = std::path::absolute(&path).unwrap_or(path);
+        let path = if actionlay_layout::package::is_package(&path) {
+            match layouts::import_package(&path) {
+                Ok(path) => path,
+                Err(error) => {
+                    self.error = Some(error);
+                    return;
+                }
+            }
+        } else {
+            path
+        };
         match layouts::load(&path) {
             Ok((layout, notice)) => {
                 self.select_layout = false;
@@ -1138,6 +1228,7 @@ impl eframe::App for App {
                 Some(editor::Action::SaveAs) => {
                     self.save_edit(true);
                 }
+                Some(editor::Action::Export) => self.export_layout(),
                 Some(editor::Action::Exit) => self.request_edit_action(EditAction::Exit, ui.ctx()),
                 Some(editor::Action::New) => self.request_edit_action(EditAction::New, ui.ctx()),
                 None => {}
@@ -1304,7 +1395,10 @@ fn main() -> eframe::Result {
                 app.save_prefs();
             }
             if let Some(path) = path {
-                app.open(path);
+                match layouts::classify(path) {
+                    layouts::Dropped::Layout(path) => app.open_layout(path),
+                    layouts::Dropped::Video(path) => app.open(path),
+                }
             }
             Ok(Box::new(app))
         }),

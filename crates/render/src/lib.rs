@@ -1,6 +1,7 @@
 //! ActionLay overlay renderer: (layout, snapshot, size) → premultiplied RGBA (spec §4.5).
-//! CPU only (tiny-skia), embedded fonts and icons: same output on every machine.
+//! CPU only (tiny-skia), document-scoped fonts and embedded fallback fonts/icons.
 mod dials;
+pub mod fonts;
 mod history;
 mod icons;
 mod scene;
@@ -172,6 +173,9 @@ impl Renderer {
         target: &mut Pixmap,
     ) {
         let start = Instant::now();
+        if self.text.configure(layout) {
+            self.statics = Default::default();
+        }
         let size = (target.width(), target.height());
         if size != self.last_size {
             // glyph outlines and icons are cached per pixel size
@@ -241,17 +245,24 @@ pub struct HitBox {
 /// only in layouts built in code). Such widgets render their empty state or fallback.
 pub fn diagnose(layout: &Layout) -> Vec<Issue> {
     let mut issues = Vec::new();
+    let db = fonts::database(layout);
+    issues.extend(
+        fonts::warnings(layout)
+            .into_iter()
+            .filter(|message| message.starts_with("Unusable") || message.contains(" weight "))
+            .map(|message| Issue::warning("fonts", message)),
+    );
     if let Some(font) = layout.theme.as_ref().and_then(|t| t.font.as_deref()) {
-        check_font(font, "theme", &mut issues);
+        check_font(font, "theme", &mut issues, &db);
     }
     for (i, node) in layout.nodes.iter().enumerate() {
-        diagnose_node(node, format!("nodes[{i}]"), &mut issues);
+        diagnose_node(node, format!("nodes[{i}]"), &mut issues, &db);
     }
     issues
 }
 
-fn check_font(font: &str, path: &str, issues: &mut Vec<Issue>) {
-    if font != FAMILY {
+fn check_font(font: &str, path: &str, issues: &mut Vec<Issue>, db: &fontdb::Database) {
+    if fonts::query(db, font, 400).is_none() {
         issues.push(Issue::warning(
             path,
             format!("font `{font}` is not available, using {FAMILY}"),
@@ -259,9 +270,9 @@ fn check_font(font: &str, path: &str, issues: &mut Vec<Issue>) {
     }
 }
 
-fn check_style(style: &TextStyleOpt, path: &str, issues: &mut Vec<Issue>) {
+fn check_style(style: &TextStyleOpt, path: &str, issues: &mut Vec<Issue>, db: &fontdb::Database) {
     if let Some(font) = &style.font {
-        check_font(font, path, issues);
+        check_font(font, path, issues, db);
     }
 }
 
@@ -294,7 +305,7 @@ fn check_metric(
     }
 }
 
-fn diagnose_node(node: &Node, path: String, issues: &mut Vec<Issue>) {
+fn diagnose_node(node: &Node, path: String, issues: &mut Vec<Issue>, db: &fontdb::Database) {
     let Node::Known(w) = node else { return };
     let path = match node.id() {
         Some(id) => format!("{path} ({id})"),
@@ -310,7 +321,7 @@ fn diagnose_node(node: &Node, path: String, issues: &mut Vec<Issue>) {
                 issues,
             );
             if let Some(style) = &c.value_style {
-                check_style(style, &path, issues);
+                check_style(style, &path, issues, db);
             }
         }
         Widget::GMeter(g) => {
@@ -341,7 +352,7 @@ fn diagnose_node(node: &Node, path: String, issues: &mut Vec<Issue>) {
                 ));
             }
             for style in [&d.value_style, &d.label_style].into_iter().flatten() {
-                check_style(style, &path, issues);
+                check_style(style, &path, issues, db);
             }
             if let Some(Err(e)) = d.format.as_deref().map(format::parse) {
                 issues.push(Issue::warning(&path, format!("{e}: shown as empty")));
@@ -356,7 +367,7 @@ fn diagnose_node(node: &Node, path: String, issues: &mut Vec<Issue>) {
                 issues,
             );
             if let Some(style) = &b.value_style {
-                check_style(style, &path, issues);
+                check_style(style, &path, issues, db);
             }
             if let Some(Err(e)) = b.format.as_deref().map(format::parse) {
                 issues.push(Issue::warning(&path, format!("{e}: shown as empty")));
@@ -371,14 +382,14 @@ fn diagnose_node(node: &Node, path: String, issues: &mut Vec<Issue>) {
             if let Some(Err(e)) = m.format.as_deref().map(format::parse) {
                 issues.push(Issue::warning(&path, format!("{e}: shown as empty")));
             }
-            check_style(&m.style, &path, issues);
+            check_style(&m.style, &path, issues, db);
         }
         Widget::MetricUnit(m) => {
             let if_unknown = "no unit is drawn";
             check_metric(&m.metric, m.units.as_deref(), if_unknown, &path, issues);
-            check_style(&m.style, &path, issues);
+            check_style(&m.style, &path, issues, db);
         }
-        Widget::Text(t) => check_style(&t.style, &path, issues),
+        Widget::Text(t) => check_style(&t.style, &path, issues, db),
         Widget::Datetime(d) => {
             if let Some(f) = &d.format
                 && !format::is_valid_strftime(f)
@@ -388,7 +399,7 @@ fn diagnose_node(node: &Node, path: String, issues: &mut Vec<Issue>) {
                     format!("invalid strftime format `{f}`: shown as empty"),
                 ));
             }
-            check_style(&d.style, &path, issues);
+            check_style(&d.style, &path, issues, db);
         }
         Widget::Icon(i) if IconId::from_name(&i.icon).is_none() => {
             let names: Vec<&str> = IconId::ALL.iter().map(|i| i.name()).collect();
@@ -404,6 +415,6 @@ fn diagnose_node(node: &Node, path: String, issues: &mut Vec<Issue>) {
         _ => {}
     }
     for (i, child) in w.children().iter().enumerate() {
-        diagnose_node(child, format!("{path}.children[{i}]"), issues);
+        diagnose_node(child, format!("{path}.children[{i}]"), issues, db);
     }
 }

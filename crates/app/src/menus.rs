@@ -9,6 +9,7 @@ pub enum Command {
     EditLayout,
     SaveLayout,
     SaveLayoutAs,
+    ExportLayout,
     ExitEditor,
     AudioSettings,
     OpenLayoutFile,
@@ -24,7 +25,7 @@ pub struct Menus {
     _menu: muda::Menu,
     close: muda::MenuItem,
     has_video: std::cell::Cell<bool>,
-    editor_items: [muda::MenuItem; 3],
+    editor_items: [muda::MenuItem; 4],
     edit: muda::MenuItem,
     recent: muda::Submenu,
     recent_paths: Option<Vec<std::path::PathBuf>>,
@@ -93,6 +94,7 @@ impl Menus {
         let edit = MenuItem::with_id("edit-layout", "Edit Layout", true, key(Code::KeyE, false));
         let save = MenuItem::with_id("save-layout", "Save", false, key(Code::KeyS, false));
         let save_as = MenuItem::with_id("save-layout-as", "Save As…", false, key(Code::KeyS, true));
+        let export = MenuItem::with_id("export-layout", "Export package…", false, None);
         let exit = MenuItem::with_id("exit-editor", "Exit Editor", false, None);
         let layouts = Submenu::with_items(
             "Layout",
@@ -103,6 +105,7 @@ impl Menus {
                 &PredefinedMenuItem::separator(),
                 &save,
                 &save_as,
+                &export,
                 &exit,
             ],
         )?;
@@ -117,6 +120,7 @@ impl Menus {
                 "edit-layout" => Command::EditLayout,
                 "save-layout" => Command::SaveLayout,
                 "save-layout-as" => Command::SaveLayoutAs,
+                "export-layout" => Command::ExportLayout,
                 "exit-editor" => Command::ExitEditor,
                 "audio-settings" => Command::AudioSettings,
                 "clear-recent-videos" => Command::ClearRecentVideos,
@@ -140,7 +144,7 @@ impl Menus {
             _menu: menu,
             close,
             has_video: std::cell::Cell::new(false),
-            editor_items: [save, save_as, exit],
+            editor_items: [save, save_as, export, exit],
             edit,
             commands,
             recent,
@@ -285,6 +289,7 @@ impl Menus {
                         ("Edit Layout", Command::EditLayout, !editing),
                         ("Save", Command::SaveLayout, editing),
                         ("Save As…", Command::SaveLayoutAs, editing),
+                        ("Export package…", Command::ExportLayout, editing),
                         ("Exit Editor", Command::ExitEditor, editing),
                     ] {
                         if ui.add_enabled(enabled, egui::Button::new(label)).clicked() {

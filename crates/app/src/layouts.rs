@@ -15,11 +15,60 @@ pub enum Dropped {
 /// A dropped `*.ovl.json` (any case) is a layout; anything else is opened as a video.
 pub fn classify(path: PathBuf) -> Dropped {
     let name = path.to_string_lossy().to_ascii_lowercase();
-    if name.ends_with(FILE_SUFFIX) || name.ends_with(".xml") {
+    if name.ends_with(FILE_SUFFIX)
+        || name.ends_with(".xml")
+        || actionlay_layout::package::is_package(&path)
+    {
         Dropped::Layout(path)
     } else {
         Dropped::Video(path)
     }
+}
+
+/// Validate before adding an independent copy to the library. Name conflicts keep
+/// both documents; copying never overwrites another user's layout.
+pub fn import_package(path: &Path) -> Result<PathBuf, String> {
+    let dirs = directories::ProjectDirs::from("org", "ActionLay", "ActionLay")
+        .ok_or("Layout library unavailable")?;
+    import_package_into(path, &dirs.data_dir().join("layouts"))
+}
+
+fn import_package_into(path: &Path, library: &Path) -> Result<PathBuf, String> {
+    let loaded = Layout::load(path).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(library).map_err(|e| e.to_string())?;
+    if path
+        .canonicalize()
+        .ok()
+        .and_then(|p| p.parent().map(Path::to_path_buf))
+        == library.canonicalize().ok()
+    {
+        return Ok(path.to_path_buf());
+    }
+    let stem = path.file_stem().unwrap_or_default().to_string_lossy();
+    for index in 1.. {
+        let name = if index == 1 {
+            stem.to_string()
+        } else {
+            format!("{stem}-{index}")
+        };
+        let out = library.join(format!("{name}.actionlay-layout"));
+        let placeholder = match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&out)
+        {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e.to_string()),
+        };
+        drop(placeholder);
+        if let Err(e) = actionlay_layout::package::save(&loaded.layout, &out) {
+            let _ = std::fs::remove_file(&out);
+            return Err(e.to_string());
+        }
+        return Ok(out);
+    }
+    unreachable!()
 }
 
 /// Loads a layout file. Validation warnings and render diagnostics are logged and
@@ -138,6 +187,23 @@ pub fn scale_mode_for(width: u32, height: u32, layout: &Layout) -> ScaleMode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn importing_packages_keeps_both_names_and_assets() {
+        let source = tempfile::tempdir().unwrap();
+        let library = tempfile::tempdir().unwrap();
+        let path = source.path().join("test.actionlay-layout");
+        let mut layout = default_layout();
+        actionlay_layout::package::attach(&mut layout, "assets/test.png".into(), vec![1, 2, 3])
+            .unwrap();
+        actionlay_layout::package::save(&layout, &path).unwrap();
+        let first = import_package_into(&path, library.path()).unwrap();
+        let second = import_package_into(&path, library.path()).unwrap();
+        assert_ne!(first, second);
+        assert_eq!(Layout::load(&first).unwrap().layout, layout);
+        assert_eq!(Layout::load(&second).unwrap().layout, layout);
+        assert_eq!(import_package_into(&first, library.path()).unwrap(), first);
+    }
 
     #[test]
     fn selected_builtin_is_restored_and_unknown_builtin_falls_back() {
