@@ -120,7 +120,7 @@ jobs:
 
       - name: Fetch GoPro samples
         if: steps.gopro-cache.outputs.cache-hit != 'true'
-        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
+        shell: ${{ matrix.os == 'windows-2022' && 'msys2 {0}' || 'bash' }}
         run: make gopro-samples
 
       - name: Require GoPro samples in tests
@@ -141,10 +141,10 @@ jobs:
           fi
 
       - name: Check formatting
-        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
+        shell: ${{ matrix.os == 'windows-2022' && 'msys2 {0}' || 'bash' }}
         run: make fmt-check
       - name: Run Clippy
-        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
+        shell: ${{ matrix.os == 'windows-2022' && 'msys2 {0}' || 'bash' }}
         run: make clippy
       # Player tests open the audio device and are timing-sensitive, so they
       # must not run concurrently. Every other test is fast; running the whole
@@ -152,7 +152,7 @@ jobs:
       # per-target split cannot exclude only tests/player.rs, and
       # `--exclude actionlay-media` fails while it is the only member).
       - name: Run workspace tests
-        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
+        shell: ${{ matrix.os == 'windows-2022' && 'msys2 {0}' || 'bash' }}
         run: make test
 
       - name: Upload golden image diffs
@@ -164,7 +164,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Build release binaries
-        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
+        shell: ${{ matrix.os == 'windows-2022' && 'msys2 {0}' || 'bash' }}
         run: make build
 
       - name: Upload binaries
