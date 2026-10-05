@@ -1,4 +1,11 @@
 //! ActionLay M0 prototype: plays a video with hardware decoding and synced audio.
+// Wired into the UI in Task 12.
+#[allow(dead_code)]
+mod layouts;
+#[allow(dead_code)]
+mod prefs;
+#[allow(dead_code)]
+mod telemetry_load;
 mod transport;
 mod video_view;
 
