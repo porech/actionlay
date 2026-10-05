@@ -176,6 +176,10 @@ Each widget inherits the layout's unit system and can override it.
 
 ## 5. Editor
 
+- Enter using the always-available **Edit layout** toolbar button or **Layout → Edit Layout**. **New Layout…** opens an empty draft, even without a video.
+- Choose the open video, when available, or a static image background with 16:9, 4:3, 9:16, square or custom dimensions. Static previews use clearly labelled demonstration telemetry. The draggable widget palette sits beside the preview.
+- Layouts are saved only from the editor. **Save** and **Save As…** both request a destination for new layouts and system presets; after the first successful save, **Save** updates that user file and **Save As…** creates a new copy. System presets remain read-only. Saving does not exit the editor.
+- **Exit editor** returns to the player. Unsaved changes on exit, application close or layout replacement prompt **Save**, **Discard changes**, or **Cancel**. Cancelling the save dialog or a failed save leaves the draft and editor open. The player uses the latest successfully saved layout; discarding never alters that version.
 - Selection from the video or from the layer tree; selection boxes computed by `render` at the current instant.
 - Moving: edits `offset` (moving a group moves its children). Option: automatic anchor update based on the quadrant where the node is dropped.
 - Resizing on the widget's own parameter: `size` with locked proportions (text, icons, maps, indicators) or width/height (frames, charts, bars).

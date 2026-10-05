@@ -149,6 +149,57 @@ fn next_id() -> u64 {
     ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 impl Telemetry {
+    /// Clearly labelled demonstration data for editing without a video. This is
+    /// independent of real files; callers must keep its map tile requests offline.
+    pub fn preview() -> Self {
+        let mut out = Self::empty(60.0);
+        out.start_utc = DateTime::from_timestamp(1_735_689_600, 0);
+        for m in Metric::ALL {
+            let points = (0..60).map(|i| {
+                let t = i as f64;
+                let phase = t / 6.0;
+                let value = match m {
+                    Metric::Speed | Metric::CSpeed => 8.0 + phase.sin(),
+                    Metric::Alt => 300.0 + 20.0 * phase.sin(),
+                    Metric::Gradient | Metric::CGrad => 0.05 * phase.cos(),
+                    Metric::Lat => 0.001 * phase.sin(),
+                    Metric::Lon => 0.001 * phase.cos(),
+                    Metric::Heading | Metric::Cog | Metric::Azi => (t * 6.0) % 360.0,
+                    Metric::Odo | Metric::COdo | Metric::Dist => t * 8.0,
+                    Metric::Hr => 140.0 + 8.0 * phase.sin(),
+                    Metric::Power => 220.0 + 30.0 * phase.cos(),
+                    Metric::Cadence => 85.0 + 5.0 * phase.sin(),
+                    Metric::Temp => 22.0,
+                    Metric::GpsLock => 3.0,
+                    Metric::GpsDop => 1.0,
+                    Metric::AccelLon | Metric::AccelLat => phase.sin() * 1.5,
+                    _ => 1.0 + phase.sin(),
+                };
+                (t, t + 1.0, Some(value))
+            });
+            out.series[m.index()] = Some(Series::new(
+                if matches!(m, Metric::Heading | Metric::Cog) {
+                    Interp::Angle360
+                } else {
+                    Interp::Linear
+                },
+                points,
+            ));
+        }
+        out.track = (0..60)
+            .map(|i| {
+                let t = i as f64;
+                TrackPoint {
+                    t,
+                    lat: out.sample_metric(Metric::Lat, t).last_known().unwrap(),
+                    lon: out.sample_metric(Metric::Lon, t).last_known().unwrap(),
+                    alt: out.sample_metric(Metric::Alt, t).last_known().unwrap(),
+                }
+            })
+            .collect();
+        out.availability = availability(&out.series, out.duration);
+        out
+    }
     pub fn has_imu_acceleration(&self) -> bool {
         self.imu_acceleration.is_some()
     }

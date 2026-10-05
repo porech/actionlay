@@ -11,7 +11,8 @@ as a single executable for Windows, macOS and Linux.
 > **Status: early prototype (milestones M1–M3 done).** ActionLay plays
 > GoPro footage with hardware decoding and a live telemetry dashboard, including
 > maps, charts, circular instruments and a G-meter. Upstream XML layouts can be
-> imported. The visual editor and video export are next; see the
+> imported. M4 is in progress: a visual editor can create and save layouts,
+> with or without an open video. Video export comes next; see the
 > [roadmap](#roadmap). Expect rough edges.
 
 ## What works today

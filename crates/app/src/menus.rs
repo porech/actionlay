@@ -5,6 +5,11 @@ use eframe::egui;
 pub enum Command {
     OpenVideo,
     SelectLayout,
+    NewLayout,
+    EditLayout,
+    SaveLayout,
+    SaveLayoutAs,
+    ExitEditor,
     AudioSettings,
     OpenLayoutFile,
     OpenRecentVideo(usize),
@@ -19,6 +24,8 @@ pub struct Menus {
     _menu: muda::Menu,
     close: muda::MenuItem,
     has_video: std::cell::Cell<bool>,
+    editor_items: [muda::MenuItem; 3],
+    edit: muda::MenuItem,
     recent: muda::Submenu,
     recent_paths: Option<Vec<std::path::PathBuf>>,
     commands: std::sync::mpsc::Receiver<Command>,
@@ -82,13 +89,35 @@ impl Menus {
         )?;
         let audio = MenuItem::with_id("audio-settings", "Audio…", true, None);
         let settings = Submenu::with_items("Settings", true, &[&audio])?;
-        let menu = Menu::with_items(&[&app, &file, &settings])?;
+        let new = MenuItem::with_id("new-layout", "New Layout…", true, key(Code::KeyN, false));
+        let edit = MenuItem::with_id("edit-layout", "Edit Layout", true, key(Code::KeyE, false));
+        let save = MenuItem::with_id("save-layout", "Save", false, key(Code::KeyS, false));
+        let save_as = MenuItem::with_id("save-layout-as", "Save As…", false, key(Code::KeyS, true));
+        let exit = MenuItem::with_id("exit-editor", "Exit Editor", false, None);
+        let layouts = Submenu::with_items(
+            "Layout",
+            true,
+            &[
+                &new,
+                &edit,
+                &PredefinedMenuItem::separator(),
+                &save,
+                &save_as,
+                &exit,
+            ],
+        )?;
+        let menu = Menu::with_items(&[&app, &file, &layouts, &settings])?;
         let (tx, commands) = std::sync::mpsc::channel();
         let ctx = ctx.clone();
         muda::MenuEvent::set_event_handler(Some(move |event: muda::MenuEvent| {
             let command = match event.id.0.as_str() {
                 "open-video" => Command::OpenVideo,
                 "select-layout" => Command::SelectLayout,
+                "new-layout" => Command::NewLayout,
+                "edit-layout" => Command::EditLayout,
+                "save-layout" => Command::SaveLayout,
+                "save-layout-as" => Command::SaveLayoutAs,
+                "exit-editor" => Command::ExitEditor,
                 "audio-settings" => Command::AudioSettings,
                 "clear-recent-videos" => Command::ClearRecentVideos,
                 "close-video" => Command::CloseVideo,
@@ -111,6 +140,8 @@ impl Menus {
             _menu: menu,
             close,
             has_video: std::cell::Cell::new(false),
+            editor_items: [save, save_as, exit],
+            edit,
             commands,
             recent,
             recent_paths: None,
@@ -121,8 +152,13 @@ impl Menus {
         &mut self,
         _ui: &mut egui::Ui,
         has_video: bool,
+        editing: bool,
         prefs: &crate::prefs::Prefs,
     ) -> Option<Command> {
+        for item in &self.editor_items {
+            item.set_enabled(editing);
+        }
+        self.edit.set_enabled(!editing);
         if self.has_video.replace(has_video) != has_video {
             self.close.set_enabled(has_video);
         }
@@ -172,11 +208,16 @@ impl Menus {
         &mut self,
         ui: &mut egui::Ui,
         has_video: bool,
+        editing: bool,
         prefs: &crate::prefs::Prefs,
     ) -> Option<Command> {
         let mut command = ui.ctx().input_mut(|i| {
             // Consume the more specific shortcut first.
-            if i.consume_key(
+            if i.consume_key(egui::Modifiers::COMMAND, egui::Key::N) {
+                Some(Command::NewLayout)
+            } else if i.consume_key(egui::Modifiers::COMMAND, egui::Key::E) && !editing {
+                Some(Command::EditLayout)
+            } else if i.consume_key(
                 egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
                 egui::Key::O,
             ) {
@@ -236,6 +277,20 @@ impl Menus {
                     if ui.button("Audio…").clicked() {
                         command = Some(Command::AudioSettings);
                         ui.close();
+                    }
+                });
+                ui.menu_button("Layout", |ui| {
+                    for (label, command_to_run, enabled) in [
+                        ("New Layout…", Command::NewLayout, true),
+                        ("Edit Layout", Command::EditLayout, !editing),
+                        ("Save", Command::SaveLayout, editing),
+                        ("Save As…", Command::SaveLayoutAs, editing),
+                        ("Exit Editor", Command::ExitEditor, editing),
+                    ] {
+                        if ui.add_enabled(enabled, egui::Button::new(label)).clicked() {
+                            command = Some(command_to_run);
+                            ui.close();
+                        }
                     }
                 });
             });

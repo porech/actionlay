@@ -61,6 +61,8 @@ pub struct RenderStats {
 /// Draws layouts. Holds the font system, glyph and icon caches and reusable buffers:
 /// keep one per output and reuse it every frame.
 pub struct Renderer {
+    boxes: Vec<HitBox>,
+    collect_boxes: bool,
     text: TextEngine,
     icons: IconCache,
     formats: FormatCache,
@@ -83,6 +85,8 @@ impl Default for Renderer {
 impl Renderer {
     pub fn new() -> Self {
         Self {
+            boxes: Vec::new(),
+            collect_boxes: false,
             text: TextEngine::new(),
             icons: IconCache::new(),
             formats: FormatCache::default(),
@@ -99,6 +103,24 @@ impl Renderer {
 
     pub fn set_maps(&mut self, maps: actionlay_maps::TileStore) {
         self.maps = maps;
+    }
+
+    /// Selection geometry from the same draw traversal, in layout units.
+    pub fn hit_boxes(&self) -> &[HitBox] {
+        &self.boxes
+    }
+
+    pub fn render_editor_into(
+        &mut self,
+        layout: &Layout,
+        telemetry: &Telemetry,
+        t: f64,
+        target: &mut Pixmap,
+    ) {
+        self.boxes.clear();
+        self.collect_boxes = true;
+        self.render_telemetry_into(layout, telemetry, t, target);
+        self.collect_boxes = false;
     }
 
     pub fn set_zone(&mut self, zone: Zone) {
@@ -191,6 +213,9 @@ impl Renderer {
             scratch: &mut self.scratch,
             headings: &mut self.headings,
             statics: &mut self.statics,
+            boxes: self.collect_boxes.then_some(&mut self.boxes),
+            path: Vec::new(),
+            hit_index: None,
         };
         scene::draw_nodes(
             &mut painter,
@@ -202,6 +227,13 @@ impl Renderer {
         stats.total = start.elapsed();
         self.stats = stats;
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct HitBox {
+    pub path: Vec<usize>,
+    pub parent: actionlay_layout::geom::Rect,
+    pub rect: actionlay_layout::geom::Rect,
 }
 
 /// Warnings about what the renderer cannot honour: unknown metrics, units, icons and

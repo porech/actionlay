@@ -4,6 +4,7 @@
     windows_subsystem = "windows"
 )]
 
+mod editor;
 mod layouts;
 mod menus;
 mod overlay;
@@ -25,6 +26,8 @@ use overlay::{OverlayKey, OverlayRequest, OverlayWorker, Scheduler};
 use video_view::VideoView;
 
 struct App {
+    editor: Option<editor::Editor>,
+    pending_edit_action: Option<EditAction>,
     egui_ctx: egui::Context,
     menus: menus::Menus,
     video_path: Option<PathBuf>,
@@ -70,7 +73,171 @@ struct App {
     logged_overlay_size: Option<(u32, u32)>,
 }
 
+enum EditAction {
+    Exit,
+    New,
+    Command(menus::Command),
+    OpenLayout(PathBuf),
+    Builtin(String),
+}
+
 impl App {
+    fn begin_edit(&mut self, new: bool) {
+        if self.editor.is_some() {
+            return;
+        }
+        if let Some(player) = &mut self.player {
+            player.pause();
+        }
+        let size = self
+            .player
+            .as_ref()
+            .map(|p| [p.info().video.width, p.info().video.height]);
+        self.select_layout = false;
+        self.editor = Some(editor::Editor::new(
+            if new {
+                editor::Editor::blank()
+            } else {
+                (*self.base_layout).clone()
+            },
+            if new {
+                None
+            } else {
+                self.prefs.last_layout.clone()
+            },
+            size,
+            new,
+        ));
+    }
+
+    fn save_edit(&mut self, save_as: bool) -> bool {
+        let Some(editor) = &mut self.editor else {
+            return false;
+        };
+        let path = if !save_as { editor.path.clone() } else { None };
+        let path = match path {
+            Some(path) => path,
+            None => {
+                let name = editor.draft.name.as_deref().unwrap_or("Untitled");
+                let name: String = name
+                    .chars()
+                    .map(|c| if "/\\:*?\"<>|".contains(c) { '_' } else { c })
+                    .collect();
+                let name = if editor.is_system_copy() {
+                    format!("{name} copy.ovl.json")
+                } else {
+                    format!("{name}.ovl.json")
+                };
+                let mut dialog = rfd::FileDialog::new()
+                    .add_filter("ActionLay layout", &["json"])
+                    .set_file_name(name);
+                if let Some(dirs) = directories::ProjectDirs::from("org", "ActionLay", "ActionLay")
+                {
+                    let library = dirs.data_dir().join("layouts");
+                    if std::fs::create_dir_all(&library).is_ok() {
+                        dialog = dialog.set_directory(library);
+                    }
+                }
+                let Some(mut path) = dialog.save_file() else {
+                    return false;
+                };
+                if path.extension().is_none() {
+                    path.set_extension("ovl.json");
+                }
+                path
+            }
+        };
+        if let Err(e) = editor.save_to(&path) {
+            editor.error = Some(format!("Cannot save layout: {e}"));
+            return false;
+        }
+        let layout = Arc::new(editor.draft.clone());
+        self.set_layout(layout);
+        prefs::remember(&mut self.prefs.recent_layouts, path.clone());
+        self.prefs.last_layout = Some(path);
+        self.prefs.last_builtin = None;
+        self.save_prefs();
+        true
+    }
+
+    fn request_edit_action(&mut self, action: EditAction, ctx: &egui::Context) {
+        if self.pending_edit_action.is_some() {
+            return;
+        }
+        if self.editor.as_ref().is_some_and(editor::Editor::dirty) {
+            self.pending_edit_action = Some(action);
+        } else {
+            self.finish_edit_action(action, ctx);
+        }
+    }
+
+    fn finish_edit_action(&mut self, action: EditAction, ctx: &egui::Context) {
+        self.editor = None;
+        match action {
+            EditAction::Exit => {}
+            EditAction::New => self.begin_edit(true),
+            EditAction::Command(command) => self.command(command, ctx),
+            EditAction::OpenLayout(path) => self.open_layout(path),
+            EditAction::Builtin(id) => {
+                if let Some(preset) = actionlay_layout::catalog::find(&id) {
+                    self.set_layout(Arc::new(preset.layout()));
+                    self.prefs.last_layout = None;
+                    self.prefs.last_builtin = Some(id);
+                    self.layout_notice = None;
+                    self.save_prefs();
+                    self.select_layout = false;
+                }
+            }
+        }
+    }
+
+    fn edit_confirmation(&mut self, ctx: &egui::Context) {
+        if self.pending_edit_action.is_none() {
+            return;
+        }
+        let mut decision = None;
+        let save_label = if matches!(
+            self.pending_edit_action,
+            Some(EditAction::Exit | EditAction::Command(menus::Command::Quit))
+        ) {
+            "Save and exit"
+        } else {
+            "Save and continue"
+        };
+        let response = egui::Modal::new(egui::Id::new("unsaved-layout")).show(ctx, |ui| {
+            ui.heading("Save layout changes?");
+            ui.label("Your layout has unsaved changes.");
+            if let Some(e) = self.editor.as_ref().and_then(|e| e.error.as_deref()) {
+                ui.colored_label(egui::Color32::LIGHT_RED, e);
+            }
+            ui.horizontal(|ui| {
+                if ui.button(save_label).clicked() {
+                    decision = Some(0);
+                }
+                if ui.button("Discard changes").clicked() {
+                    decision = Some(1);
+                }
+                if ui.button("Cancel").clicked() {
+                    decision = Some(2);
+                }
+            });
+        });
+        if response.should_close() {
+            decision = Some(2);
+        }
+        match decision {
+            Some(0) if self.save_edit(false) => {
+                let action = self.pending_edit_action.take().unwrap();
+                self.finish_edit_action(action, ctx);
+            }
+            Some(1) => {
+                let action = self.pending_edit_action.take().unwrap();
+                self.finish_edit_action(action, ctx);
+            }
+            Some(2) => self.pending_edit_action = None,
+            _ => {}
+        }
+    }
     fn audio_dialog(&mut self, ctx: &egui::Context) {
         if !self.select_audio {
             return;
@@ -412,15 +579,7 @@ impl App {
             });
         self.select_layout = visible;
         if let Some(id) = builtin {
-            self.set_layout(Arc::new(
-                actionlay_layout::catalog::find(id).unwrap().layout(),
-            ));
-            self.prefs.last_layout = None;
-            self.prefs.last_builtin = Some(id.into());
-            self.layout_notice = None;
-            self.error = None;
-            self.save_prefs();
-            self.select_layout = false;
+            self.request_edit_action(EditAction::Builtin(id.into()), ctx);
         } else if let Some(path) = selected {
             self.open_layout(path);
             // Keep the chooser available if a recent file has moved or is invalid.
@@ -431,7 +590,31 @@ impl App {
     }
 
     fn command(&mut self, command: menus::Command, ctx: &egui::Context) {
+        if self.pending_edit_action.is_some() {
+            return;
+        }
+        if self.editor.is_some()
+            && matches!(
+                command,
+                menus::Command::Quit
+                    | menus::Command::SelectLayout
+                    | menus::Command::OpenLayoutFile
+                    | menus::Command::NewLayout
+            )
+        {
+            self.request_edit_action(EditAction::Command(command), ctx);
+            return;
+        }
         match command {
+            menus::Command::EditLayout => self.begin_edit(false),
+            menus::Command::NewLayout => self.begin_edit(true),
+            menus::Command::SaveLayout => {
+                self.save_edit(false);
+            }
+            menus::Command::SaveLayoutAs => {
+                self.save_edit(true);
+            }
+            menus::Command::ExitEditor => self.request_edit_action(EditAction::Exit, ctx),
             menus::Command::SelectLayout => self.select_layout = true,
             menus::Command::AudioSettings => {
                 match actionlay_media::audio::AudioOutput::devices() {
@@ -568,6 +751,11 @@ impl App {
     }
 
     fn open_layout(&mut self, path: PathBuf) {
+        if self.editor.is_some() {
+            let ctx = self.egui_ctx.clone();
+            self.request_edit_action(EditAction::OpenLayout(path), &ctx);
+            return;
+        }
         if path
             .extension()
             .is_some_and(|e| e.eq_ignore_ascii_case("xml"))
@@ -734,7 +922,19 @@ impl App {
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        if let Some(command) = self.menus.show(ui, self.player.is_some(), &self.prefs) {
+        if ui.ctx().input(|i| i.viewport().close_requested())
+            && self.editor.as_ref().is_some_and(editor::Editor::dirty)
+        {
+            ui.ctx()
+                .send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            self.request_edit_action(EditAction::Command(menus::Command::Quit), ui.ctx());
+        }
+        if let Some(command) = self.menus.show(
+            ui,
+            self.player.is_some(),
+            self.editor.is_some(),
+            &self.prefs,
+        ) {
             self.command(command, ui.ctx());
         }
         let dropped: Vec<PathBuf> = ui.ctx().input(|i| {
@@ -766,7 +966,12 @@ impl eframe::App for App {
         }
 
         if let Some(p) = &mut self.player {
-            transport::handle_keys(ui.ctx(), p, &self.scrub);
+            if !ui.ctx().egui_wants_keyboard_input()
+                && self.pending_edit_action.is_none()
+                && self.editor.as_ref().is_none_or(|e| e.video_background)
+            {
+                transport::handle_keys(ui.ctx(), p, &self.scrub);
+            }
             if let Some(frame) = p.poll_frame() {
                 self.shown_t = Some(frame.pts);
                 let color = p.info().video.color;
@@ -778,8 +983,12 @@ impl eframe::App for App {
         let status = self.overlay_status();
         let notices = self.notices();
         egui::Panel::bottom("transport").show(ui, |ui| {
+            let enabled = self.pending_edit_action.is_none()
+                && self.editor.as_ref().is_none_or(|e| e.video_background);
             if let Some(p) = &mut self.player {
-                transport::show(ui, p, &mut self.scrub, &status);
+                ui.add_enabled_ui(enabled, |ui| {
+                    transport::show(ui, p, &mut self.scrub, &status)
+                });
             }
             if let Some(e) = &self.error {
                 ui.colored_label(egui::Color32::LIGHT_RED, e);
@@ -789,57 +998,105 @@ impl eframe::App for App {
             }
         });
         self.audio_dialog(ui.ctx());
-        let mut open_clicked = false;
-        egui::CentralPanel::default().show(ui, |ui| {
-            let rect = ui.available_rect_before_wrap();
-            if self.player.is_none() {
-                let response = ui
-                    .allocate_rect(rect, egui::Sense::click())
-                    .on_hover_cursor(egui::CursorIcon::PointingHand);
-                response.widget_info(|| {
-                    egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Open a video")
+        if let Some(mut editor) = self.editor.take() {
+            editor.set_maps(self.overlay.maps().clone());
+            let video_size = self
+                .player
+                .as_ref()
+                .map(|p| [p.info().video.width, p.info().video.height]);
+            let action = ui
+                .add_enabled_ui(self.pending_edit_action.is_none(), |ui| {
+                    editor.ui(
+                        ui,
+                        Some(&mut self.view),
+                        video_size,
+                        self.loaded_telemetry.as_deref(),
+                        self.shown_t.unwrap_or(0.0),
+                    )
+                })
+                .inner;
+            self.editor = Some(editor);
+            if self.editor.as_ref().is_some_and(|e| !e.video_background)
+                && let Some(player) = &mut self.player
+            {
+                player.pause();
+            }
+            match action {
+                Some(editor::Action::Save) => {
+                    self.save_edit(false);
+                }
+                Some(editor::Action::SaveAs) => {
+                    self.save_edit(true);
+                }
+                Some(editor::Action::Exit) => self.request_edit_action(EditAction::Exit, ui.ctx()),
+                Some(editor::Action::New) => self.request_edit_action(EditAction::New, ui.ctx()),
+                None => {}
+            }
+        } else {
+            egui::Panel::top("layout-toolbar").show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(self.layout.name.as_deref().unwrap_or("Layout"));
+                    if ui.button("Edit layout").clicked() {
+                        self.begin_edit(false);
+                    }
+                    if ui.button("New layout…").clicked() {
+                        self.begin_edit(true);
+                    }
                 });
-                ui.painter().text(
-                    rect.center() - egui::vec2(0.0, 32.0),
-                    egui::Align2::CENTER_CENTER,
-                    "Open a video",
-                    egui::FontId::proportional(28.0),
-                    ui.visuals().text_color(),
-                );
-                ui.painter().text(
-                    rect.center() + egui::vec2(0.0, 8.0),
-                    egui::Align2::CENTER_CENTER,
-                    "Click here or drag a video into the window",
-                    egui::FontId::proportional(16.0),
-                    ui.visuals().weak_text_color(),
-                );
-                ui.painter().text(
-                    rect.center() + egui::vec2(0.0, 38.0),
-                    egui::Align2::CENTER_CENTER,
-                    if cfg!(target_os = "macos") {
-                        "File / Open Video…   ·   ⌘O"
-                    } else {
-                        "File / Open Video…   ·   Ctrl+O"
-                    },
-                    egui::FontId::proportional(14.0),
-                    ui.visuals().weak_text_color(),
-                );
-                open_clicked = response.clicked();
-                return;
+            });
+            let mut open_clicked = false;
+            egui::CentralPanel::default().show(ui, |ui| {
+                let rect = ui.available_rect_before_wrap();
+                if self.player.is_none() {
+                    let response = ui
+                        .allocate_rect(rect, egui::Sense::click())
+                        .on_hover_cursor(egui::CursorIcon::PointingHand);
+                    response.widget_info(|| {
+                        egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Open a video")
+                    });
+                    ui.painter().text(
+                        rect.center() - egui::vec2(0.0, 32.0),
+                        egui::Align2::CENTER_CENTER,
+                        "Open a video",
+                        egui::FontId::proportional(28.0),
+                        ui.visuals().text_color(),
+                    );
+                    ui.painter().text(
+                        rect.center() + egui::vec2(0.0, 8.0),
+                        egui::Align2::CENTER_CENTER,
+                        "Click here or drag a video into the window",
+                        egui::FontId::proportional(16.0),
+                        ui.visuals().weak_text_color(),
+                    );
+                    ui.painter().text(
+                        rect.center() + egui::vec2(0.0, 38.0),
+                        egui::Align2::CENTER_CENTER,
+                        if cfg!(target_os = "macos") {
+                            "File / Open Video…   ·   ⌘O"
+                        } else {
+                            "File / Open Video…   ·   Ctrl+O"
+                        },
+                        egui::FontId::proportional(14.0),
+                        ui.visuals().weak_text_color(),
+                    );
+                    open_clicked = response.clicked();
+                    return;
+                }
+                // snapped once: the paint viewport and the overlay texture share its size
+                let video = self.view.video_rect(rect, ui.ctx().pixels_per_point());
+                if let Some(video) = video {
+                    self.request_overlay(ui.ctx(), video);
+                }
+                self.view
+                    .show(ui, rect, video, self.overlay_visible && self.overlay_ready);
+            });
+            if open_clicked {
+                self.command(menus::Command::OpenVideo, ui.ctx());
             }
-            // snapped once: the paint viewport and the overlay texture share its size
-            let video = self.view.video_rect(rect, ui.ctx().pixels_per_point());
-            if let Some(video) = video {
-                self.request_overlay(ui.ctx(), video);
-            }
-            self.view
-                .show(ui, rect, video, self.overlay_visible && self.overlay_ready);
-        });
-        if open_clicked {
-            self.command(menus::Command::OpenVideo, ui.ctx());
         }
         self.layout_chooser(ui.ctx());
         self.import_dialog(ui.ctx());
+        self.edit_confirmation(ui.ctx());
         if self.title_dirty {
             let title = self
                 .video_path
@@ -871,7 +1128,12 @@ fn main() -> eframe::Result {
     let path = std::env::args().nth(1).map(PathBuf::from);
     eframe::run_native(
         "ActionLay",
-        eframe::NativeOptions::default(),
+        eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default()
+                .with_inner_size([1200.0, 800.0])
+                .with_min_inner_size([720.0, 480.0]),
+            ..Default::default()
+        },
         Box::new(move |cc| {
             let rs = cc
                 .wgpu_render_state
@@ -894,6 +1156,8 @@ fn main() -> eframe::Result {
                 .maps()
                 .configure(prefs.maps.clone().unwrap_or_default());
             let mut app = App {
+                editor: None,
+                pending_edit_action: None,
                 menus: menus::Menus::new(&cc.egui_ctx)?,
                 video_path: None,
                 title_dirty: false,

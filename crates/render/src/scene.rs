@@ -79,6 +79,31 @@ pub(crate) struct Painter<'p> {
     pub scratch: &'p mut String,
     pub headings: &'p mut crate::history::HeadingCache,
     pub statics: &'p mut crate::history::StaticCache,
+    pub boxes: Option<&'p mut Vec<crate::HitBox>>,
+    pub path: Vec<usize>,
+    pub hit_index: Option<usize>,
+}
+
+impl Painter<'_> {
+    fn record_box(&mut self, r: Rect) {
+        if let Some(boxes) = &mut self.boxes
+            && let Some(i) = self.hit_index
+        {
+            let old = boxes[i].rect;
+            boxes[i].rect = if old.w <= 0.0 || old.h <= 0.0 {
+                r
+            } else {
+                let x = old.x.min(r.x);
+                let y = old.y.min(r.y);
+                Rect::new(
+                    x,
+                    y,
+                    (old.x + old.w).max(r.x + r.w) - x,
+                    (old.y + old.h).max(r.y + r.h) - y,
+                )
+            };
+        }
+    }
 }
 
 /// Where a leaf widget goes: anchored in `parent` (layout units).
@@ -91,7 +116,7 @@ pub(crate) struct Placement {
 }
 
 pub(crate) fn draw_nodes(p: &mut Painter, nodes: &[Node], parent: Rect, opacity: f32, ctx: &Ctx) {
-    for node in nodes {
+    for (index, node) in nodes.iter().enumerate() {
         // nodes of unknown types are kept in the layout but not drawn
         let Node::Known(w) = node else { continue };
         let c = w.common();
@@ -106,6 +131,30 @@ pub(crate) fn draw_nodes(p: &mut Painter, nodes: &[Node], parent: Rect, opacity:
             offset: c.offset_in(parent),
             opacity,
         };
+        let previous = p.hit_index;
+        if let Some(boxes) = &mut p.boxes {
+            p.path.push(index);
+            p.hit_index = Some(boxes.len());
+            let size = match w {
+                Widget::Group(g) => g.size.unwrap_or([0.0; 2]),
+                Widget::Frame(f) => f.size,
+                Widget::Chart(c) | Widget::GradientChart(c) => c.size(),
+                Widget::Map(m) => m.size(),
+                Widget::GMeter(g) => [g.diameter(); 2],
+                Widget::Gauge(g) => [g.dial.diameter(); 2],
+                Widget::Compass(c) => [c.dial.diameter(); 2],
+                Widget::Bar(b) => b.size(),
+                Widget::ZoneBar(b) => b.bar.size(),
+                Widget::Icon(i) => [i.size.unwrap_or(defaults::ICON_SIZE); 2],
+                Widget::GpsLockIcon(i) => [i.size.unwrap_or(defaults::ICON_SIZE); 2],
+                _ => [0.0; 2],
+            };
+            boxes.push(crate::HitBox {
+                path: p.path.clone(),
+                parent,
+                rect: place(parent, at.anchor, at.offset, size),
+            });
+        }
         match w {
             Widget::Group(g) => {
                 let r = place(parent, at.anchor, at.offset, g.size.unwrap_or([0.0, 0.0]));
@@ -148,6 +197,19 @@ pub(crate) fn draw_nodes(p: &mut Painter, nodes: &[Node], parent: Rect, opacity:
             }
             Widget::GpsLockIcon(g) => draw_gps_lock(p, g, at, ctx),
         }
+        if let Some(i) = p.hit_index {
+            let child_rects: Vec<_> = p.boxes.as_ref().unwrap()[i + 1..]
+                .iter()
+                .map(|b| b.rect)
+                .collect();
+            if matches!(w, Widget::Group(g) if g.size.is_none()) {
+                for rect in child_rects {
+                    p.record_box(rect);
+                }
+            }
+            p.path.pop();
+        }
+        p.hit_index = previous;
     }
 }
 
@@ -159,6 +221,7 @@ pub(crate) fn draw_text(p: &mut Painter, style: &TextStyle, dim: bool, at: Place
     let (w_px, h_px) = p.text.layout(p.scratch, style.size * s, style.weight);
     if w_px > 0.0 {
         let r = place(at.parent, at.anchor, at.offset, [w_px / s, h_px / s]);
+        p.record_box(r);
         if let Some(path) = p.text.path_at(r.x * s, r.y * s) {
             let alpha = at.opacity * if dim { ctx.theme.dim_opacity } else { 1.0 };
             let [dx, dy] = style.shadow.offset;
