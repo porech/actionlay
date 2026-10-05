@@ -1,6 +1,5 @@
 //! Text format mini-language for metric widgets (spec §4.1):
 //! literal text, `{value}`, `{value:.N}`, `{value:+.N}`, `{unit}`; `{{`/`}}` escape braces.
-use std::fmt::Write as _;
 
 /// Shown instead of a value that is missing (empty state, spec §4.4.1).
 pub const EMPTY: &str = "—";
@@ -92,9 +91,12 @@ fn parse_field(field: &str) -> Result<Piece, &'static str> {
             let digits = rest
                 .strip_prefix('.')
                 .ok_or("expected `.N` after `:` (e.g. `{value:.1}`)")?;
-            match digits.parse::<u8>() {
-                Ok(decimals) if decimals <= 9 => Ok(Piece::Value { decimals, sign }),
-                _ => Err("decimals must be a number from 0 to 9"),
+            match digits.as_bytes() {
+                [d @ b'0'..=b'9'] => Ok(Piece::Value {
+                    decimals: d - b'0',
+                    sign,
+                }),
+                _ => Err("decimals must be a single digit from 0 to 9"),
             }
         }
         _ => Err("unknown field (expected `value` or `unit`)"),
@@ -111,14 +113,20 @@ pub fn apply(out: &mut String, pieces: &[Piece], value: Option<f64>, unit: &str)
                 None => out.push_str(EMPTY),
                 Some(v) => {
                     let d = usize::from(*decimals);
-                    let scaled = v * 10f64.powi(i32::from(*decimals));
-                    // never print "-0" / "-0.0"
-                    let v = if scaled.round() == 0.0 { 0.0 } else { v };
-                    let _ = if *sign {
-                        write!(out, "{v:+.d$}")
+                    let mut text = if *sign {
+                        format!("{v:+.d$}")
                     } else {
-                        write!(out, "{v:.d$}")
+                        format!("{v:.d$}")
                     };
+                    // a value that rounds to zero never prints "-0" / "-0.0"
+                    if text.chars().all(|c| matches!(c, '0' | '.' | '-' | '+')) {
+                        text = if *sign {
+                            format!("{:+.d$}", 0.0)
+                        } else {
+                            format!("{:.d$}", 0.0)
+                        };
+                    }
+                    out.push_str(&text);
                 }
             },
         }
@@ -208,19 +216,76 @@ mod tests {
     }
 
     #[test]
-    fn arbitrary_input_never_panics() {
-        for s in [
-            "{",
-            "{{{",
-            "}}}",
-            "°{value:.1}°{",
-            "{:}",
-            "{value:+.}",
-            "è{è}",
-            "{value:.1}}",
-            "{value::}",
-        ] {
-            let _ = parse(s);
+    fn rounding_ties_follow_format_and_never_print_minus_zero() {
+        assert_eq!(fmt("{value:.0}", Some(-0.5), ""), "0");
+        assert_eq!(fmt("{value:+.0}", Some(-0.5), ""), "+0");
+        assert_eq!(fmt("{value:.1}", Some(-0.04), ""), "0.0");
+        assert_eq!(fmt("{value:.1}", Some(-0.25), ""), "-0.2");
+        assert_eq!(fmt("{value:.0}", Some(2.5), ""), "2");
+    }
+
+    #[test]
+    fn malformed_and_tricky_formats_table() {
+        let lit = |s: &str| Piece::Literal(s.into());
+        let val = Piece::Value {
+            decimals: 0,
+            sign: false,
+        };
+        let ok: Vec<(&str, Vec<Piece>)> = vec![
+            ("{{{value}}}", vec![lit("{"), val.clone(), lit("}")]),
+            (
+                "{value:.9}",
+                vec![Piece::Value {
+                    decimals: 9,
+                    sign: false,
+                }],
+            ),
+        ];
+        for (input, want) in ok {
+            assert_eq!(parse(input).unwrap(), want, "{input}");
+        }
+        let err: Vec<(&str, usize)> = vec![
+            ("{value", 0),
+            ("ab{", 2),
+            ("}", 0),
+            ("a}", 1),
+            ("{value:.1}}", 10),
+            ("°{speed}", 2),
+            ("è{value", 2),
+            ("{value:.999999999}", 0),
+            ("{value:.+1}", 0),
+            ("{value:.09}", 0),
+            ("{value:.}", 0),
+            ("{}", 0),
+            ("{:}", 0),
+            ("{value::}", 0),
+        ];
+        for (input, at) in err {
+            let e = parse(input).expect_err(input);
+            assert_eq!(e.at, at, "{input}: {e}");
+        }
+    }
+
+    #[test]
+    fn error_positions_are_char_boundaries() {
+        let alphabet = ['{', '}', 'è', '°', 'v', ':', '.', '+', '1'];
+        for n in 0..6u32 {
+            for seed in 0..alphabet.len().pow(n.min(4)) * 4 {
+                let mut x = seed;
+                let input: String = (0..n)
+                    .map(|_| {
+                        let c = alphabet[x % alphabet.len()];
+                        x = x / alphabet.len() + 7;
+                        c
+                    })
+                    .collect();
+                if let Err(e) = parse(&input) {
+                    assert!(
+                        e.at < input.len() && input.is_char_boundary(e.at),
+                        "{input}"
+                    );
+                }
+            }
         }
     }
 }
