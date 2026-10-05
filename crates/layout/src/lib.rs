@@ -30,6 +30,8 @@ pub const CURRENT_VERSION: u32 = 1;
 pub struct Layout {
     #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
+    /// Format version, 1 or higher.
+    #[schemars(range(min = 1))]
     pub version: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -78,9 +80,7 @@ impl Layout {
     pub fn from_json(text: &str) -> Result<Loaded, LayoutError> {
         let layout: Layout =
             serde_json::from_str(text).map_err(|e| LayoutError::Json(name_the_field(text, e)))?;
-        let (errors, warnings): (Vec<Issue>, Vec<Issue>) = validate::validate(&layout)
-            .into_iter()
-            .partition(|i| i.severity == Severity::Error);
+        let (errors, warnings) = split(validate::validate(&layout));
         if errors.is_empty() {
             Ok(Loaded { layout, warnings })
         } else {
@@ -92,19 +92,36 @@ impl Layout {
         Self::from_json(&std::fs::read_to_string(path)?)
     }
 
-    pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).expect("a layout always serializes")
+    /// The layout as pretty JSON. A layout with errors is refused, so that nothing is
+    /// written that cannot be loaded back.
+    pub fn to_json(&self) -> Result<String, LayoutError> {
+        let (errors, _) = split(validate::validate(self));
+        if !errors.is_empty() {
+            return Err(LayoutError::Invalid(errors));
+        }
+        Ok(serde_json::to_string_pretty(self).expect("a layout always serializes"))
     }
 
-    pub fn save(&self, path: &Path) -> std::io::Result<()> {
-        std::fs::write(path, self.to_json() + "\n")
+    /// Writes the layout; refuses a layout with errors (see [`Layout::to_json`]).
+    pub fn save(&self, path: &Path) -> Result<(), LayoutError> {
+        std::fs::write(path, self.to_json()? + "\n")?;
+        Ok(())
     }
 }
 
+/// (errors, warnings)
+fn split(issues: Vec<Issue>) -> (Vec<Issue>, Vec<Issue>) {
+    issues
+        .into_iter()
+        .partition(|i| i.severity == Severity::Error)
+}
+
 /// serde names a bad value (`unknown variant `middle``, `invalid colour `blue``) but,
-/// through the flattened structs of the model, not the key that holds it. Find that key
-/// in the document and put its path in front of the message:
+/// through the flattened structs of the model, not the key that holds it. Put the path
+/// of that key in front of the message when it can be told for sure:
 /// `nodes[0].anchor: text node `t`: unknown variant `middle`, expected one of …`.
+/// Errors in nodes are located by the failing node itself ([`model::node_error`]);
+/// errors in the header by the only header key holding the bad value.
 fn name_the_field(text: &str, e: serde_json::Error) -> serde_json::Error {
     if !e.is_data() {
         return e;
@@ -112,48 +129,23 @@ fn name_the_field(text: &str, e: serde_json::Error) -> serde_json::Error {
     let Ok(doc) = serde_json::from_str::<serde_json::Value>(text) else {
         return e;
     };
-    let message = e.to_string();
-    // the bad value is the last `quoted` token before the list of accepted values
-    let head = message.split("expected").next().unwrap_or_default();
-    let Some(bad) = head.rsplit('`').nth(1) else {
-        return e;
-    };
-    // Only for unknown values (serde's enums, `ColorRef`, `Aspect`): in other errors the
-    // last quoted token may be the node id from the `metric node `lat`:` prefix.
-    let before = head.rsplit_once(&format!("`{bad}`")).map_or("", |(b, _)| b);
-    if !["variant ", "colour ", "aspect "]
-        .iter()
-        .any(|w| before.ends_with(w))
-    {
-        return e;
-    }
-    match find_string(&doc, bad, String::new()) {
-        Some(path) => serde::de::Error::custom(format!("{path}: {message}")),
-        None => e,
-    }
-}
-
-/// Path of the first string value equal to `wanted`, skipping free-text keys.
-fn find_string(v: &serde_json::Value, wanted: &str, path: String) -> Option<String> {
-    use serde_json::Value;
-    match v {
-        Value::String(s) if s == wanted && !path.is_empty() => Some(path),
-        Value::Array(items) => items
-            .iter()
-            .enumerate()
-            .find_map(|(i, item)| find_string(item, wanted, format!("{path}[{i}]"))),
-        Value::Object(map) => map
-            .iter()
-            .filter(|(k, _)| !matches!(k.as_str(), "id" | "name" | "text" | "type" | "$schema"))
-            .find_map(|(k, item)| {
-                let p = if path.is_empty() {
-                    k.clone()
+    let position = format!(" at line {} column {}", e.line(), e.column());
+    if let Some(nodes) = doc.get("nodes").and_then(|n| n.as_array()) {
+        for (i, node) in nodes.iter().enumerate() {
+            if let Some((path, message)) = model::node_error(node) {
+                let path = if path.is_empty() {
+                    format!("nodes[{i}]")
                 } else {
-                    format!("{path}.{k}")
+                    format!("nodes[{i}].{path}")
                 };
-                find_string(item, wanted, p)
-            }),
-        _ => None,
+                return serde::de::Error::custom(model::at_path(&path, &message) + &position);
+            }
+        }
+    }
+    let message = e.to_string();
+    match model::bad_value(&message).and_then(|bad| model::unique_key(&doc, bad, &["nodes"])) {
+        Some(path) => serde::de::Error::custom(model::at_path(&path, &message)),
+        None => e,
     }
 }
 
@@ -265,7 +257,7 @@ mod tests {
             "{w:?}"
         );
         assert!(w.iter().any(|m| m.contains("glow")), "{w:?}");
-        let saved = loaded.layout.to_json();
+        let saved = loaded.layout.to_json().unwrap();
         for kept in ["moving_map", "projection", "glow", "\"zoom\": 15"] {
             assert!(saved.contains(kept), "{kept} lost on save:\n{saved}");
         }
@@ -301,7 +293,7 @@ mod tests {
             );
         }
         // kept on save
-        let saved = loaded.layout.to_json();
+        let saved = loaded.layout.to_json().unwrap();
         for kept in ["tertiary", "spread", "dotted", "dash"] {
             assert!(saved.contains(kept), "{kept} lost on save:\n{saved}");
         }
@@ -428,42 +420,68 @@ mod tests {
 
     #[test]
     fn unknown_enum_values_name_the_field_and_the_value() {
+        let text = |nodes: serde_json::Value| layout_with(nodes);
         let cases = [
             (
-                layout_with(json!([{"type": "text", "id": "t", "text": "x", "anchor": "middle"}])),
-                ["nodes[0].anchor", "middle"],
+                text(json!([{"type": "text", "id": "t", "text": "x", "anchor": "middle"}])),
+                "nodes[0].anchor: text node `t`: unknown variant `middle`, expected one of",
             ),
             (
-                layout_with(json!([{"type": "text", "text": "x", "weight": "black"}])),
-                ["nodes[0].weight", "black"],
+                text(json!([{"type": "text", "text": "x", "weight": "black"}])),
+                "nodes[0].weight: text node: unknown variant `black`",
             ),
+            // nested child: the path goes through the parents
             (
-                layout_with(json!([{"type": "group", "children": [
-                    {"type": "frame", "size": [1, 1], "border": {"color": "blue"}}]}])),
-                ["nodes[0].children[0].border.color", "blue"],
+                text(json!([{"type": "group", "id": "g", "children": [
+                    {"type": "text", "text": "ok", "anchor": "top"},
+                    {"type": "frame", "id": "f", "size": [1, 1], "children": [
+                        {"type": "frame", "size": [1, 1], "border": {"color": "blue"}}]}]}])),
+                "nodes[0].children[1].children[0].border.color: frame node: invalid colour `blue`",
             ),
             (
                 json!({"version": 1, "units": "nautical", "nodes": []}).to_string(),
-                ["units", "nautical"],
+                "units: unknown variant `nautical`",
+            ),
+            (
+                json!({"version": 1, "design_aspect": "4x3"}).to_string(),
+                "design_aspect: invalid aspect `4x3`",
             ),
             (
                 json!({"version": 1, "theme": {"outline": {"color": "pink"}}}).to_string(),
-                ["theme.outline.color", "pink"],
+                "theme.outline.color: invalid colour `pink`",
+            ),
+            // the same string in a valid key of another node is not searched
+            (
+                text(json!([
+                    {"type": "text", "text": "a", "color": "secondary"},
+                    {"type": "text", "id": "b", "text": "b", "weight": "secondary"}
+                ])),
+                "nodes[1].weight: text node `b`: unknown variant `secondary`",
+            ),
+            // two keys of the failing node hold the bad value: no field is guessed
+            (
+                text(json!([{"type": "text", "text": "a", "anchor": "top", "color": "top"}])),
+                "nodes[0]: text node: invalid colour `top`",
+            ),
+            // unknown nodes are kept verbatim and never searched
+            (
+                text(json!([
+                    {"type": "moving_map", "tint": "blue"},
+                    {"type": "text", "text": "a", "color": "blue"}
+                ])),
+                "nodes[1].color: text node: invalid colour `blue`",
+            ),
+            // a wrong type is not an unknown value: no field is guessed, even when the
+            // node id (quoted in the message) equals another of its string fields
+            (
+                text(json!([{"type": "metric", "id": "lat", "metric": "lat", "size": "big"}])),
+                "nodes[0]: metric node `lat`: invalid type: string \"big\", expected f32",
             ),
         ];
-        for (text, needles) in cases {
+        for (text, expected) in cases {
             let e = json_error(&text);
-            for needle in needles {
-                assert!(e.contains(needle), "missing `{needle}` in: {e}");
-            }
+            assert!(e.starts_with(expected), "expected `{expected}…`, got: {e}");
         }
-        // a wrong type is not an unknown value: no path is guessed, even when the node's
-        // id (quoted in the message) equals another of its string fields
-        let e = json_error(&layout_with(json!([
-            {"type": "metric", "id": "lat", "metric": "lat", "size": "big"}
-        ])));
-        assert!(e.contains("size") || e.contains("f32"), "{e}");
-        assert!(!e.contains(".metric:"), "wrong field named: {e}");
         // a syntax error is reported as is, with its position
         let e = json_error("{\"version\": 1,");
         assert!(e.contains("line 1"), "{e}");
@@ -506,5 +524,29 @@ mod tests {
         assert_eq!(loaded.layout, layout);
         assert!(loaded.warnings.is_empty());
         assert!(matches!(Layout::load(&path), Err(LayoutError::Io(_))));
+    }
+
+    #[test]
+    fn layouts_with_errors_are_not_written() {
+        let path = std::env::temp_dir().join(format!(
+            "actionlay-{}-invalid{FILE_SUFFIX}",
+            std::process::id()
+        ));
+        let mut layout = default_layout();
+        layout.version = 0;
+        let Node::Known(Widget::Frame(f)) = &mut layout.nodes[1] else {
+            panic!("the second default node is a frame")
+        };
+        f.common.opacity = Some(2.0);
+        let Err(LayoutError::Invalid(issues)) = layout.to_json() else {
+            panic!("to_json accepted an invalid layout")
+        };
+        assert_eq!(issues.len(), 2, "{issues:?}");
+        assert!(matches!(layout.save(&path), Err(LayoutError::Invalid(_))));
+        assert!(!path.exists(), "an invalid layout was written");
+        // warnings do not block saving
+        let mut layout = default_layout();
+        layout.extra.insert("future".into(), json!(1));
+        assert!(layout.to_json().unwrap().contains("\"future\": 1"));
     }
 }

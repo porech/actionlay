@@ -1296,8 +1296,9 @@
       "description": "Default unit system; widgets can override it with `units`. Default metric."
     },
     "version": {
+      "description": "Format version, 1 or higher.",
       "format": "uint32",
-      "minimum": 0,
+      "minimum": 1,
       "type": "integer"
     }
   },

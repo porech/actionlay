@@ -323,16 +323,131 @@ impl<'de> Deserialize<'de> for Node {
         let ty = value
             .get("type")
             .and_then(|t| t.as_str())
-            .ok_or_else(|| D::Error::custom("node without a string `type`"))?
-            .to_string();
-        if !Widget::TYPES.contains(&ty.as_str()) {
+            .ok_or_else(|| D::Error::custom(NO_TYPE))?;
+        if !Widget::TYPES.contains(&ty) {
             return Ok(Node::Unknown(value));
         }
-        let id = value.get("id").and_then(|t| t.as_str()).map(str::to_string);
-        serde_json::from_value(value).map(Node::Known).map_err(|e| {
-            let id = id.map(|i| format!(" `{i}`")).unwrap_or_default();
-            D::Error::custom(format!("{ty} node{id}: {e}"))
-        })
+        match Widget::deserialize(&value) {
+            Ok(w) => Ok(Node::Known(w)),
+            Err(e) => {
+                let (path, message) = node_error(&value).unwrap_or_else(|| {
+                    // not reproducible on its own: report what serde said
+                    (
+                        String::new(),
+                        format!("{ty} node{}: {e}", quoted_id(&value)),
+                    )
+                });
+                Err(D::Error::custom(at_path(&path, &message)))
+            }
+        }
+    }
+}
+
+const NO_TYPE: &str = "node without a string `type`";
+
+fn quoted_id(value: &serde_json::Value) -> String {
+    value
+        .get("id")
+        .and_then(|t| t.as_str())
+        .map(|i| format!(" `{i}`"))
+        .unwrap_or_default()
+}
+
+/// `path: message`, or the message alone when the path is empty.
+pub(crate) fn at_path(path: &str, message: &str) -> String {
+    if path.is_empty() {
+        message.to_string()
+    } else {
+        format!("{path}: {message}")
+    }
+}
+
+fn join(parent: &str, child: &str) -> String {
+    if child.is_empty() {
+        parent.to_string()
+    } else if parent.is_empty() {
+        child.to_string()
+    } else {
+        format!("{parent}.{child}")
+    }
+}
+
+/// Why the node `value` does not deserialize, and where relative to it:
+/// `("children[1].anchor", "text node `t`: unknown variant `middle`, …")`. The path is
+/// empty when the field cannot be told for sure. `None` if the node is fine. Nodes of
+/// unknown types are never searched (they are kept verbatim, so they cannot fail).
+pub(crate) fn node_error(value: &serde_json::Value) -> Option<(String, String)> {
+    let Some(ty) = value.get("type").and_then(|t| t.as_str()) else {
+        return Some((String::new(), NO_TYPE.to_string()));
+    };
+    if !Widget::TYPES.contains(&ty) {
+        return None;
+    }
+    // a failing child is the culprit
+    if let Some(children) = value.get("children").and_then(|c| c.as_array()) {
+        for (i, child) in children.iter().enumerate() {
+            if let Some((path, message)) = node_error(child) {
+                return Some((join(&format!("children[{i}]"), &path), message));
+            }
+        }
+    }
+    let e = Widget::deserialize(value).err()?;
+    let field = bad_value(&e.to_string()).and_then(|bad| unique_key(value, bad, &["children"]));
+    Some((
+        field.unwrap_or_default(),
+        format!("{ty} node{}: {e}", quoted_id(value)),
+    ))
+}
+
+/// The value serde rejected as unknown (an enum variant, a colour, an aspect), if the
+/// message is about one. In other messages the last quoted token may be anything,
+/// e.g. the node id of a `metric node `lat`:` prefix.
+pub(crate) fn bad_value(message: &str) -> Option<&str> {
+    // the bad value is the last `quoted` token before the list of accepted values
+    let head = message.split("expected").next().unwrap_or_default();
+    let bad = head.rsplit('`').nth(1)?;
+    let before = head.rsplit_once(&format!("`{bad}`")).map_or("", |(b, _)| b);
+    ["variant ", "colour ", "aspect "]
+        .iter()
+        .any(|w| before.ends_with(w))
+        .then_some(bad)
+}
+
+/// Path of the only key of `object` (or of an object nested in it, such as a style
+/// group) whose value is the string `wanted`; `None` if there is no such key or more
+/// than one. Free-text keys and the keys in `skip` are not searched.
+pub(crate) fn unique_key(
+    object: &serde_json::Value,
+    wanted: &str,
+    skip: &[&str],
+) -> Option<String> {
+    fn walk(
+        v: &serde_json::Value,
+        wanted: &str,
+        skip: &[&str],
+        path: &str,
+        found: &mut Vec<String>,
+    ) {
+        let Some(map) = v.as_object() else { return };
+        for (k, item) in map {
+            if matches!(k.as_str(), "id" | "name" | "text" | "type" | "$schema")
+                || skip.contains(&k.as_str())
+            {
+                continue;
+            }
+            let p = join(path, k);
+            match item {
+                serde_json::Value::String(s) if s == wanted => found.push(p),
+                serde_json::Value::Object(_) => walk(item, wanted, skip, &p, found),
+                _ => {}
+            }
+        }
+    }
+    let mut found = Vec::new();
+    walk(object, wanted, skip, "", &mut found);
+    match found.len() {
+        1 => found.pop(),
+        _ => None,
     }
 }
 

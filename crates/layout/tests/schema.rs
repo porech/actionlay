@@ -49,6 +49,7 @@ fn schema_rejects_bad_values() {
         serde_json::json!({"version": 1, "nodes": [{"type": "text", "text": "x", "color": "blue"}]}),
         serde_json::json!({"version": 1, "nodes": [{"type": "frame"}]}),
         serde_json::json!({"nodes": []}),
+        serde_json::json!({"version": 0, "nodes": []}),
     ] {
         assert!(!validator.is_valid(&bad), "accepted: {bad}");
     }
