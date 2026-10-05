@@ -1,0 +1,4 @@
+//! ActionLay overlay layouts (`*.ovl.json`): model, defaults, validation, geometry.
+//! Pure data: no dependency on other ActionLay crates (spec §2).
+pub mod color;
+pub mod geom;
