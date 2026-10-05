@@ -410,6 +410,12 @@ pub(crate) fn draw_chart(p: &mut Painter, c: &ChartNode, gradient: bool, at: Pla
     }
 }
 
+// The far edge is exclusive: an aligned viewport must not prefetch the
+// adjacent off-screen tile. Return unwrapped coordinates for placement.
+fn tile_span(origin: f64, size: f32) -> std::ops::RangeInclusive<i64> {
+    (origin / 256.0).floor() as i64..=((origin + size as f64) / 256.0).ceil() as i64 - 1
+}
+
 pub(crate) fn draw_map(p: &mut Painter, m: &MapNode, at: Placement, ctx: &Ctx) {
     let settings = ctx.maps.settings();
     let size = m.size();
@@ -498,10 +504,8 @@ pub(crate) fn draw_map(p: &mut Painter, m: &MapNode, at: Placement, ctx: &Ctx) {
             if mode != MapMode::Circuit {
                 let left = center[0] * world - size[0] as f64 / 2.0;
                 let top = center[1] * world - size[1] as f64 / 2.0;
-                let x0 = (left / 256.0).floor() as i64;
-                let y0 = (top / 256.0).floor() as i64;
-                for y in y0..=y0 + (size[1] / 256.0).ceil().min(12.0) as i64 {
-                    for x in x0..=x0 + (size[0] / 256.0).ceil().min(12.0) as i64 {
+                for y in tile_span(top, size[1]).take(13) {
+                    for x in tile_span(left, size[0]).take(13) {
                         if let Some(key) = actionlay_maps::Tile::at(zoom, x, y) {
                             let Some(tile) = ctx.maps.get(key) else {
                                 cacheable &= !settings.online;
@@ -813,6 +817,13 @@ pub(crate) fn draw_g_meter(p: &mut Painter, g: &GMeterNode, at: Placement, ctx: 
 #[cfg(test)]
 mod heading_tests {
     use super::*;
+
+    #[test]
+    fn tile_requests_exclude_the_adjacent_tile_at_an_aligned_viewport_edge() {
+        assert_eq!(tile_span(0.0, 256.0).collect::<Vec<_>>(), vec![0]);
+        assert_eq!(tile_span(128.0, 256.0).collect::<Vec<_>>(), vec![0, 1]);
+        assert_eq!(tile_span(-256.0, 256.0).collect::<Vec<_>>(), vec![-1]);
+    }
 
     fn telemetry(headings: Vec<(f64, f64)>, speed: f64) -> Telemetry {
         Telemetry::for_test(

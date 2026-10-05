@@ -322,8 +322,14 @@ fn switching_output_preserves_time_speed_pause_and_metadata_receiver() {
     let at = p.position();
     assert!(p.change_audio_device(device.as_deref()).unwrap());
     assert!(!p.is_paused());
+    let resumed = wait_for_frame(&mut p, Duration::from_secs(5))
+        .expect("no frame after changing the output device");
+    assert!(
+        (resumed - at).abs() < 0.1,
+        "output switch jumped: {at} -> {resumed}"
+    );
     let frames = collect_frames(&mut p, Duration::from_millis(700));
-    assert!(last(&frames, "changed device") > at + 0.2);
+    assert!(last(&frames, "changed device") > resumed + 0.2);
     assert!(
         p.change_audio_device(Some("__missing_ActionLay_output__"))
             .is_err()
