@@ -42,8 +42,9 @@ undo, cross-parent geometry and opacity, cycle rejection, snapping, packages,
 font scope and fallback, and invalid/failed saves. Existing renderer pixel tests
 remain part of the checks. Native desktop checks verified adding widgets,
 select-all, grouping/ungrouping and package export; the exported ZIP was inspected.
-The desktop mouse automation did not reliably produce widget movement, so native
-manual drag verification remains pending. Linux and macOS were not tested locally.
+The desktop mouse automation did not reliably produce widget movement. The user
+subsequently confirmed that the editor works and snapping behaves correctly in
+the Windows build. Linux and macOS were not tested locally.
 
-Build and check logs accompany the local executable. The roadmap remains open
-until the remaining manual interaction check is resolved.
+Build and check logs accompany the local executable. With automated checks and
+the user's Windows interaction verification complete, milestone M4 is closed.

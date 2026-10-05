@@ -8,7 +8,7 @@ top: speed, altitude, maps, heart rate and more. You can also design the
 dashboard visually and export the result. It is free, open source, and ships
 as a single executable for Windows, macOS and Linux.
 
-> **Status: early prototype (milestones M1–M3 done).** ActionLay plays
+> **Status: early prototype (milestones M1–M4 done).** ActionLay plays
 > GoPro footage with hardware decoding and a live telemetry dashboard, including
 > maps, charts, circular instruments and a G-meter. Upstream XML layouts can be
 > imported. The M4 visual editor can create and save portable layouts,
@@ -95,7 +95,7 @@ as a single executable for Windows, macOS and Linux.
 | **M1** ✅ | Telemetry from GoPro files (GPS, speed, altitude, accelerometer, …) |
 | **M2** ✅ | Dashboard overlay drawn live on the video |
 | **M3** ✅ | All dashboard widgets: gauges, charts, compasses, moving and journey maps, plus a G-meter. Every widget is deeply customisable, with good defaults and a polished look when data is missing. Layouts from gopro-dashboard-overlay can be imported |
-| M4 | Visual layout editor: add, move, resize and style widgets, with anchors that adapt to any resolution or aspect ratio. It warns you when a widget can't work with the data in your video, and layouts can be shared as files |
+| **M4** ✅ | Visual layout editor: add, move, resize and style widgets, with anchors that adapt to any resolution or aspect ratio. It warns you when a widget can't work with the data in your video, and layouts can be shared as files |
 | M5 | Export: the final video, or a transparent overlay-only track (ProRes 4444 / PNG) for your video editor |
 | M6 | GPX/FIT files from bike computers and watches, other cameras (DJI, Insta360, …), and GoPro chapters joined automatically |
 | M7 | Polished releases for Windows, macOS and Linux |
