@@ -33,7 +33,6 @@ as a single executable for Windows, macOS and Linux.
   CSV or JSON; `actionlay-telemetry info VIDEO` shows where data is missing.
   The tool ships in the same download as `actionlay`; run it from a terminal,
   or from source with `cargo run -p actionlay-telemetry-cli -- dump VIDEO`.
-
 - **Live telemetry overlay**: open a GoPro video and a default dashboard
   appears over it, following the video as you play, pause and seek. Press
   `O` to show or hide it. Where the video has no GPS (or the signal is lost),
@@ -156,6 +155,11 @@ ActionLay stands on the shoulders of these open-source projects:
   computes distances and bearings exactly as gopro-dashboard-overlay does.
 - **[FFmpeg](https://ffmpeg.org)** does the decoding, through the
   [ffmpeg-next](https://github.com/zmwangx/rust-ffmpeg) Rust bindings.
+- **[tiny-skia](https://github.com/linebender/tiny-skia)** draws the overlay
+  and **[cosmic-text](https://github.com/pop-os/cosmic-text)** shapes its text.
+- **[Roboto](https://github.com/googlefonts/roboto)** (Apache-2.0) is the
+  overlay font, and **[Tabler Icons](https://tabler.io/icons)** (MIT) provide
+  its icons.
 - **[egui / eframe](https://github.com/emilk/egui)** and
   **[wgpu](https://github.com/gfx-rs/wgpu)** power the user interface and the
   GPU rendering.
