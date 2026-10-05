@@ -50,7 +50,9 @@ passed locally with public/synthetic samples. Audible player checks were routed
 through BlackHole 2ch via `ACTIONLAY_TEST_AUDIO_DEVICE`. The new Settings → Audio
 window supports system default or an explicit output, immediate persistence,
 refreshing devices and an unavailable-device notice. Changing output keeps time,
-pause state and speed. BlackHole drove the playback clock, but the input capture
+pause state, speed and the original metadata receiver. Active-output changes
+replace the stream without reopening the input; a regression test covers paused
+and playing switches and a failed-device switch. BlackHole drove the playback clock, but the input capture
 returned silence, so acoustic loopback is not claimed as verified. Manual window
 inspection was unavailable because Computer Use returned cgWindowNotFound for
 all inspected apps; offline renderer previews were inspected instead.

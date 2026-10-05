@@ -99,6 +99,22 @@ impl App {
             });
         self.select_audio = open;
         if selected != self.prefs.audio_device {
+            if let Some(player) = &mut self.player {
+                match player.change_audio_device(selected.as_deref()) {
+                    Ok(true) => {
+                        self.prefs.audio_device = selected;
+                        self.save_prefs();
+                        self.error = None;
+                        self.video_notice = None;
+                        return;
+                    }
+                    Err(e) => {
+                        self.error = Some(format!("Cannot change audio output: {e}"));
+                        return;
+                    }
+                    Ok(false) => {}
+                }
+            }
             self.prefs.audio_device = selected;
             self.save_prefs();
             if let Some(path) = self.video_path.clone() {
@@ -106,6 +122,9 @@ impl App {
                     self.player.as_ref().map_or((0.0, true, 1.0), |p| {
                         (p.position(), p.is_paused(), p.speed())
                     });
+                if let Some(p) = &mut self.player {
+                    p.pause();
+                }
                 self.open(path);
                 if let Some(p) = &mut self.player {
                     p.seek(position, true);

@@ -288,3 +288,45 @@ fn metadata_streams_from_the_player_while_paused_and_after_seek() {
     }
     assert!(found, "seek did not deliver metadata from its new position");
 }
+
+#[test]
+fn switching_output_preserves_time_speed_pause_and_metadata_receiver() {
+    let Some(path) = common::sample("h264-1080p30-44k.mp4") else {
+        return;
+    };
+    let mut p = open(&path, PlayerOptions::default()).unwrap();
+    if !p.stats().audio_active {
+        return;
+    } // Headless CI has no output device.
+    let receiver = p.take_telemetry().unwrap();
+    p.seek(2.0, true);
+    wait_for_frame(&mut p, Duration::from_secs(5)).unwrap();
+    let device = std::env::var("ACTIONLAY_TEST_AUDIO_DEVICE").ok();
+    p.set_speed(1.5);
+    let at = p.position();
+    assert!(p.change_audio_device(device.as_deref()).unwrap());
+    assert!(p.is_paused());
+    assert_eq!(p.speed(), 1.5);
+    assert!((wait_for_frame(&mut p, Duration::from_secs(5)).unwrap() - at).abs() < 0.05);
+    assert!(
+        p.take_telemetry().is_none(),
+        "metadata receiver was replaced"
+    );
+    assert!(!matches!(
+        receiver.try_recv(),
+        Err(std::sync::mpsc::TryRecvError::Disconnected)
+    ));
+    p.set_speed(1.0);
+    p.play();
+    collect_frames(&mut p, Duration::from_millis(300));
+    let at = p.position();
+    assert!(p.change_audio_device(device.as_deref()).unwrap());
+    assert!(!p.is_paused());
+    let frames = collect_frames(&mut p, Duration::from_millis(700));
+    assert!(last(&frames, "changed device") > at + 0.2);
+    assert!(
+        p.change_audio_device(Some("__missing_ActionLay_output__"))
+            .is_err()
+    );
+    assert!(!p.is_paused(), "failed switch interrupted playback");
+}

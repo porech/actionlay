@@ -71,8 +71,9 @@ as a single executable for Windows, macOS and Linux.
   upstream layouts are embedded alongside the three ActionLay presets.
 - **Settings → Audio…**: choose the system default or a specific output device.
   The preference saves immediately; changing devices preserves playback position,
-  pause state and speed. An unavailable output produces a visible notice and
-  silent playback; it never routes an explicit selection to another device.
+  pause state, speed and loaded telemetry. A failed switch keeps the current
+  device and shows an error. On open, an unavailable output produces a visible
+  notice and silent playback; it never redirects an explicit selection.
 
 ## Roadmap
 

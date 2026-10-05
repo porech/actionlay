@@ -361,6 +361,34 @@ impl Player {
         }
     }
 
+    /// Replace an active output without reopening the input or losing streamed
+    /// telemetry. False means no output slot exists (opening previously failed).
+    pub fn change_audio_device(&mut self, device: Option<&str>) -> Result<bool, MediaError> {
+        if self.info.audio.is_none() {
+            return Ok(true);
+        }
+        if self.audio.is_none() {
+            return Ok(false);
+        }
+        let mut output = AudioOutput::open_on(device)?;
+        output.set_muted(true);
+        let resume = !self.is_paused();
+        let position = self.position();
+        self.pause();
+        output.reset(position);
+        *self.audio.as_ref().unwrap().lock().unwrap() = output;
+        self.audio_dead = false;
+        self.audio_lost = false;
+        self.stall.reset();
+        self.starving_since = None;
+        // A new generation recreates resampling for the selected device's rate.
+        self.seek(position, true);
+        if resume {
+            self.play();
+        }
+        Ok(true)
+    }
+
     pub fn speed(&self) -> f64 {
         self.clock.speed()
     }
