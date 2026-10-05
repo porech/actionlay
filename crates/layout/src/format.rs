@@ -1,5 +1,6 @@
 //! Text format mini-language for metric widgets (spec §4.1):
 //! literal text, `{value}`, `{value:.N}`, `{value:+.N}`, `{unit}`; `{{`/`}}` escape braces.
+use std::fmt::Write as _;
 
 /// Shown instead of a value that is missing (empty state, spec §4.4.1).
 pub const EMPTY: &str = "—";
@@ -112,21 +113,27 @@ pub fn apply(out: &mut String, pieces: &[Piece], value: Option<f64>, unit: &str)
             Piece::Value { decimals, sign } => match value.filter(|v| v.is_finite()) {
                 None => out.push_str(EMPTY),
                 Some(v) => {
+                    // written in place: no allocation per value (the renderer calls this
+                    // for every widget of every frame)
                     let d = usize::from(*decimals);
-                    let mut text = if *sign {
-                        format!("{v:+.d$}")
+                    let start = out.len();
+                    let _ = if *sign {
+                        write!(out, "{v:+.d$}")
                     } else {
-                        format!("{v:.d$}")
+                        write!(out, "{v:.d$}")
                     };
                     // a value that rounds to zero never prints "-0" / "-0.0"
-                    if text.chars().all(|c| matches!(c, '0' | '.' | '-' | '+')) {
-                        text = if *sign {
-                            format!("{:+.d$}", 0.0)
+                    if out[start..]
+                        .chars()
+                        .all(|c| matches!(c, '0' | '.' | '-' | '+'))
+                    {
+                        out.truncate(start);
+                        let _ = if *sign {
+                            write!(out, "{:+.d$}", 0.0)
                         } else {
-                            format!("{:.d$}", 0.0)
+                            write!(out, "{:.d$}", 0.0)
                         };
                     }
-                    out.push_str(&text);
                 }
             },
         }
