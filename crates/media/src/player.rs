@@ -138,6 +138,8 @@ struct Shared {
     /// The player wants audio for the current generation (audio is driving).
     audio_wanted: AtomicBool,
     backend: Mutex<&'static str>,
+    #[cfg(test)]
+    decode_delay_ms: AtomicU64,
 }
 
 pub struct Player {
@@ -236,6 +238,8 @@ impl Player {
             generation: AtomicU64::new(0),
             audio_wanted: AtomicBool::new(false),
             backend: Mutex::new("unknown"),
+            #[cfg(test)]
+            decode_delay_ms: AtomicU64::new(0),
         });
 
         let worker = Worker {
@@ -371,6 +375,7 @@ impl Player {
             return Ok(false);
         }
         let mut output = AudioOutput::open_on(device)?;
+        output.set_gain(self.audio.as_ref().unwrap().lock().unwrap().gain());
         output.set_muted(true);
         let resume = !self.is_paused();
         let position = self.position();
@@ -391,6 +396,13 @@ impl Player {
 
     pub fn speed(&self) -> f64 {
         self.clock.speed()
+    }
+
+    /// Volume in [0, 1]; zero silences playback while preserving its audio clock.
+    pub fn set_volume(&self, volume: f32) {
+        if let Some(audio) = &self.audio {
+            audio.lock().unwrap().set_gain(volume);
+        }
     }
 
     pub fn set_speed(&mut self, speed: f64) {
@@ -651,6 +663,13 @@ impl Player {
     fn present(&mut self, f: Nv12Frame) -> Nv12Frame {
         self.presented += 1;
         self.last_frame_pts = f.pts;
+        log::trace!(
+            "video presented: pts={:.3}s clock={:.3}s frames={} dropped={}",
+            f.pts,
+            self.current_time(),
+            self.presented,
+            self.dropped
+        );
         f
     }
 
@@ -903,22 +922,19 @@ impl Worker {
             }
 
             let mut progressed = false;
+            let mut audio_now = None;
             let audio_wanted =
                 audio_dec.is_some() && self.shared.audio_wanted.load(Ordering::SeqCst);
             if !audio_wanted {
                 p.drop_audio();
             } else if let Some(audio) = &self.audio {
                 let now = audio.lock().unwrap().clock();
+                audio_now = Some(now);
                 if self.shared.generation.load(Ordering::SeqCst) == p.generation.id {
                     // Continue filling the source while the OS suppresses UI frames.
                     self.shared
                         .read_until
                         .store((now + READ_AHEAD_SECONDS).to_bits(), Ordering::SeqCst);
-                }
-                if matches!(&p.outbox,Some(Msg::Frame {frame,..}) if now-frame.pts>0.25) {
-                    // Do not let an occluded window's full decoded-frame channel
-                    // prevent reaching the next audio/metadata packets.
-                    p.outbox = None;
                 }
             }
 
@@ -926,6 +942,17 @@ impl Worker {
             if let Some(msg) = p.outbox.take() {
                 match self.msgs.try_send(msg) {
                     Ok(()) => progressed = true,
+                    Err(TrySendError::Full(msg))
+                        if audio_now.is_some_and(|now| {
+                            matches!(&msg, Msg::Frame { frame, .. } if now - frame.pts > 0.25)
+                        }) =>
+                    {
+                        // A full channel can mean an occluded window. Discard
+                        // its stale pending frame to keep reaching audio packets.
+                        // Always try delivery first: a slow decoder must keep
+                        // supplying frames to an actively polling UI.
+                        progressed = true;
+                    }
                     Err(TrySendError::Full(msg)) => p.outbox = Some(msg),
                     Err(TrySendError::Disconnected(_)) => return Ok(()),
                 }
@@ -949,6 +976,12 @@ impl Worker {
                     None
                 });
                 if let Some(frame) = decoded {
+                    #[cfg(test)]
+                    if let delay = self.shared.decode_delay_ms.load(Ordering::Relaxed)
+                        && delay > 0
+                    {
+                        std::thread::sleep(Duration::from_millis(delay));
+                    }
                     progressed = true;
                     *self.shared.backend.lock().unwrap() = video.active_backend();
                     if let Some(frame) = self.accept(&mut p, frame, audio_dec.as_ref().map(|a| a.2))
@@ -1229,6 +1262,69 @@ mod tests {
             p.buffered_seconds()
         );
     }
+    #[test]
+    fn active_presentation_keeps_receiving_frames_when_decode_falls_behind_audio() {
+        let path = std::env::var_os("ACTIONLAY_SAMPLES")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/synthetic")
+            })
+            .join("hevc8-1440p100-sync.mp4");
+        if !path.exists() {
+            eprintln!("synthetic sample unavailable; skipping slow decode test");
+            return;
+        }
+        let mut p = Player::open(
+            &path,
+            PlayerOptions {
+                prefer_hw: false,
+                audio: true,
+            },
+        )
+        .unwrap();
+        if !p.stats().audio_active {
+            return;
+        }
+        p.play();
+        pump(&mut p, |p| p.position() > 0.4, Duration::from_secs(5));
+        // User mute must keep consuming audio and driving playback even when
+        // the video decoder is behind.
+        p.set_volume(0.0);
+        // Simulate a decoder producing less than the source's 100 fps while
+        // the UI keeps polling and the audio device consumes buffered samples.
+        p.shared.decode_delay_ms.store(20, Ordering::Relaxed);
+        let started = Instant::now();
+        let mut late_frames = 0;
+        let mut last_report = Instant::now();
+        while started.elapsed() < Duration::from_secs(3) {
+            if let Some(frame) = p.poll_frame()
+                && p.current_time() - frame.pts > 0.25
+            {
+                late_frames += 1;
+            }
+            if last_report.elapsed() >= Duration::from_millis(500) {
+                eprintln!(
+                    "clock={:.3} video={:.3} presented={} av={:?}",
+                    p.current_time(),
+                    p.last_frame_pts,
+                    p.presented,
+                    p.stats().av_offset
+                );
+                last_report = Instant::now();
+            }
+            std::thread::sleep(Duration::from_millis(4));
+        }
+        assert!(p.stats().audio_active, "audio did not remain active");
+        assert!(
+            p.current_time() - p.last_frame_pts > 0.25,
+            "test did not create decoder lag"
+        );
+        assert!(
+            late_frames >= 10,
+            "active UI received only {late_frames} late frames: video froze while audio advanced"
+        );
+    }
+
     #[test]
     fn background_audio_keeps_advancing_beyond_the_buffer_horizon() {
         let Some((mut p, _, _)) = slow_player(Duration::ZERO) else {

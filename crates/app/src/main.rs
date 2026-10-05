@@ -35,6 +35,8 @@ struct App {
     select_layout: bool,
     select_audio: bool,
     audio_devices: Vec<String>,
+    volume: f32,
+    muted: bool,
     map_revision: u64,
     import_draft: Option<(PathBuf, [u32; 2])>,
     player: Option<Player>,
@@ -470,6 +472,113 @@ impl App {
         }
     }
 
+    fn layout_toolbar(&mut self, ui: &mut egui::Ui) {
+        let mut command = None;
+        let mut builtin = None;
+        let mut recent = None;
+        let selected = self
+            .prefs
+            .last_builtin
+            .as_deref()
+            .or_else(|| self.prefs.last_layout.is_none().then_some("default"))
+            .and_then(actionlay_layout::catalog::find)
+            .map(|preset| preset.name)
+            .unwrap_or_else(|| self.layout.name.as_deref().unwrap_or("Layout"));
+        ui.add_enabled_ui(self.pending_edit_action.is_none(), |ui| {
+            ui.horizontal_wrapped(|ui| {
+                if ui
+                    .button("Open video…")
+                    .on_hover_text("Open a video file")
+                    .clicked()
+                {
+                    command = Some(menus::Command::OpenVideo);
+                }
+                ui.separator();
+                ui.label("Layout");
+                egui::ComboBox::from_id_salt("toolbar-layout")
+                    .selected_text(selected)
+                    .width(220.0)
+                    .show_ui(ui, |ui| {
+                        ui.weak("Included presets");
+                        for preset in actionlay_layout::catalog::PRESETS {
+                            let active = self.prefs.last_layout.is_none()
+                                && self.prefs.last_builtin.as_deref().unwrap_or("default")
+                                    == preset.id;
+                            if ui
+                                .selectable_label(active, preset.name)
+                                .on_hover_text(preset.description)
+                                .clicked()
+                            {
+                                builtin = Some(preset.id);
+                                ui.close();
+                            }
+                        }
+                        if !self.prefs.recent_layouts.is_empty() {
+                            ui.separator();
+                            ui.weak("Recent layouts");
+                            for path in &self.prefs.recent_layouts {
+                                let name = path.file_name().unwrap_or_default().to_string_lossy();
+                                if ui
+                                    .selectable_label(
+                                        self.prefs.last_layout.as_ref() == Some(path),
+                                        name,
+                                    )
+                                    .on_hover_text(path.display().to_string())
+                                    .clicked()
+                                {
+                                    recent = Some(path.clone());
+                                    ui.close();
+                                }
+                            }
+                        }
+                        ui.separator();
+                        if ui.button("Open layout from file…").clicked() {
+                            command = Some(menus::Command::OpenLayoutFile);
+                            ui.close();
+                        }
+                        if ui.button("More layouts and settings…").clicked() {
+                            command = Some(menus::Command::SelectLayout);
+                            ui.close();
+                        }
+                    });
+                ui.separator();
+                if ui.button("Edit layout").clicked() {
+                    command = Some(menus::Command::EditLayout);
+                }
+                if ui.button("New layout…").clicked() {
+                    command = Some(menus::Command::NewLayout);
+                }
+                ui.separator();
+                let mute_changed = ui
+                    .selectable_label(self.muted, if self.muted { "Unmute" } else { "Mute" })
+                    .on_hover_text("Mute audio without pausing playback")
+                    .clicked();
+                if mute_changed {
+                    self.muted = !self.muted;
+                }
+                let volume_changed = ui
+                    .add(
+                        egui::Slider::new(&mut self.volume, 0.0..=1.0)
+                            .text("Volume")
+                            .custom_formatter(|value, _| format!("{:.0}%", value * 100.0)),
+                    )
+                    .changed();
+                if (mute_changed || volume_changed)
+                    && let Some(player) = &self.player
+                {
+                    player.set_volume(if self.muted { 0.0 } else { self.volume });
+                }
+            });
+        });
+        if let Some(id) = builtin {
+            self.request_edit_action(EditAction::Builtin(id.into()), ui.ctx());
+        } else if let Some(path) = recent {
+            self.open_layout(path);
+        } else if let Some(command) = command {
+            self.command(command, ui.ctx());
+        }
+    }
+
     fn layout_chooser(&mut self, ctx: &egui::Context) {
         if !self.select_layout {
             return;
@@ -713,6 +822,7 @@ impl App {
                     info.video.height,
                     self.scale_mode
                 );
+                p.set_volume(if self.muted { 0.0 } else { self.volume });
                 self.player = Some(p);
                 self.video_path = Some(path.clone());
                 prefs::remember(&mut self.prefs.recent_videos, path.clone());
@@ -1034,15 +1144,7 @@ impl eframe::App for App {
             }
         } else {
             egui::Panel::top("layout-toolbar").show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label(self.layout.name.as_deref().unwrap_or("Layout"));
-                    if ui.button("Edit layout").clicked() {
-                        self.begin_edit(false);
-                    }
-                    if ui.button("New layout…").clicked() {
-                        self.begin_edit(true);
-                    }
-                });
+                self.layout_toolbar(ui);
             });
             let mut open_clicked = false;
             egui::CentralPanel::default().show(ui, |ui| {
@@ -1164,6 +1266,8 @@ fn main() -> eframe::Result {
                 select_layout: false,
                 select_audio: false,
                 audio_devices: Vec::new(),
+                volume: 1.0,
+                muted: false,
                 map_revision: 0,
                 import_draft: None,
                 player: None,

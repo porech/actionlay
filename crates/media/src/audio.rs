@@ -1,7 +1,7 @@
 //! Audio decoding (resampled to stereo f32) and output through cpal.
 use std::sync::{
     Arc, Mutex,
-    atomic::{AtomicBool, AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
 };
 use std::time::Duration;
 
@@ -114,6 +114,7 @@ struct Shared {
     frames_played: AtomicU64,
     latency_us: AtomicU64,
     muted: AtomicBool,
+    gain: AtomicU32,
 }
 
 pub struct AudioOutput {
@@ -174,6 +175,7 @@ impl AudioOutput {
             frames_played: AtomicU64::new(0),
             latency_us: AtomicU64::new(0),
             muted: AtomicBool::new(false),
+            gain: AtomicU32::new(1.0_f32.to_bits()),
         });
 
         let slot = consumer_slot.clone();
@@ -194,6 +196,8 @@ impl AudioOutput {
                     let mut guard = slot.lock().unwrap();
                     let got = guard.as_mut().map(|c| c.pop_slice(data)).unwrap_or(0);
                     data[got..].fill(0.0);
+                    let gain = f32::from_bits(sh.gain.load(Ordering::Relaxed));
+                    apply_gain(data, gain);
                     sh.frames_played
                         .fetch_add((got / 2) as u64, Ordering::Relaxed);
                 },
@@ -263,11 +267,40 @@ impl AudioOutput {
     pub fn set_muted(&self, muted: bool) {
         self.shared.muted.store(muted, Ordering::Relaxed);
     }
+
+    /// Changes loudness without stopping sample consumption or the audio clock.
+    /// A gain of zero is the user-facing mute; `set_muted` is playback pause.
+    pub fn set_gain(&self, gain: f32) {
+        if gain.is_finite() {
+            self.shared
+                .gain
+                .store(gain.clamp(0.0, 1.0).to_bits(), Ordering::Relaxed);
+        }
+    }
+
+    pub fn gain(&self) -> f32 {
+        f32::from_bits(self.shared.gain.load(Ordering::Relaxed))
+    }
+}
+
+fn apply_gain(samples: &mut [f32], gain: f32) {
+    for sample in samples {
+        *sample *= gain;
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gain_scales_both_channels_and_mute_emits_silence() {
+        let mut samples = [0.8, -0.6, 0.2, -0.4];
+        apply_gain(&mut samples, 0.5);
+        assert_eq!(samples, [0.4, -0.3, 0.1, -0.2]);
+        apply_gain(&mut samples, 0.0);
+        assert!(samples.iter().all(|sample| *sample == 0.0));
+    }
 
     fn assert_send<T: Send>() {}
 
