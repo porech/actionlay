@@ -2,7 +2,7 @@
 //! user) and how it scales on the video.
 use std::path::{Path, PathBuf};
 
-use actionlay_layout::geom::{Aspect, ScaleMode};
+use actionlay_layout::geom::ScaleMode;
 use actionlay_layout::{FILE_SUFFIX, Layout, default_layout};
 
 use crate::prefs::Prefs;
@@ -89,21 +89,13 @@ pub fn initial(prefs: &Prefs) -> Initial {
     }
 }
 
-/// Scale mode for a video of `width × height` pixels (spec §4.2): `Fit` when the video
-/// is narrower than the layout's design aspect (e.g. vertical footage under a 16:9
-/// layout), so that widgets stay inside the frame; `Height` otherwise. The project
-/// setting that overrides this comes later.
+/// Scale mode for a video of `width × height` pixels (spec §4.2): `Fit` only when the
+/// layout's sized widgets would leave the frame or collide at the `Height` scale (e.g.
+/// 9:16 footage under the default 16:9 layout), see
+/// [`actionlay_layout::scale::auto_scale_mode`]. The project setting that overrides this
+/// comes later.
 pub fn scale_mode_for(width: u32, height: u32, layout: &Layout) -> ScaleMode {
-    if width == 0 || height == 0 {
-        return ScaleMode::Height;
-    }
-    let design = layout.design_aspect.unwrap_or(Aspect::WIDESCREEN).ratio();
-    let video = width as f32 / height as f32;
-    if video < design {
-        ScaleMode::Fit
-    } else {
-        ScaleMode::Height
-    }
+    actionlay_layout::scale::auto_scale_mode(layout, width, height)
 }
 
 #[cfg(test)]
@@ -211,33 +203,16 @@ mod tests {
         assert!(notice.contains(&path.display().to_string()), "{notice}");
     }
 
-    fn with_aspect(aspect: &str) -> Layout {
-        let mut l = default_layout();
-        l.design_aspect = Aspect::parse(aspect);
-        l
-    }
-
     #[test]
-    fn scale_mode_fits_videos_narrower_than_the_design() {
-        let wide = with_aspect("16:9");
-        assert_eq!(scale_mode_for(1920, 1080, &wide), ScaleMode::Height);
-        assert_eq!(scale_mode_for(3840, 1600, &wide), ScaleMode::Height); // 2.4:1
-        assert_eq!(scale_mode_for(1080, 1920, &wide), ScaleMode::Fit); // 9:16
-        assert_eq!(scale_mode_for(2704, 2028, &wide), ScaleMode::Fit); // 4:3
-        assert_eq!(
-            scale_mode_for(1440, 1080, &with_aspect("4:3")),
-            ScaleMode::Height
-        );
-        assert_eq!(
-            scale_mode_for(1080, 1920, &with_aspect("9:16")),
-            ScaleMode::Height
-        );
-        // Without design_aspect the layout is 16:9.
-        let mut none = default_layout();
-        none.design_aspect = None;
-        assert_eq!(scale_mode_for(1080, 1350, &none), ScaleMode::Fit);
-        assert_eq!(scale_mode_for(1920, 1080, &none), ScaleMode::Height);
+    fn auto_scale_mode_of_the_default_layout() {
+        let d = default_layout();
+        assert_eq!(scale_mode_for(1920, 1440, &d), ScaleMode::Height); // 4:3
+        assert_eq!(scale_mode_for(2704, 2028, &d), ScaleMode::Height); // 4:3
+        assert_eq!(scale_mode_for(1080, 1920, &d), ScaleMode::Fit); // 9:16
+        assert_eq!(scale_mode_for(1920, 1080, &d), ScaleMode::Height); // 16:9
+        assert_eq!(scale_mode_for(3840, 2160, &d), ScaleMode::Height); // 16:9
+        assert_eq!(scale_mode_for(3840, 1600, &d), ScaleMode::Height); // 2.4:1
         // A degenerate size never panics.
-        assert_eq!(scale_mode_for(0, 0, &wide), ScaleMode::Height);
+        assert_eq!(scale_mode_for(0, 0, &d), ScaleMode::Height);
     }
 }

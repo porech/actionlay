@@ -50,6 +50,8 @@ struct App {
     prefs: prefs::Prefs,
     prefs_path: Option<PathBuf>,
     max_texture: u32,
+    /// Overlay size last requested, logged when it changes.
+    logged_overlay_size: Option<(u32, u32)>,
 }
 
 impl App {
@@ -60,6 +62,13 @@ impl App {
                 let duration = info.duration;
                 self.scale_mode =
                     layouts::scale_mode_for(info.video.width, info.video.height, &self.layout);
+                log::info!(
+                    "{}: {}x{} video, overlay scale mode {:?}",
+                    path.display(),
+                    info.video.width,
+                    info.video.height,
+                    self.scale_mode
+                );
                 self.player = Some(p);
                 self.error = None;
                 // the previous video's telemetry, notices and overlay are gone for good:
@@ -107,6 +116,7 @@ impl App {
             let v = &p.info().video;
             layouts::scale_mode_for(v.width, v.height, &layout)
         });
+        log::info!("layout changed, overlay scale mode {:?}", self.scale_mode);
         self.overlay.set_layout(layout.clone(), self.scale_mode);
         self.layout = layout;
         self.layout_rev += 1;
@@ -186,6 +196,15 @@ impl App {
         };
         let now = Instant::now();
         if self.scheduler.should_render(now, key, !p.is_paused()) {
+            if self.logged_overlay_size != Some((width, height)) {
+                self.logged_overlay_size = Some((width, height));
+                log::info!(
+                    "overlay size {width}x{height} px (video rect {:.2}x{:.2} pt at {} px/pt)",
+                    video.width(),
+                    video.height(),
+                    ctx.pixels_per_point()
+                );
+            }
             self.overlay.request(OverlayRequest { t, width, height });
         } else if let Some(at) = self.scheduler.retry_at() {
             // e.g. the final size of a resize while paused
@@ -266,11 +285,13 @@ impl eframe::App for App {
         });
         egui::CentralPanel::default().show(ui, |ui| {
             let rect = ui.available_rect_before_wrap();
-            if let Some(video) = self.view.video_rect(rect) {
+            // snapped once: the paint viewport and the overlay texture share its size
+            let video = self.view.video_rect(rect, ui.ctx().pixels_per_point());
+            if let Some(video) = video {
                 self.request_overlay(ui.ctx(), video);
             }
             self.view
-                .show(ui, rect, self.overlay_visible && self.overlay_ready);
+                .show(ui, rect, video, self.overlay_visible && self.overlay_ready);
         });
 
         if let Some(p) = &self.player {
@@ -329,6 +350,7 @@ fn main() -> eframe::Result {
                 prefs,
                 prefs_path,
                 max_texture,
+                logged_overlay_size: None,
             };
             if initial.fallback {
                 // the notice says it once; do not repeat it at every launch

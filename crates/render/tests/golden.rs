@@ -4,6 +4,8 @@
 //! diff (differing pixels in red) to target/golden-diff/.
 use std::path::{Path, PathBuf};
 
+use actionlay_layout::geom::ScaleMode;
+use actionlay_layout::scale::auto_scale_mode;
 use actionlay_layout::{Layout, default_layout};
 use actionlay_render::tiny_skia::Pixmap;
 use actionlay_render::{Renderer, Zone};
@@ -159,6 +161,17 @@ fn default_full_16x9() {
 
 #[test]
 fn default_full_4x3() {
+    // Rendered with the mode the app picks for 4:3 footage: the default layout fits a
+    // 4:3 frame at the Height scale, so the widgets keep their 16:9 size (the renderer's
+    // default mode is Height).
+    assert_eq!(
+        auto_scale_mode(&default_layout(), 720, 540),
+        ScaleMode::Height
+    );
+    assert_eq!(
+        auto_scale_mode(&default_layout(), 1920, 1440),
+        ScaleMode::Height
+    );
     check(
         "default_full_4x3",
         &render(&default_layout(), &full(), 720, 540),

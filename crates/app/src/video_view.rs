@@ -22,6 +22,13 @@ pub fn fit_rect(available: egui::Rect, video_w: u32, video_h: u32) -> egui::Rect
     egui::Rect::from_center_size(available.center(), size)
 }
 
+/// [`fit_rect`] snapped to physical pixels: the paint callback's viewport and the
+/// overlay texture then have exactly the same size, so the overlay is drawn 1:1.
+pub fn video_rect_px(available: egui::Rect, video_w: u32, video_h: u32, ppp: f32) -> egui::Rect {
+    use egui::emath::GuiRounding as _;
+    fit_rect(available, video_w, video_h).round_to_pixels(ppp)
+}
+
 /// Blend state of the overlay draw: the renderer's pixels are premultiplied.
 pub const OVERLAY_BLEND: wgpu::BlendState = wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING;
 
@@ -273,16 +280,25 @@ impl VideoView {
         std::mem::take(&mut *lock(&self.recycled))
     }
 
-    /// Where the video is drawn inside `available` (None before the first frame).
-    pub fn video_rect(&self, available: egui::Rect) -> Option<egui::Rect> {
-        self.size.map(|(w, h)| fit_rect(available, w, h))
+    /// Where the video is drawn inside `available`, snapped to physical pixels (None
+    /// before the first frame). Pass the result to [`VideoView::show`] and use it for the
+    /// overlay size.
+    pub fn video_rect(&self, available: egui::Rect, ppp: f32) -> Option<egui::Rect> {
+        self.size.map(|(w, h)| video_rect_px(available, w, h, ppp))
     }
 
-    /// Draws the video letterboxed in `rect` and, when `show_overlay`, the last overlay
-    /// uploaded stretched over the same rect (it lags a window resize by a few frames).
-    pub fn show(&mut self, ui: &mut egui::Ui, rect: egui::Rect, show_overlay: bool) {
+    /// Fills `rect` with black and draws the video in `video` (from
+    /// [`VideoView::video_rect`]) and, when `show_overlay`, the last overlay uploaded
+    /// over the same rect (it lags a window resize by a few frames).
+    pub fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        rect: egui::Rect,
+        video: Option<egui::Rect>,
+        show_overlay: bool,
+    ) {
         ui.painter().rect_filled(rect, 0.0, egui::Color32::BLACK);
-        let Some(target) = self.video_rect(rect) else {
+        let Some(target) = video else {
             return;
         };
         ui.painter().add(egui_wgpu::Callback::new_paint_callback(
@@ -572,6 +588,40 @@ mod tests {
         for name in ["vs_main", "fs_main", "fs_main_srgb"] {
             assert!(entries.contains(&name), "{name} missing: {entries:?}");
         }
+    }
+
+    /// Size of the viewport egui-wgpu gives the paint callback of `rect`.
+    fn viewport_px(rect: Rect, ppp: f32) -> (u32, u32) {
+        let v = egui::epaint::ViewportInPixels::from_points(&rect, ppp, [100_000, 100_000]);
+        (v.width_px as u32, v.height_px as u32)
+    }
+
+    #[test]
+    fn overlay_size_matches_the_paint_viewport() {
+        let mut checked = 0;
+        for ppp in [1.0_f32, 1.5, 2.0] {
+            // fractional origins too: the central panel starts wherever the UI ends
+            for (x0, y0) in [(0.0, 0.0), (0.5, 0.25), (7.3, 3.7)] {
+                for w in (301..=1301).step_by(7) {
+                    for h in (203..=903).step_by(50) {
+                        let available =
+                            Rect::from_min_size(pos2(x0, y0), egui::vec2(w as f32, h as f32));
+                        for (vw, vh) in [(1920, 1080), (1920, 1440), (1080, 1920), (2704, 2028)] {
+                            let r = video_rect_px(available, vw, vh, ppp);
+                            let size =
+                                crate::overlay::overlay_size(r.width(), r.height(), ppp, 100_000);
+                            assert_eq!(
+                                size,
+                                Some(viewport_px(r, ppp)),
+                                "ppp {ppp} available {available:?} video {vw}x{vh} rect {r:?}"
+                            );
+                            checked += 1;
+                        }
+                    }
+                }
+            }
+        }
+        assert!(checked > 10_000, "{checked}");
     }
 
     #[test]

@@ -237,7 +237,11 @@ impl State {
         self.scene_changed();
     }
 
+    /// `None` means another video was opened: its pending request is dropped too.
     fn set_telemetry(&mut self, telemetry: Option<Arc<Telemetry>>, scale_mode: ScaleMode) {
+        if telemetry.is_none() {
+            self.request = None;
+        }
         self.telemetry = telemetry;
         self.scale_mode = scale_mode;
         self.scene_changed();
@@ -291,7 +295,10 @@ impl State {
     fn deliver(&mut self, request: OverlayRequest, frame: OverlayFrame, generation: u64) -> bool {
         if generation != self.generation {
             self.recycle(frame.pixmap);
-            self.request.get_or_insert(request);
+            // without telemetry (another video is loading) the request is stale
+            if self.telemetry.is_some() {
+                self.request.get_or_insert(request);
+            }
             return false;
         }
         if let Some(old) = self.done.replace(frame) {
@@ -684,6 +691,25 @@ mod tests {
         let job = st.next_job().unwrap();
         assert_eq!(job.request.t, 3.0);
         assert!(st.next_job().is_none(), "older requests were dropped");
+    }
+
+    #[test]
+    fn clearing_the_telemetry_drops_the_previous_videos_request() {
+        let mut st = state();
+        st.set_telemetry(Some(Arc::new(Telemetry::empty(10.0))), ScaleMode::Height);
+        // a request pending and one in flight when another video is opened
+        st.request = Some(req(1.0, 8));
+        let in_flight = st.next_job().unwrap();
+        st.request = Some(req(2.0, 8));
+        st.set_telemetry(None, ScaleMode::Height);
+        assert_eq!(st.request, None);
+        assert!(!finish(&mut st, in_flight), "old scene: discarded");
+        assert_eq!(st.request, None, "not re-queued without telemetry");
+        // the new video's telemetry arrives: nothing of the old video is rendered
+        st.set_telemetry(Some(Arc::new(Telemetry::empty(20.0))), ScaleMode::Fit);
+        assert!(st.next_job().is_none());
+        st.request = Some(req(0.0, 8));
+        assert_eq!(st.next_job().unwrap().request, req(0.0, 8));
     }
 
     #[test]
