@@ -57,7 +57,7 @@ fn diff_dir() -> PathBuf {
 fn check(name: &str, rendered: &Pixmap) {
     let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("tests/golden/{name}.png"));
     let actual = Pixmap::decode_png(&rendered.encode_png().unwrap()).unwrap();
-    if std::env::var_os("ACTIONLAY_UPDATE_GOLDENS").is_some() {
+    if std::env::var("ACTIONLAY_UPDATE_GOLDENS").is_ok_and(|v| v == "1") {
         std::fs::create_dir_all(golden.parent().unwrap()).unwrap();
         actual.save_png(&golden).unwrap();
         return;
@@ -102,6 +102,9 @@ fn check(name: &str, rendered: &Pixmap) {
         }
     }
     let allowed = allowed_bad_pixels(actual.width() as usize * actual.height() as usize);
+    eprintln!(
+        "{name}: worst channel delta {worst}, {bad} pixels over {CHANNEL_TOLERANCE} (allowed {allowed})"
+    );
     if bad > allowed {
         let dir = diff_dir();
         std::fs::create_dir_all(&dir).unwrap();
@@ -116,8 +119,38 @@ fn check(name: &str, rendered: &Pixmap) {
     }
 }
 
+/// Exact probes (premultiplied RGBA, +-2 per channel) in flat regions that are stable across
+/// platforms. The image tolerance above would let a small global colour or alpha shift
+/// through; these fail when a theme constant changes.
+fn probe(p: &Pixmap, x: u32, y: u32, expected: [u8; 4]) {
+    let c = p.pixel(x, y).unwrap();
+    let got = [c.red(), c.green(), c.blue(), c.alpha()];
+    assert!(
+        got.iter().zip(&expected).all(|(a, b)| a.abs_diff(*b) <= 2),
+        "pixel ({x},{y}): got {got:?}, expected {expected:?} +-2"
+    );
+}
+
+fn max_alpha(p: &Pixmap, xs: std::ops::Range<u32>, ys: std::ops::Range<u32>) -> u8 {
+    ys.flat_map(|y| xs.clone().map(move |x| (x, y)))
+        .map(|(x, y)| p.pixel(x, y).unwrap().alpha())
+        .max()
+        .unwrap()
+}
+
+/// Panel fill of the default layout (inside each of the four panels, clear of text).
+fn probe_panels(p: &Pixmap) {
+    for (x, y) in [(145, 40), (170, 500), (800, 55), (930, 520)] {
+        probe(p, x, y, [6, 8, 11, 140]);
+    }
+}
+
 #[test]
 fn default_full_16x9() {
+    let p = render(&default_layout(), &full(), 960, 540);
+    probe_panels(&p);
+    // undimmed digits of the speed value reach full alpha
+    assert_eq!(max_alpha(&p, 20..95, 465..525), 255);
     check(
         "default_full_16x9",
         &render(&default_layout(), &full(), 960, 540),
@@ -196,7 +229,15 @@ fn default_stale() {
         ],
         GpsLock::NoLock,
     );
-    check("default_stale", &render(&default_layout(), &snap, 960, 540));
+    let p = render(&default_layout(), &snap, 960, 540);
+    probe_panels(&p);
+    // dimmed speed digits: fill at dim_opacity composited over the panel
+    let a = max_alpha(&p, 20..95, 465..525);
+    assert!(
+        a.abs_diff(222) <= 2,
+        "dimmed speed max alpha {a}, expected 222 +-2"
+    );
+    check("default_stale", &p);
 }
 
 #[test]
