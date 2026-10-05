@@ -20,14 +20,14 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Synthetic samples only change with their script; the ffmpeg CLI that
       # generates them is installed only on a cache miss.
       - name: Cache synthetic samples (macOS/Linux)
         id: samples-cache
         if: runner.os != 'Windows'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: samples/synthetic
           key: samples-${{ matrix.target }}-${{ hashFiles('scripts/make-synthetic-samples.sh') }}
@@ -47,7 +47,24 @@ jobs:
 
       - name: MSVC environment (Windows)
         if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vsPath) { throw "Visual Studio C++ tools not found" }
+          $devCmd = Join-Path $vsPath 'Common7\Tools\VsDevCmd.bat'
+          $command = "call `"$devCmd`" -no_logo -arch=x64 -host_arch=x64 >nul && set"
+          $variables = & $env:ComSpec /d /c $command
+          if ($LASTEXITCODE -ne 0) { throw "VsDevCmd failed: $LASTEXITCODE" }
+          foreach ($line in $variables) {
+            if ($line -match '^([^=]+)=(.*)$') {
+              $name = $Matches[1]
+              $value = $Matches[2]
+              if ([Environment]::GetEnvironmentVariable($name) -cne $value) {
+                "$name=$value" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+              }
+            }
+          }
 
       - name: MSYS2 tools (Windows)
         if: runner.os == 'Windows'
@@ -58,7 +75,7 @@ jobs:
           install: make nasm diffutils git
 
       - name: Cache FFmpeg
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: third_party/ffmpeg
           key: ffmpeg-${{ matrix.target }}-${{ hashFiles('scripts/ffmpeg-version.env', 'scripts/build-ffmpeg.sh') }}
@@ -113,7 +130,7 @@ jobs:
       # in the script changes.
       - name: Cache GoPro samples
         id: gopro-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: samples/gopro/*.mp4
           key: gopro-samples-${{ hashFiles('scripts/fetch-gopro-samples.sh') }}
@@ -176,7 +193,7 @@ jobs:
 
       - name: Upload golden image diffs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: golden-diff-${{ matrix.target }}
           path: target/golden-diff
@@ -192,7 +209,7 @@ jobs:
         run: make build
 
       - name: Upload binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: actionlay-${{ matrix.target }}
           path: |
