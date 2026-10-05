@@ -76,6 +76,13 @@ pub struct BorderOpt {
     pub extra: Extra,
 }
 
+// Like the theme groups (style.rs): a border with every field unset is not serialized,
+// so resetting its last field leaves no empty object behind.
+fn border_unset(b: &Option<BorderOpt>) -> bool {
+    b.as_ref()
+        .is_none_or(|b| b.color.is_none() && b.width.is_none() && b.extra.is_empty())
+}
+
 /// Container. With `size`, children anchor inside it; without, they are placed
 /// relative to the group's origin (the original's `composite`).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -98,7 +105,7 @@ pub struct FrameNode {
     pub size: [f32; 2],
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fill: Option<ColorRef>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "border_unset")]
     pub border: Option<BorderOpt>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub radius: Option<f32>,
@@ -456,6 +463,35 @@ mod tests {
             parsed
                 .iter()
                 .all(|n| matches!(n, Node::Known(w) if w.extra().is_empty()))
+        );
+    }
+
+    #[test]
+    fn empty_border_group_is_not_serialized() {
+        let mut f = FrameNode {
+            size: [10.0, 10.0],
+            border: Some(BorderOpt {
+                width: Some(2.0),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let out = serde_json::to_value(&f).unwrap();
+        assert_eq!(out["border"], json!({"width": 2.0}));
+        f.border.as_mut().unwrap().width = None; // "Reset to default" of the last field
+        assert_eq!(
+            serde_json::to_value(&f).unwrap(),
+            json!({"size": [10.0, 10.0]})
+        );
+        // a group holding only keys of a newer version is kept
+        f.border
+            .as_mut()
+            .unwrap()
+            .extra
+            .insert("dash".into(), json!([2, 2]));
+        assert_eq!(
+            serde_json::to_value(&f).unwrap()["border"],
+            json!({"dash": [2, 2]})
         );
     }
 
