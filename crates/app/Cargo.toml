@@ -22,6 +22,11 @@ egui-wgpu = "0.36"
 bytemuck = { version = "1", features = ["derive"] }
 log.workspace = true
 env_logger = "0.11"
+rfd = "0.17"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+muda = "0.19.3"
 
 [dev-dependencies]
+anyhow.workspace = true
 naga = { version = "30", features = ["wgsl-in"] }

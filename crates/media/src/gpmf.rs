@@ -120,7 +120,7 @@ pub fn read_gpmf_packets(path: &Path) -> Result<Vec<GpmfPacket>, MediaError> {
     Ok(packets)
 }
 
-fn is_gpmd(stream: &ffmpeg::format::stream::Stream) -> bool {
+pub(crate) fn is_gpmd(stream: &ffmpeg::format::stream::Stream) -> bool {
     let params = stream.parameters();
     // SAFETY: the parameters belong to a live stream; codec_tag is plain data.
     let tag = unsafe { (*params.as_ptr()).codec_tag };

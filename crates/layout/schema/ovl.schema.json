@@ -20,6 +20,245 @@
       "pattern": "^[0-9]+(\\.[0-9]+)?:[0-9]+(\\.[0-9]+)?$",
       "type": "string"
     },
+    "BarDirection": {
+      "description": "Direction in which a bar fills; vertical bars default to a tall bounding box.",
+      "enum": [
+        "left_to_right",
+        "right_to_left",
+        "bottom_to_top",
+        "top_to_bottom"
+      ],
+      "type": "string"
+    },
+    "BarNode": {
+      "additionalProperties": true,
+      "description": "Linear indicator. Range limits are in the displayed unit, after conversion.",
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anchor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: top-left."
+        },
+        "baseline": {
+          "description": "Value from which the fill grows. Default zero, clamped into the range;\nnegative acceleration therefore fills towards the braking side.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "border": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BorderOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "direction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BarDirection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fill": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Defaults to the theme's accent."
+        },
+        "format": {
+          "description": "Default \"{value:.0} {unit}\".",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max": {
+          "description": "Defaults to 100. Values outside the range saturate the indicator.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "metric": {
+          "type": "string"
+        },
+        "min": {
+          "description": "Defaults to 0.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "offset": {
+          "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "offset_relative": {
+          "description": "Additional offset as fractions of the parent's width and height.\n[0.02, -0.02] gives a 2% inset at a bottom-left anchor.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "opacity": {
+          "description": "0..=1, multiplies down the tree. Default 1.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "radius": {
+          "description": "Corner radius, in layout units. Default 6.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "show_value": {
+          "description": "Draw the formatted value centred on the bar. Default true.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "size": {
+          "description": "Defaults to [320, 40] horizontally, [40, 320] vertically.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "stale_secs": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "track": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Defaults to the theme's panel."
+        },
+        "units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value_style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextStyleOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "visible": {
+          "description": "Default true.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "when_absent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WhenAbsent"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "metric"
+      ],
+      "type": "object"
+    },
+    "BarZone": {
+      "additionalProperties": true,
+      "description": "An upper zone boundary, in the bar's displayed units. Boundaries must be strictly\nincreasing from min, with the last equal to max.",
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/ColorRef"
+        },
+        "up_to": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "up_to",
+        "color"
+      ],
+      "type": "object"
+    },
     "BorderOpt": {
       "additionalProperties": true,
       "properties": {
@@ -118,6 +357,19 @@
         },
         "offset": {
           "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "offset_relative": {
+          "description": "Additional offset as fractions of the parent's width and height.\n[0.02, -0.02] gives a 2% inset at a bottom-left anchor.",
           "items": {
             "format": "float",
             "type": "number"
@@ -279,6 +531,19 @@
             "null"
           ]
         },
+        "offset_relative": {
+          "description": "Additional offset as fractions of the parent's width and height.\n[0.02, -0.02] gives a 2% inset at a bottom-left anchor.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "opacity": {
           "description": "0..=1, multiplies down the tree. Default 1.",
           "format": "float",
@@ -367,6 +632,19 @@
             "null"
           ]
         },
+        "offset_relative": {
+          "description": "Additional offset as fractions of the parent's width and height.\n[0.02, -0.02] gives a 2% inset at a bottom-left anchor.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "opacity": {
           "description": "0..=1, multiplies down the tree. Default 1.",
           "format": "float",
@@ -427,6 +705,19 @@
         },
         "offset": {
           "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "offset_relative": {
+          "description": "Additional offset as fractions of the parent's width and height.\n[0.02, -0.02] gives a 2% inset at a bottom-left anchor.",
           "items": {
             "format": "float",
             "type": "number"
@@ -522,6 +813,19 @@
             "null"
           ]
         },
+        "offset_relative": {
+          "description": "Additional offset as fractions of the parent's width and height.\n[0.02, -0.02] gives a 2% inset at a bottom-left anchor.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "opacity": {
           "description": "0..=1, multiplies down the tree. Default 1.",
           "format": "float",
@@ -606,6 +910,19 @@
         },
         "offset": {
           "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "offset_relative": {
+          "description": "Additional offset as fractions of the parent's width and height.\n[0.02, -0.02] gives a 2% inset at a bottom-left anchor.",
           "items": {
             "format": "float",
             "type": "number"
@@ -749,6 +1066,19 @@
         },
         "offset": {
           "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "offset_relative": {
+          "description": "Additional offset as fractions of the parent's width and height.\n[0.02, -0.02] gives a 2% inset at a bottom-left anchor.",
           "items": {
             "format": "float",
             "type": "number"
@@ -941,6 +1271,32 @@
             "type"
           ],
           "type": "object"
+        },
+        {
+          "$ref": "#/$defs/BarNode",
+          "properties": {
+            "type": {
+              "const": "bar",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/ZoneBarNode",
+          "properties": {
+            "type": {
+              "const": "zone_bar",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -1103,6 +1459,19 @@
             "null"
           ]
         },
+        "offset_relative": {
+          "description": "Additional offset as fractions of the parent's width and height.\n[0.02, -0.02] gives a 2% inset at a bottom-left anchor.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "opacity": {
           "description": "0..=1, multiplies down the tree. Default 1.",
           "format": "float",
@@ -1163,6 +1532,66 @@
       "required": [
         "text"
       ],
+      "type": "object"
+    },
+    "TextStyleOpt": {
+      "description": "Text style group shared by text-like widgets; flattened into the widget's JSON object.",
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "font": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OutlineOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "shadow": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShadowOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "size": {
+          "description": "Font size = height of the text box, in layout units.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "weight": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FontWeight"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
       "type": "object"
     },
     "Theme": {
@@ -1238,6 +1667,226 @@
           "type": "string"
         }
       ]
+    },
+    "ZoneBarNode": {
+      "additionalProperties": true,
+      "description": "A bar whose filled portion passes through coloured zones. The default zones\ndivide the range into thirds: green, theme accent, red.",
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anchor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: top-left."
+        },
+        "baseline": {
+          "description": "Value from which the fill grows. Default zero, clamped into the range;\nnegative acceleration therefore fills towards the braking side.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "border": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BorderOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "direction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BarDirection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fill": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Defaults to the theme's accent."
+        },
+        "format": {
+          "description": "Default \"{value:.0} {unit}\".",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max": {
+          "description": "Defaults to 100. Values outside the range saturate the indicator.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "metric": {
+          "type": "string"
+        },
+        "min": {
+          "description": "Defaults to 0.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "offset": {
+          "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "offset_relative": {
+          "description": "Additional offset as fractions of the parent's width and height.\n[0.02, -0.02] gives a 2% inset at a bottom-left anchor.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "opacity": {
+          "description": "0..=1, multiplies down the tree. Default 1.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "radius": {
+          "description": "Corner radius, in layout units. Default 6.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "show_value": {
+          "description": "Draw the formatted value centred on the bar. Default true.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "size": {
+          "description": "Defaults to [320, 40] horizontally, [40, 320] vertically.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "stale_secs": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "track": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Defaults to the theme's panel."
+        },
+        "units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value_style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextStyleOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "visible": {
+          "description": "Default true.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "when_absent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WhenAbsent"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zones": {
+          "items": {
+            "$ref": "#/$defs/BarZone"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "metric"
+      ],
+      "type": "object"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",

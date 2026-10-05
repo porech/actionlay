@@ -2,6 +2,8 @@ use ffmpeg_next as ffmpeg;
 
 #[derive(Debug, thiserror::Error)]
 pub enum MediaError {
+    #[error("file read: {0}")]
+    Io(String),
     #[error("FFmpeg: {0}")]
     Ffmpeg(#[from] ffmpeg::Error),
     #[error("the file has no video stream")]

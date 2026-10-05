@@ -119,6 +119,8 @@ impl Snapshot {
 
 #[derive(Debug, Clone)]
 pub struct Telemetry {
+    loaded_ranges: Option<Vec<(f64, f64)>>,
+    cumulative_until: Option<f64>,
     duration: f64,
     start_utc: Option<DateTime<Utc>>,
     /// Indexed by `Metric::index()`; None when the source has no such data.
@@ -141,6 +143,54 @@ fn axis_series(samples: &[Sample<3>], axis: usize, interp: Interp) -> Series {
 }
 
 impl Telemetry {
+    /// A progressively read track: never extrapolate through unread file ranges,
+    /// or invent an odometer when the beginning of the journey is missing.
+    pub fn from_gpmf_packets_progressive(packets: &[RawPacket]) -> Result<Self, TelemetryError> {
+        let mut ranges: Vec<(f64, f64)> = Vec::new();
+        for p in packets {
+            let end = p.pts + p.duration;
+            if let Some(last) = ranges.last_mut().filter(|r| p.pts <= r.1 + 0.001) {
+                last.1 = last.1.max(end);
+            } else {
+                ranges.push((p.pts, end));
+            }
+        }
+        let mut tel = Self::from_gpmf_packets(packets)?;
+        // Recompute each independently read segment so derived speed/gradient
+        // and filtering cannot bridge a seek over unread metadata.
+        if ranges.len() > 1 || ranges.first().is_some_and(|r| r.0 > 0.001) {
+            let mut ex = extract(packets);
+            for &(start, end) in &ranges {
+                let a = ex.gps.partition_point(|p| p.t < start);
+                let b = ex.gps.partition_point(|p| p.t < end);
+                lock::apply(&mut ex.gps[a..b], &TelemetryOptions::default().lock);
+                derive(&mut ex.gps[a..b]);
+                if start > 0.001 {
+                    for p in &mut ex.gps[a..b] {
+                        p.derived.codo = None;
+                    }
+                }
+            }
+            tel = Self::assemble(ex, None);
+        }
+        tel.cumulative_until = if ranges.first().is_some_and(|r| r.0 > 0.001) {
+            Some(0.0)
+        } else if ranges.len() > 1 {
+            Some(ranges[0].1)
+        } else {
+            None
+        };
+        tel.loaded_ranges = Some(ranges);
+        Ok(tel)
+    }
+
+    pub fn is_loaded_at(&self, t: f64) -> bool {
+        self.loaded_ranges.as_ref().is_none_or(|ranges| {
+            let i = ranges.partition_point(|r| r.0 <= t + 0.000001);
+            i > 0 && t < ranges[i - 1].1
+        })
+    }
+
     pub fn from_gpmf_packets(packets: &[RawPacket]) -> Result<Telemetry, TelemetryError> {
         Self::from_gpmf_packets_with(packets, &TelemetryOptions::default())
     }
@@ -249,6 +299,8 @@ impl Telemetry {
         }
         let availability = availability(&series, timeline);
         Telemetry {
+            loaded_ranges: None,
+            cumulative_until: None,
             duration: ex.duration,
             start_utc,
             series,
@@ -263,6 +315,8 @@ impl Telemetry {
     pub fn empty(duration: f64) -> Telemetry {
         let series = vec![None; Metric::COUNT];
         Telemetry {
+            loaded_ranges: None,
+            cumulative_until: None,
             duration,
             start_utc: None,
             availability: availability(&series, duration),
@@ -289,6 +343,12 @@ impl Telemetry {
 
     pub fn sample(&self, t: f64) -> Snapshot {
         let values: [Value; Metric::COUNT] = std::array::from_fn(|i| {
+            if !self.is_loaded_at(t)
+                || (matches!(Metric::ALL[i], Metric::Odo | Metric::COdo)
+                    && self.cumulative_until.is_some_and(|until| t >= until))
+            {
+                return Value::Absent;
+            }
             self.series[i]
                 .as_ref()
                 .map_or(Value::Absent, |s| s.sample(t))
@@ -391,6 +451,33 @@ mod tests {
                 }
             })
             .collect()
+    }
+
+    #[test]
+    fn unread_seek_ranges_have_no_values_or_invented_odometer() {
+        let packets = gps_packets(&[3; 8]);
+        let tel = Telemetry::from_gpmf_packets_progressive(&[
+            packets[0].clone(),
+            packets[6].clone(),
+            packets[7].clone(),
+        ])
+        .unwrap();
+        assert!(tel.is_loaded_at(0.1));
+        assert!(!tel.is_loaded_at(3.0));
+        assert!(tel.is_loaded_at(6.1));
+        assert_eq!(tel.sample(3.0).get(Metric::Speed), Value::Absent);
+        assert_eq!(tel.sample(6.1).get(Metric::Odo), Value::Absent);
+        assert_eq!(tel.sample(6.1).get(Metric::COdo), Value::Absent);
+        assert!(matches!(
+            tel.sample(6.1).get(Metric::Speed),
+            Value::Present(_)
+        ));
+        let complete = Telemetry::from_gpmf_packets_progressive(&packets).unwrap();
+        let reference = Telemetry::from_gpmf_packets(&packets).unwrap();
+        for t in [0.1, 3.0, 6.1] {
+            assert_eq!(complete.sample(t), reference.sample(t));
+        }
+        assert!(!complete.is_loaded_at(9.0));
     }
 
     #[test]

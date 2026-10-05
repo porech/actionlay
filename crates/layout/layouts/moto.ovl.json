@@ -1,0 +1,319 @@
+{
+  "version": 1,
+  "name": "Moto",
+  "design_aspect": "16:9",
+  "nodes": [
+    {
+      "id": "clock",
+      "type": "frame",
+      "anchor": "top-left",
+      "size": [
+        300,
+        112
+      ],
+      "children": [
+        {
+          "id": "date",
+          "type": "datetime",
+          "anchor": "top-left",
+          "offset": [
+            20,
+            14
+          ],
+          "format": "%a %d %b %Y",
+          "size": 26,
+          "color": "secondary"
+        },
+        {
+          "id": "time",
+          "type": "datetime",
+          "anchor": "bottom-left",
+          "offset": [
+            20,
+            -12
+          ],
+          "format": "%H:%M:%S",
+          "size": 52,
+          "weight": "bold"
+        }
+      ],
+      "offset_relative": [
+        0.018,
+        0.025
+      ]
+    },
+    {
+      "id": "gps",
+      "type": "frame",
+      "anchor": "top-right",
+      "size": [
+        330,
+        112
+      ],
+      "children": [
+        {
+          "id": "gps-lock",
+          "type": "gps_lock_icon",
+          "anchor": "left",
+          "offset": [
+            18,
+            0
+          ],
+          "size": 44
+        },
+        {
+          "id": "lat",
+          "type": "metric",
+          "metric": "lat",
+          "anchor": "top-right",
+          "offset": [
+            -20,
+            16
+          ],
+          "format": "{value:.5}°",
+          "size": 32,
+          "weight": "medium"
+        },
+        {
+          "id": "lon",
+          "type": "metric",
+          "metric": "lon",
+          "anchor": "bottom-right",
+          "offset": [
+            -20,
+            -16
+          ],
+          "format": "{value:.5}°",
+          "size": 32,
+          "weight": "medium"
+        }
+      ],
+      "offset_relative": [
+        -0.018,
+        0.025
+      ]
+    },
+    {
+      "id": "speed",
+      "type": "frame",
+      "anchor": "bottom-left",
+      "size": [
+        340,
+        224
+      ],
+      "children": [
+        {
+          "id": "speed-icon",
+          "type": "icon",
+          "icon": "speed",
+          "anchor": "top-left",
+          "offset": [
+            20,
+            18
+          ],
+          "size": 34
+        },
+        {
+          "id": "speed-label",
+          "type": "text",
+          "text": "SPEED",
+          "anchor": "top-left",
+          "offset": [
+            62,
+            22
+          ],
+          "size": 24,
+          "color": "secondary",
+          "weight": "medium"
+        },
+        {
+          "id": "speed-value",
+          "type": "metric",
+          "metric": "speed",
+          "anchor": "bottom-left",
+          "offset": [
+            18,
+            -34
+          ],
+          "size": 120
+        },
+        {
+          "id": "speed-unit",
+          "type": "metric_unit",
+          "metric": "speed",
+          "anchor": "bottom-right",
+          "offset": [
+            -20,
+            -48
+          ],
+          "size": 30
+        },
+        {
+          "id": "speed-bar",
+          "type": "bar",
+          "metric": "speed",
+          "max": 220,
+          "size": [
+            300,
+            8
+          ],
+          "offset": [
+            20,
+            204
+          ],
+          "show_value": false,
+          "track": "#ffffff18"
+        }
+      ],
+      "offset_relative": [
+        0.018,
+        -0.025
+      ]
+    },
+    {
+      "id": "ride",
+      "type": "frame",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.018,
+        -0.025
+      ],
+      "size": [
+        440,
+        210
+      ],
+      "children": [
+        {
+          "id": "ride-label",
+          "type": "text",
+          "text": "RIDE DYNAMICS",
+          "offset": [
+            22,
+            16
+          ],
+          "size": 24,
+          "color": "secondary",
+          "weight": "medium"
+        },
+        {
+          "id": "brake-label",
+          "type": "text",
+          "text": "BRAKING",
+          "offset": [
+            22,
+            59
+          ],
+          "size": 17,
+          "color": "secondary",
+          "weight": "medium"
+        },
+        {
+          "id": "accel-label",
+          "type": "text",
+          "text": "ACCELERATION",
+          "offset": [
+            244,
+            59
+          ],
+          "size": 17,
+          "color": "secondary",
+          "weight": "medium"
+        },
+        {
+          "id": "brake",
+          "type": "bar",
+          "metric": "accel",
+          "min": -3,
+          "max": 0,
+          "units": "mps2",
+          "size": [
+            174,
+            24
+          ],
+          "offset": [
+            22,
+            87
+          ],
+          "fill": "#ff7878",
+          "show_value": false,
+          "track": "#ffffff18"
+        },
+        {
+          "id": "throttle",
+          "type": "bar",
+          "metric": "accel",
+          "min": 0,
+          "max": 3,
+          "units": "mps2",
+          "size": [
+            174,
+            24
+          ],
+          "offset": [
+            244,
+            87
+          ],
+          "fill": "accent",
+          "show_value": false,
+          "track": "#ffffff18"
+        },
+        {
+          "id": "accel",
+          "type": "metric",
+          "metric": "accel",
+          "offset": [
+            22,
+            130
+          ],
+          "size": 34,
+          "format": "{value:+.1} {unit}",
+          "weight": "medium"
+        },
+        {
+          "id": "alt",
+          "type": "metric",
+          "metric": "alt",
+          "offset": [
+            290,
+            130
+          ],
+          "size": 34,
+          "format": "{value:.0} {unit}",
+          "weight": "medium"
+        },
+        {
+          "id": "gradient",
+          "type": "metric",
+          "metric": "gradient",
+          "offset": [
+            290,
+            173
+          ],
+          "size": 23,
+          "format": "{value:+.1} {unit}",
+          "weight": "medium"
+        },
+        {
+          "id": "alt-icon",
+          "type": "icon",
+          "icon": "altitude",
+          "offset": [
+            244,
+            133
+          ],
+          "size": 28
+        },
+        {
+          "id": "gradient-icon",
+          "type": "icon",
+          "icon": "gradient",
+          "offset": [
+            244,
+            173
+          ],
+          "size": 28
+        }
+      ]
+    }
+  ]
+}

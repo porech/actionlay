@@ -1,9 +1,10 @@
-//! Playback engine: one decode thread feeding a small frame queue and the audio output.
+//! Playback engine: buffered I/O, independent decoding, and clocked presentation.
 //!
 //! Threads and channels:
 //! - the UI thread owns [`Player`] and calls [`Player::poll_frame`] once per
 //!   UI frame; it keeps at most [`QUEUE_CAP`] decoded frames;
-//! - one decode thread ([`Worker`]) owns the demuxer and both decoders, sends
+//! - one I/O thread owns the demuxer and reads ahead in bounded, cached blocks;
+//! - one decode thread ([`Worker`]) owns both decoders, sends
 //!   [`Msg`]s on a bounded channel and pushes samples into the shared
 //!   [`AudioOutput`]; it receives [`Command`]s on an unbounded channel.
 //!
@@ -19,11 +20,13 @@
 //! audio queued before a pause is stale by the time playback resumes: every
 //! transition into audio-driven playback re-seeks precisely to the current
 //! position, which flushes the decoders and restarts the audio output.
+#[path = "demux.rs"]
+mod demux;
 use std::collections::VecDeque;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{
     Arc, Mutex,
-    atomic::{AtomicBool, AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
 };
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -38,8 +41,9 @@ use crate::{
     audio::{AudioChunk, AudioDecoder, AudioOutput},
     clock::SystemClock,
     frame::Nv12Frame,
+    gpmf::GpmfPacket,
     present::select_frame,
-    probe::{MediaInfo, probe},
+    probe::MediaInfo,
     video::VideoDecoder,
 };
 
@@ -49,12 +53,24 @@ const CHANNEL_CAP: usize = 8;
 const QUEUE_CAP: usize = 4;
 /// Compressed video packets the worker may read ahead to reach audio packets.
 const MAX_VIDEO_PACKETS: usize = 512;
+const MAX_VIDEO_PACKET_BYTES: usize = 32 * 1024 * 1024;
+const READ_AHEAD_SECONDS: f64 = 3.0;
+const START_BUFFER_SECONDS: f64 = 2.0;
 /// Longest the worker waits without checking its commands.
 const POLL: Duration = Duration::from_millis(5);
 /// How long the audio may starve a full video queue, or stand still with
 /// samples queued (stalled device), before playback falls back to the system
 /// clock.
 const AUDIO_STARVATION: Duration = Duration::from_millis(500);
+/// Resynchronize after presentation was suspended instead of replaying old frames.
+const MAX_VIDEO_LAG: f64 = 0.5;
+
+/// Metadata from the very same demux pass as video/audio. It survives video
+/// generations: the consumer caches packets by timestamp across seeks.
+pub enum TelemetryEvent {
+    Packet { timestamp: i64, packet: GpmfPacket },
+    End { from_start: bool },
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct PlayerOptions {
@@ -104,7 +120,19 @@ enum Msg {
 }
 
 /// State shared between the player and the decode thread.
+#[derive(Clone, Copy)]
+struct BufferState {
+    generation: u64,
+    until: f64,
+    full: bool,
+    eof: bool,
+}
+
 struct Shared {
+    cancelled: Arc<AtomicBool>,
+    packet_bytes: AtomicUsize,
+    read_until: AtomicU64,
+    buffer: Mutex<BufferState>,
     /// Latest generation requested by the player.
     generation: AtomicU64,
     /// The player wants audio for the current generation (audio is driving).
@@ -113,6 +141,9 @@ struct Shared {
 }
 
 pub struct Player {
+    telemetry: Option<std::sync::mpsc::Receiver<TelemetryEvent>>,
+    last_poll: Instant,
+    buffering: bool,
     info: MediaInfo,
     commands: Sender<Command>,
     msgs: Receiver<Msg>,
@@ -144,7 +175,17 @@ pub struct Player {
 
 impl Player {
     pub fn open(path: &Path, options: PlayerOptions) -> Result<Self, MediaError> {
-        let info = probe(path)?;
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let input = crate::input::open(path, cancelled.clone())?;
+        Self::from_input(input, options, cancelled)
+    }
+
+    fn from_input(
+        input: ffmpeg::format::context::Input,
+        options: PlayerOptions,
+        cancelled: Arc<AtomicBool>,
+    ) -> Result<Self, MediaError> {
+        let info = crate::probe::describe(&input)?;
         let audio = if options.audio && info.audio.is_some() {
             match AudioOutput::open() {
                 Ok(out) => {
@@ -162,19 +203,30 @@ impl Player {
 
         let (cmd_tx, cmd_rx) = unbounded();
         let (msg_tx, msg_rx) = bounded(CHANNEL_CAP);
+        let (telemetry_tx, telemetry_rx) = std::sync::mpsc::channel();
         let shared = Arc::new(Shared {
+            cancelled,
+            packet_bytes: AtomicUsize::new(0),
+            read_until: AtomicU64::new(READ_AHEAD_SECONDS.to_bits()),
+            buffer: Mutex::new(BufferState {
+                generation: 0,
+                until: 0.0,
+                full: false,
+                eof: false,
+            }),
             generation: AtomicU64::new(0),
             audio_wanted: AtomicBool::new(false),
             backend: Mutex::new("unknown"),
         });
 
         let worker = Worker {
-            path: path.to_path_buf(),
+            input: Some(input),
             info: info.clone(),
             prefer_hw: options.prefer_hw,
             audio: audio.clone(),
             commands: cmd_rx,
             msgs: msg_tx,
+            telemetry: telemetry_tx,
             shared: shared.clone(),
         };
         let thread = std::thread::Builder::new()
@@ -187,6 +239,9 @@ impl Player {
             .map_err(|e| MediaError::Audio(format!("cannot spawn the decode thread: {e}")))?;
 
         Ok(Self {
+            telemetry: Some(telemetry_rx),
+            last_poll: Instant::now(),
+            buffering: false,
             info,
             commands: cmd_tx,
             msgs: msg_rx,
@@ -215,8 +270,30 @@ impl Player {
         &self.info
     }
 
+    pub fn take_telemetry(&mut self) -> Option<std::sync::mpsc::Receiver<TelemetryEvent>> {
+        self.telemetry.take()
+    }
+
     pub fn is_paused(&self) -> bool {
-        self.clock.is_paused()
+        self.clock.is_paused() && !self.buffering
+    }
+
+    pub fn is_buffering(&self) -> bool {
+        self.buffering
+    }
+
+    pub fn buffered_seconds(&self) -> f64 {
+        (self.shared.buffer.lock().unwrap().until - self.current_time()).max(0.0)
+    }
+
+    fn prebuffer(&mut self) {
+        self.position = self.current_time();
+        self.clock.seek(self.position, Instant::now());
+        self.clock.set_paused(true, Instant::now());
+        self.buffering = true;
+        self.stall.reset();
+        self.starving_since = None;
+        self.update_audio_mode();
     }
 
     /// True while a frame requested by open/seek/step has not been delivered yet.
@@ -241,6 +318,7 @@ impl Player {
             self.seek(self.position, true);
         } else {
             self.update_audio_mode();
+            self.prebuffer();
         }
     }
 
@@ -249,6 +327,7 @@ impl Player {
             return;
         }
         self.position = self.current_time();
+        self.buffering = false;
         let now = Instant::now();
         self.clock.seek(self.position, now);
         self.clock.set_paused(true, now);
@@ -286,6 +365,8 @@ impl Player {
     }
 
     pub fn seek(&mut self, to: f64, precise: bool) {
+        let playing = !self.is_paused();
+        self.last_poll = Instant::now();
         // Unknown duration (0): only clamp at the start.
         let last = if self.info.duration > 0.0 {
             (self.info.duration - self.frame_duration()).max(0.0)
@@ -303,6 +384,16 @@ impl Player {
         // checks it under the same lock before every push, so no audio of an
         // older generation can land in the buffer after this reset.
         self.shared.generation.store(generation, Ordering::SeqCst);
+        *self.shared.buffer.lock().unwrap() = BufferState {
+            generation,
+            until: to,
+            full: false,
+            eof: false,
+        };
+        self.shared.read_until.store(
+            (to + READ_AHEAD_SECONDS * self.speed()).to_bits(),
+            Ordering::SeqCst,
+        );
         if let Some(a) = &self.audio {
             a.lock().unwrap().reset(to);
         }
@@ -315,6 +406,10 @@ impl Player {
         self.seek_frame_ready = None;
         self.position = to;
         self.clock.seek(to, Instant::now());
+        if playing {
+            self.buffering = true;
+            self.clock.set_paused(true, Instant::now());
+        }
         // Decide whether the worker should feed audio before it sees the seek.
         self.update_audio_mode();
         let _ = self.commands.send(Command::Seek {
@@ -359,6 +454,10 @@ impl Player {
 
     /// Call once per UI frame: returns the frame to show now, if it changed.
     pub fn poll_frame(&mut self) -> Option<Nv12Frame> {
+        let poll_time = Instant::now();
+        let presentation_suspended =
+            poll_time.duration_since(self.last_poll).as_secs_f64() > MAX_VIDEO_LAG;
+        self.last_poll = poll_time;
         self.receive();
         if self.awaiting_seek_frame {
             let f = self.queue.pop_front()?;
@@ -374,15 +473,53 @@ impl Player {
         if self.is_paused() {
             return None;
         }
+        let buffer = *self.shared.buffer.lock().unwrap();
+        if self.buffering {
+            if self.buffered_seconds() < START_BUFFER_SECONDS * self.speed()
+                && !buffer.full
+                && !buffer.eof
+            {
+                return None;
+            }
+            self.buffering = false;
+            self.stall.reset();
+            self.starving_since = None;
+            self.resumed_at = Instant::now();
+            self.clock.seek(self.position, self.resumed_at);
+            self.clock.set_paused(false, self.resumed_at);
+            self.update_audio_mode();
+        }
         self.watch_audio();
         let now = self.current_time();
+        self.shared.read_until.store(
+            (now + READ_AHEAD_SECONDS * self.speed()).to_bits(),
+            Ordering::SeqCst,
+        );
         if self.audio_driven() {
             // Keep the system clock on the audio clock so that a fallback to it is seamless.
             self.clock.seek(now, Instant::now());
         }
+        if presentation_suspended
+            && self
+                .queue
+                .back()
+                .is_some_and(|f| now - f.pts > MAX_VIDEO_LAG)
+        {
+            // A background/occluded window can stop polling while audio keeps
+            // running. The bounded decoded queue then holds old frames and
+            // blocks decoding. Seek directly to the active clock rather than
+            // presenting that backlog over many subsequent UI updates.
+            self.dropped += self.queue.len() as u64;
+            self.seek(now, true);
+            return None;
+        }
         let (frame, dropped) = select_frame(&mut self.queue, now);
         self.dropped += dropped as u64;
         self.position = now.min(self.info.duration);
+        if frame.is_none() && self.queue.is_empty() && self.buffered_seconds() < 0.05 && !buffer.eof
+        {
+            self.prebuffer();
+        }
         let frame = frame.map(|f| self.present(f));
         if self.at_end() {
             self.pause();
@@ -484,7 +621,7 @@ impl Player {
     }
 
     fn audio_driven(&self) -> bool {
-        self.audio_can_drive() && !self.audio_lost && !self.is_paused()
+        self.audio_can_drive() && !self.audio_lost && !self.is_paused() && !self.buffering
     }
 
     fn current_time(&self) -> f64 {
@@ -497,7 +634,10 @@ impl Player {
 
     fn update_audio_mode(&mut self) {
         let driven = self.audio_driven();
-        self.shared.audio_wanted.store(driven, Ordering::SeqCst);
+        self.shared.audio_wanted.store(
+            self.audio_can_drive() && !self.audio_lost && !self.is_paused(),
+            Ordering::SeqCst,
+        );
         if let Some(a) = &self.audio {
             a.lock().unwrap().set_muted(!driven);
         }
@@ -506,12 +646,17 @@ impl Player {
 
 impl Drop for Player {
     fn drop(&mut self) {
+        self.shared.cancelled.store(true, Ordering::SeqCst);
+        self.shared.audio_wanted.store(false, Ordering::SeqCst);
+        if let Some(audio) = &self.audio {
+            audio.lock().unwrap().set_muted(true);
+        }
         let _ = self.commands.send(Command::Quit);
-        if let Some(t) = self.thread.take() {
-            // The worker checks its commands at least every POLL, even when
-            // the channel or the audio buffer is full.
+        if let Some(t) = self.thread.take().filter(|t| t.is_finished()) {
             let _ = t.join();
         }
+        // A mounted remote filesystem can block inside an OS read. Its thread
+        // exits as soon as that read returns; never hold up opening another file.
     }
 }
 
@@ -579,12 +724,13 @@ impl Generation {
 }
 
 struct Worker {
-    path: PathBuf,
+    input: Option<ffmpeg::format::context::Input>,
     info: MediaInfo,
     prefer_hw: bool,
     audio: Option<Arc<Mutex<AudioOutput>>>,
     commands: Receiver<Command>,
     msgs: Sender<Msg>,
+    telemetry: std::sync::mpsc::Sender<TelemetryEvent>,
     shared: Arc<Shared>,
 }
 
@@ -593,6 +739,7 @@ struct Pipeline {
     generation: Generation,
     /// Demuxed video packets not yet sent to the decoder.
     video_packets: VecDeque<ffmpeg::Packet>,
+    video_packet_bytes: usize,
     /// A message waiting for room on the channel.
     outbox: Option<Msg>,
     /// Audio decoded before the first frame of the generation was known.
@@ -610,6 +757,7 @@ impl Pipeline {
         Self {
             generation,
             video_packets: VecDeque::new(),
+            video_packet_bytes: 0,
             outbox: None,
             early_audio: Vec::new(),
             audio_buf: Vec::new(),
@@ -632,8 +780,8 @@ impl Pipeline {
 }
 
 impl Worker {
-    fn run(self) -> Result<(), MediaError> {
-        let mut input = ffmpeg::format::input(&self.path)?;
+    fn run(mut self) -> Result<(), MediaError> {
+        let input = self.input.take().unwrap();
         let vindex = self.info.video.stream_index;
         let vstream = input.stream(vindex).ok_or(MediaError::NoVideoStream)?;
         let mut video = VideoDecoder::open(
@@ -656,8 +804,17 @@ impl Worker {
 
         let mut p = Pipeline::new(Generation::new(0, f64::NEG_INFINITY));
         let mut next_command: Option<Command> = None;
+        let (read_commands, packets) = demux::spawn(
+            input,
+            self.info.clone(),
+            self.shared.clone(),
+            self.telemetry.clone(),
+        );
 
         loop {
+            if self.shared.cancelled.load(Ordering::SeqCst) {
+                return Ok(());
+            }
             // 1. Commands: only the latest seek matters, quit wins.
             let mut seek = None;
             let mut command = next_command.take();
@@ -678,10 +835,14 @@ impl Worker {
                 };
             }
             if let Some((to, precise, generation)) = seek {
-                let ts = (to * f64::from(ffmpeg::ffi::AV_TIME_BASE)) as i64;
-                if let Err(e) = input.seek(ts, ..ts) {
-                    log::warn!("seek to {to:.3}s failed: {e}");
-                }
+                self.shared
+                    .packet_bytes
+                    .fetch_sub(p.video_packet_bytes, Ordering::SeqCst);
+                let _ = read_commands.send(Command::Seek {
+                    to,
+                    precise,
+                    generation,
+                });
                 video.flush();
                 if let Some((_, a, _)) = &mut audio_dec {
                     a.flush();
@@ -699,6 +860,19 @@ impl Worker {
                 audio_dec.is_some() && self.shared.audio_wanted.load(Ordering::SeqCst);
             if !audio_wanted {
                 p.drop_audio();
+            } else if let Some(audio) = &self.audio {
+                let now = audio.lock().unwrap().clock();
+                if self.shared.generation.load(Ordering::SeqCst) == p.generation.id {
+                    // Continue filling the source while the OS suppresses UI frames.
+                    self.shared
+                        .read_until
+                        .store((now + READ_AHEAD_SECONDS).to_bits(), Ordering::SeqCst);
+                }
+                if matches!(&p.outbox,Some(Msg::Frame {frame,..}) if now-frame.pts>0.25) {
+                    // Do not let an occluded window's full decoded-frame channel
+                    // prevent reaching the next audio/metadata packets.
+                    p.outbox = None;
+                }
             }
 
             // 2. Deliver the pending message.
@@ -722,7 +896,6 @@ impl Worker {
             }
 
             // 4. Decode the next video frame when there is room for it.
-            let mut need_video_packet = false;
             if p.outbox.is_none() && !p.end_sent {
                 let decoded = video.receive().unwrap_or_else(|e| {
                     log::warn!("video decoding error: {e}");
@@ -740,6 +913,10 @@ impl Worker {
                         });
                     }
                 } else if let Some(packet) = p.video_packets.pop_front() {
+                    p.video_packet_bytes -= packet.size();
+                    self.shared
+                        .packet_bytes
+                        .fetch_sub(packet.size(), Ordering::SeqCst);
                     progressed = true;
                     if let Err(e) = video.send(&packet) {
                         log::warn!("video packet rejected: {e}");
@@ -771,42 +948,67 @@ impl Worker {
                             generation: p.generation.id,
                         });
                     }
-                } else {
-                    need_video_packet = true;
                 }
             }
 
-            // 5. Demux when video needs data, or when the audio output is
-            //    running low (reading video packets ahead, compressed).
-            let audio_hungry = audio_wanted
-                && p.generation.started
-                && !p.audio_pending()
+            // 5. Consume already-read packets without waiting for storage.
+            if !p.demux_eof
                 && p.video_packets.len() < MAX_VIDEO_PACKETS
-                && self.audio_has_room();
-            if !p.demux_eof && (need_video_packet || audio_hungry) {
-                progressed = true;
-                match input.packets().next() {
-                    None => p.demux_eof = true,
-                    Some((stream, packet)) => {
-                        if stream.index() == vindex {
+                && p.video_packet_bytes < MAX_VIDEO_PACKET_BYTES
+            {
+                match packets.try_recv() {
+                    Ok(demux::PacketMessage::End { generation })
+                        if generation == p.generation.id =>
+                    {
+                        p.demux_eof = true;
+                        progressed = true;
+                    }
+                    Ok(demux::PacketMessage::End { .. }) => {
+                        progressed = true;
+                    }
+                    Ok(demux::PacketMessage::Packet {
+                        generation,
+                        stream,
+                        packet,
+                    }) => {
+                        progressed = true;
+                        if generation != p.generation.id {
+                            self.shared
+                                .packet_bytes
+                                .fetch_sub(packet.size(), Ordering::SeqCst);
+                        } else if stream == vindex {
+                            p.video_packet_bytes += packet.size();
                             p.video_packets.push_back(packet);
-                        } else if let Some((aindex, dec, rate)) = &mut audio_dec
-                            && stream.index() == *aindex
-                            && audio_wanted
-                        {
-                            if let Err(e) = dec.send(&packet) {
-                                log::warn!("audio packet rejected: {e}");
-                            }
-                            loop {
-                                match dec.receive() {
-                                    Ok(Some(chunk)) => queue_audio(&mut p, chunk, *rate),
-                                    Ok(None) => break,
-                                    Err(e) => {
-                                        log::warn!("audio decoding error: {e}");
-                                        break;
+                        } else {
+                            self.shared
+                                .packet_bytes
+                                .fetch_sub(packet.size(), Ordering::SeqCst);
+                            if let Some((aindex, dec, rate)) = &mut audio_dec
+                                && stream == *aindex
+                                && audio_wanted
+                            {
+                                if let Err(e) = dec.send(&packet) {
+                                    log::warn!("audio packet rejected: {e}");
+                                }
+                                loop {
+                                    match dec.receive() {
+                                        Ok(Some(chunk)) => queue_audio(&mut p, chunk, *rate),
+                                        Ok(None) => break,
+                                        Err(e) => {
+                                            log::warn!("audio decoding error: {e}");
+                                            break;
+                                        }
                                     }
                                 }
                             }
+                        }
+                    }
+                    Err(TryRecvError::Empty) => {}
+                    Err(TryRecvError::Disconnected) => {
+                        p.demux_eof = true;
+                        let mut buffer = self.shared.buffer.lock().unwrap();
+                        if buffer.generation == p.generation.id {
+                            buffer.eof = true;
                         }
                     }
                 }
@@ -869,14 +1071,6 @@ impl Worker {
         self.with_audio(generation, |a| a.push(samples))
             .unwrap_or(0)
     }
-
-    fn audio_has_room(&self) -> bool {
-        self.audio.as_ref().is_some_and(|a| {
-            let a = a.lock().unwrap();
-            let capacity = f64::from(a.sample_rate()) * AudioOutput::CAPACITY_SECONDS;
-            (a.queued_frames() as f64) < capacity * 0.75
-        })
-    }
 }
 
 /// Queues decoded audio for the output. Before the generation's first frame is
@@ -916,6 +1110,239 @@ fn queue_audio(p: &mut Pipeline, chunk: AudioChunk, rate: u32) {
 mod tests {
     use super::*;
     use crate::clock::audio_clock_time;
+
+    struct SlowSource {
+        file: std::fs::File,
+        stall: Arc<AtomicBool>,
+        blocked: Arc<AtomicBool>,
+        delay: Duration,
+    }
+    impl std::io::Read for SlowSource {
+        fn read(&mut self, b: &mut [u8]) -> std::io::Result<usize> {
+            if self.stall.swap(false, Ordering::SeqCst) {
+                self.blocked.store(true, Ordering::SeqCst);
+                std::thread::sleep(self.delay);
+                self.blocked.store(false, Ordering::SeqCst);
+            }
+            std::io::Read::read(&mut self.file, b)
+        }
+    }
+    impl std::io::Seek for SlowSource {
+        fn seek(&mut self, s: std::io::SeekFrom) -> std::io::Result<u64> {
+            std::io::Seek::seek(&mut self.file, s)
+        }
+    }
+    fn slow_player(delay: Duration) -> Option<(Player, Arc<AtomicBool>, Arc<AtomicBool>)> {
+        let path = std::env::var_os("ACTIONLAY_SAMPLES")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/synthetic")
+            })
+            .join("h264-1080p30-44k.mp4");
+        let Ok(file) = std::fs::File::open(path) else {
+            eprintln!("synthetic sample unavailable; skipping slow I/O test");
+            return None;
+        };
+        crate::ffmpeg_info::init();
+        let stall = Arc::new(AtomicBool::new(false));
+        let blocked = Arc::new(AtomicBool::new(false));
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let input = crate::input::open_source(
+            SlowSource {
+                file,
+                stall: stall.clone(),
+                blocked: blocked.clone(),
+                delay,
+            },
+            Some("sample.mp4"),
+            cancelled.clone(),
+        )
+        .unwrap();
+        let p = Player::from_input(
+            input,
+            PlayerOptions {
+                prefer_hw: true,
+                audio: true,
+            },
+            cancelled,
+        )
+        .unwrap();
+        Some((p, stall, blocked))
+    }
+    fn pump(p: &mut Player, until: impl Fn(&Player) -> bool, timeout: Duration) {
+        let end = Instant::now() + timeout;
+        while !until(p) && Instant::now() < end {
+            p.poll_frame();
+            std::thread::sleep(POLL);
+        }
+        assert!(
+            until(p),
+            "timed out at {}s, buffer {}s",
+            p.position(),
+            p.buffered_seconds()
+        );
+    }
+    #[test]
+    fn background_audio_keeps_advancing_beyond_the_buffer_horizon() {
+        let Some((mut p, _, _)) = slow_player(Duration::ZERO) else {
+            return;
+        };
+        if !p.stats().audio_active {
+            return;
+        }
+        p.play();
+        pump(
+            &mut p,
+            |p| !p.is_buffering() && p.position() > 0.2,
+            Duration::from_secs(5),
+        );
+        let before = p.current_time();
+        std::thread::sleep(Duration::from_secs(4));
+        assert!(
+            p.current_time() > before + 3.5,
+            "audio stopped when the window stopped polling"
+        );
+        assert!(p.poll_frame().is_none(), "presented old background frames");
+        let target = p.position();
+        pump(
+            &mut p,
+            |p| !p.is_buffering() && !p.is_awaiting_frame(),
+            Duration::from_secs(5),
+        );
+        assert!((p.last_frame_pts - target).abs() < 0.15);
+        assert!(p.stats().audio_active);
+    }
+
+    #[test]
+    fn closing_a_blocked_source_does_not_delay_the_next_files_metadata() {
+        let Some((mut p, stall, blocked)) = slow_player(Duration::from_secs(5)) else {
+            return;
+        };
+        p.play();
+        pump(
+            &mut p,
+            |p| !p.is_buffering() && p.buffered_seconds() > 2.5,
+            Duration::from_secs(5),
+        );
+        stall.store(true, Ordering::SeqCst);
+        pump(
+            &mut p,
+            |_| blocked.load(Ordering::SeqCst),
+            Duration::from_secs(5),
+        );
+        let start = Instant::now();
+        drop(p);
+        assert!(start.elapsed() < Duration::from_millis(200));
+        let path = std::env::var_os("ACTIONLAY_GOPRO_SAMPLES")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/gopro")
+            })
+            .join("hero5.mp4");
+        if !path.exists() {
+            return;
+        }
+        let mut next = Player::open(
+            &path,
+            PlayerOptions {
+                prefer_hw: true,
+                audio: false,
+            },
+        )
+        .unwrap();
+        let rx = next.take_telemetry().unwrap();
+        assert!(matches!(
+            rx.recv_timeout(Duration::from_secs(3)),
+            Ok(TelemetryEvent::Packet { .. })
+        ));
+        assert!(
+            blocked.load(Ordering::SeqCst),
+            "old read completed before testing independence"
+        );
+    }
+
+    #[test]
+    fn cached_video_keeps_decoding_during_a_slow_source_read() {
+        let Some((mut p, stall, blocked)) = slow_player(Duration::from_millis(1200)) else {
+            return;
+        };
+        p.play();
+        pump(
+            &mut p,
+            |p| !p.is_buffering() && p.buffered_seconds() > 2.5,
+            Duration::from_secs(5),
+        );
+        stall.store(true, Ordering::SeqCst);
+        pump(
+            &mut p,
+            |_| blocked.load(Ordering::SeqCst),
+            Duration::from_secs(5),
+        );
+        let before = p.position();
+        let presented = p.stats().presented;
+        let end = Instant::now() + Duration::from_millis(800);
+        while Instant::now() < end {
+            p.poll_frame();
+            assert!(!p.is_buffering());
+            std::thread::sleep(POLL);
+        }
+        assert!(p.position() > before + 0.5, "playback stopped for storage");
+        assert!(
+            p.stats().presented > presented + 12,
+            "decoder stopped for storage"
+        );
+    }
+    #[test]
+    fn underrun_freezes_both_clocks_and_pause_cancels_autoresume() {
+        let Some((mut p, stall, blocked)) = slow_player(Duration::from_secs(5)) else {
+            return;
+        };
+        p.play();
+        pump(
+            &mut p,
+            |p| !p.is_buffering() && p.buffered_seconds() > 2.5,
+            Duration::from_secs(5),
+        );
+        stall.store(true, Ordering::SeqCst);
+        pump(
+            &mut p,
+            |_| blocked.load(Ordering::SeqCst),
+            Duration::from_secs(5),
+        );
+        pump(&mut p, |p| p.is_buffering(), Duration::from_secs(5));
+        let at = p.position();
+        let end = Instant::now() + Duration::from_millis(200);
+        while Instant::now() < end {
+            p.poll_frame();
+            std::thread::sleep(POLL);
+        }
+        assert!(
+            (p.position() - at).abs() < 0.02,
+            "clock moved while buffering"
+        );
+        assert!(!p.is_paused());
+        p.pause();
+        assert!(p.is_paused());
+        assert!(!p.is_buffering());
+        pump(
+            &mut p,
+            |_| !blocked.load(Ordering::SeqCst),
+            Duration::from_secs(5),
+        );
+        for _ in 0..20 {
+            p.poll_frame();
+            std::thread::sleep(POLL);
+        }
+        assert!(p.is_paused());
+        assert!((p.position() - at).abs() < 0.000001);
+        p.play();
+        pump(
+            &mut p,
+            |p| !p.is_buffering() && !p.is_awaiting_frame(),
+            Duration::from_secs(5),
+        );
+        pump(&mut p, |p| p.position() > at + 0.2, Duration::from_secs(5));
+    }
 
     const MS: Duration = Duration::from_millis(1);
 

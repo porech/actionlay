@@ -84,6 +84,10 @@ pub fn show(ui: &mut egui::Ui, player: &mut Player, scrub: &mut ScrubState, over
             player.step(1);
         }
 
+        if player.is_buffering() {
+            ui.spinner();
+            ui.label("Buffering…");
+        }
         let pos = player.position();
         let mut value = if scrub.dragging { scrub.target } else { pos };
         ui.label(format_time(value));

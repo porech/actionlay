@@ -11,8 +11,8 @@ use actionlay_layout::color::{Color, ColorRef};
 use actionlay_layout::format::{self, Piece};
 use actionlay_layout::geom::{Anchor, Rect, place};
 use actionlay_layout::model::{
-    DateZone, DatetimeNode, FrameNode, GpsLockIconNode, MetricNode, MetricUnitNode, Node,
-    WhenAbsent, Widget,
+    BarDirection, BarNode, BarZone, DateZone, DatetimeNode, FrameNode, GpsLockIconNode, MetricNode,
+    MetricUnitNode, Node, WhenAbsent, Widget,
 };
 use actionlay_layout::style::{ResolvedTheme, TextKind, TextStyle, defaults};
 use actionlay_telemetry::units::UnitSystem;
@@ -99,7 +99,7 @@ pub(crate) fn draw_nodes(p: &mut Painter, nodes: &[Node], parent: Rect, opacity:
         let at = Placement {
             parent,
             anchor: c.anchor.unwrap_or_default(),
-            offset: c.offset.unwrap_or([0.0, 0.0]),
+            offset: c.offset_in(parent),
             opacity,
         };
         match w {
@@ -123,6 +123,8 @@ pub(crate) fn draw_nodes(p: &mut Painter, nodes: &[Node], parent: Rect, opacity:
                     ctx,
                 );
             }
+            Widget::Bar(b) => draw_bar(p, b, None, false, at, ctx),
+            Widget::ZoneBar(b) => draw_bar(p, &b.bar, b.zones.as_deref(), true, at, ctx),
             Widget::Metric(m) => draw_metric(p, m, at, ctx),
             Widget::MetricUnit(m) => draw_metric_unit(p, m, at, ctx),
             Widget::Datetime(d) => draw_datetime(p, d, at, ctx),
@@ -184,6 +186,195 @@ fn fill_text(pm: &mut Pixmap, path: &Path, style: &TextStyle, alpha: f32, s: f32
         id,
         None,
     );
+}
+
+/// Bars use a hard-stop gradient inside a single rounded path, so partial fills
+/// and zone boundaries stay clipped to the corners without offscreen allocations.
+fn draw_bar(
+    p: &mut Painter,
+    b: &BarNode,
+    zones: Option<&[BarZone]>,
+    zoned: bool,
+    at: Placement,
+    ctx: &Ctx,
+) {
+    use tiny_skia::{GradientStop, LinearGradient, Point, SpreadMode};
+    let (min, max) = b.range();
+    if !(min.is_finite() && max.is_finite() && max > min && (max - min).is_finite()) {
+        return;
+    }
+    let resolved = value::resolve(&b.metric, b.units.as_deref(), ctx.system);
+    let policy = b.when_absent.unwrap_or_default();
+    let shown = resolved.map_or_else(
+        || value::shown_unknown(policy),
+        |r| {
+            value::shown(
+                ctx.snap.get(r.metric),
+                ctx.snap.is_available(r.metric),
+                f64::from(b.stale_secs.unwrap_or(defaults::STALE_SECS)),
+                policy,
+            )
+        },
+    );
+    let (raw, dim) = match shown {
+        Shown::Hidden => return,
+        Shown::Value(v) => (Some(v), false),
+        Shown::Dimmed(v) => (Some(v), true),
+        Shown::Empty => (None, true),
+    };
+    let display = raw
+        .zip(resolved)
+        .map(|(v, r)| r.display(v))
+        .filter(|v| v.is_finite());
+    let alpha = at.opacity
+        * if dim || display.is_none() {
+            ctx.theme.dim_opacity
+        } else {
+            1.0
+        };
+    let rect = place(at.parent, at.anchor, at.offset, b.size());
+    let s = ctx.scale;
+    let (x, y, w, h) = (rect.x * s, rect.y * s, rect.w * s, rect.h * s);
+    if !(x.is_finite() && y.is_finite() && w.is_finite() && h.is_finite()) {
+        return;
+    }
+    let Some(path) = rounded_rect(x, y, w, h, b.radius.unwrap_or(6.0) * s) else {
+        return;
+    };
+    let start = Instant::now();
+    let color = |c| ctx.theme.color(c);
+    p.pixmap.fill_path(
+        &path,
+        &paint(
+            color(
+                b.track
+                    .unwrap_or(ColorRef::Role(actionlay_layout::color::Role::Panel)),
+            ),
+            alpha,
+        ),
+        FillRule::Winding,
+        Transform::identity(),
+        None,
+    );
+    if let Some(v) = display {
+        let fraction = |v: f64| ((v.clamp(min, max) - min) / (max - min)) as f32;
+        let a = fraction(b.baseline.unwrap_or(0.0));
+        let current = fraction(v);
+        let (low, high) = (a.min(current), a.max(current));
+        if high > low {
+            let transparent = tiny_skia::Color::TRANSPARENT;
+            let skia_color = |c: Color| {
+                let c = c.with_alpha_mul(alpha);
+                tiny_skia::Color::from_rgba8(c.r, c.g, c.b, c.a)
+            };
+            let mut stops = vec![
+                GradientStop::new(0.0, transparent),
+                GradientStop::new(low, transparent),
+            ];
+            let mut segment = |from: f32, to: f32, c: Color| {
+                let from = from.max(low);
+                let to = to.min(high);
+                if to > from {
+                    let c = skia_color(c);
+                    stops.push(GradientStop::new(from, c));
+                    stops.push(GradientStop::new(to, c));
+                }
+            };
+            if zoned {
+                if let Some(zones) = zones {
+                    let mut previous = 0.0;
+                    for zone in zones {
+                        let end = fraction(zone.up_to);
+                        segment(previous, end, color(zone.color));
+                        previous = end;
+                    }
+                } else {
+                    segment(0.0, 1.0 / 3.0, Color::rgba(100, 220, 165, 255));
+                    segment(1.0 / 3.0, 2.0 / 3.0, ctx.theme.accent);
+                    segment(2.0 / 3.0, 1.0, Color::rgba(255, 107, 107, 255));
+                }
+            } else {
+                segment(
+                    0.0,
+                    1.0,
+                    color(
+                        b.fill
+                            .unwrap_or(ColorRef::Role(actionlay_layout::color::Role::Accent)),
+                    ),
+                );
+            }
+            stops.push(GradientStop::new(high, transparent));
+            stops.push(GradientStop::new(1.0, transparent));
+            let (from, to) = match b.direction.unwrap_or_default() {
+                BarDirection::LeftToRight => (Point::from_xy(x, y), Point::from_xy(x + w, y)),
+                BarDirection::RightToLeft => (Point::from_xy(x + w, y), Point::from_xy(x, y)),
+                BarDirection::BottomToTop => (Point::from_xy(x, y + h), Point::from_xy(x, y)),
+                BarDirection::TopToBottom => (Point::from_xy(x, y), Point::from_xy(x, y + h)),
+            };
+            if let Some(shader) =
+                LinearGradient::new(from, to, stops, SpreadMode::Pad, Transform::identity())
+            {
+                let mut fill = paint(Color::rgba(255, 255, 255, 255), 1.0);
+                fill.shader = shader;
+                p.pixmap
+                    .fill_path(&path, &fill, FillRule::Winding, Transform::identity(), None);
+            }
+        }
+    }
+    if let Some(border) = &b.border {
+        let width = border.width.unwrap_or(1.0) * s;
+        if width > 0.0 {
+            p.pixmap.stroke_path(
+                &path,
+                &paint(
+                    color(
+                        border
+                            .color
+                            .unwrap_or(ColorRef::Role(actionlay_layout::color::Role::Secondary)),
+                    ),
+                    alpha,
+                ),
+                &Stroke {
+                    width,
+                    ..Default::default()
+                },
+                Transform::identity(),
+                None,
+            );
+        }
+    }
+    p.stats.shapes += start.elapsed();
+    if b.show_value != Some(false) {
+        p.scratch.clear();
+        let fmt = b.format.as_deref().unwrap_or("{value:.0} {unit}");
+        if let Some(pieces) = p.formats.get(fmt) {
+            format::apply(
+                p.scratch,
+                pieces,
+                display,
+                resolved.map_or("", |r| r.symbol),
+            );
+        } else {
+            p.scratch.push_str(format::EMPTY);
+        }
+        let opt = b.value_style.clone().unwrap_or_default();
+        let mut style = opt.resolve(TextKind::Metric, ctx.theme);
+        if opt.size.is_none() {
+            style.size = 26.0_f32.min(rect.h * 0.65);
+        }
+        draw_text(
+            p,
+            &style,
+            dim || display.is_none(),
+            Placement {
+                parent: rect,
+                anchor: Anchor::Center,
+                offset: [0.0, 0.0],
+                opacity: at.opacity,
+            },
+            ctx,
+        );
+    }
 }
 
 fn draw_metric(p: &mut Painter, m: &MetricNode, at: Placement, ctx: &Ctx) {

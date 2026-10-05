@@ -232,6 +232,21 @@ fn diagnose_node(node: &Node, path: String, issues: &mut Vec<Issue>) {
         None => path,
     };
     match w {
+        Widget::Bar(b) | Widget::ZoneBar(actionlay_layout::model::ZoneBarNode { bar: b, .. }) => {
+            check_metric(
+                &b.metric,
+                b.units.as_deref(),
+                "shown as empty or hidden by when_absent",
+                &path,
+                issues,
+            );
+            if let Some(style) = &b.value_style {
+                check_style(style, &path, issues);
+            }
+            if let Some(Err(e)) = b.format.as_deref().map(format::parse) {
+                issues.push(Issue::warning(&path, format!("{e}: shown as empty")));
+            }
+        }
         Widget::Metric(m) => {
             let if_unknown = match m.when_absent.unwrap_or_default() {
                 WhenAbsent::Show => "shown as empty",

@@ -89,6 +89,42 @@ struct Validator {
 }
 
 impl Validator {
+    fn bar(&mut self, path: &str, b: &crate::model::BarNode) {
+        if b.metric.is_empty() {
+            self.error(path, "metric must not be empty");
+        }
+        let [w, h] = b.size();
+        self.positive(path, "size", w);
+        self.positive(path, "size", h);
+        let (min, max) = b.range();
+        if !(min.is_finite() && max.is_finite() && max > min && (max - min).is_finite()) {
+            self.error(path, "range must be finite with max greater than min");
+        }
+        if b.baseline.is_some_and(|v| !v.is_finite()) {
+            self.error(path, "baseline must be finite");
+        }
+        if let Some(radius) = b.radius {
+            self.non_negative(path, "radius", radius);
+        }
+        if let Some(secs) = b.stale_secs {
+            self.non_negative(path, "stale_secs", secs);
+        }
+        if let Some(f) = &b.format
+            && let Err(e) = format::parse(f)
+        {
+            self.error(path, e.to_string());
+        }
+        if let Some(style) = &b.value_style {
+            self.style(&format!("{path}.value_style"), style);
+        }
+        if let Some(border) = &b.border {
+            if let Some(w) = border.width {
+                self.non_negative(path, "border width", w);
+            }
+            self.extra(&format!("{path}.border"), &border.extra);
+        }
+    }
+
     fn error(&mut self, path: &str, message: impl Into<String>) {
         self.issues.push(Issue::error(path, message));
     }
@@ -187,6 +223,9 @@ impl Validator {
         if let Some(offset) = c.offset {
             self.finite_pair(path, "offset", offset);
         }
+        if let Some(offset) = c.offset_relative {
+            self.finite_pair(path, "offset_relative", offset);
+        }
     }
 
     fn node(&mut self, node: &Node, path: String) {
@@ -210,6 +249,27 @@ impl Validator {
         self.common(&path, w.common());
         self.extra(&path, w.extra());
         match w {
+            Widget::Bar(b) => self.bar(&path, b),
+            Widget::ZoneBar(z) => {
+                self.bar(&path, &z.bar);
+                if let Some(zones) = &z.zones {
+                    let (mut previous, max) = z.bar.range();
+                    if zones.is_empty() {
+                        self.error(&path, "zones must not be empty");
+                    }
+                    for (i, zone) in zones.iter().enumerate() {
+                        let path = format!("{path}.zones[{i}]");
+                        if !(zone.up_to.is_finite() && zone.up_to > previous && zone.up_to <= max) {
+                            self.error(&path, "up_to must increase strictly within the bar range");
+                        }
+                        previous = zone.up_to;
+                        self.extra(&path, &zone.extra);
+                    }
+                    if !zones.is_empty() && previous != max {
+                        self.error(&path, "last zone must end at max");
+                    }
+                }
+            }
             Widget::Group(g) => {
                 if let Some([sw, sh]) = g.size {
                     self.positive(&path, "size", sw);

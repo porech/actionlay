@@ -52,14 +52,9 @@ fn plays_file_without_audio() {
     let mut p = Player::open(&path, PlayerOptions::default()).unwrap();
     assert!(!p.stats().audio_active);
     p.play();
-    std::thread::sleep(Duration::from_millis(600));
-    let mut last = 0.0;
-    for _ in 0..50 {
-        if let Some(f) = p.poll_frame() {
-            last = f.pts;
-        }
-        std::thread::sleep(Duration::from_millis(5));
-    }
+    wait_for_frame(&mut p, Duration::from_secs(5)).expect("no preview frame");
+    let frames = collect_frames(&mut p, Duration::from_millis(700));
+    let last = last(&frames, "buffered playback");
     assert!(last > 0.4, "playback did not advance: {last}");
 }
 
@@ -220,4 +215,67 @@ fn drop_does_not_hang() {
             t.elapsed()
         );
     }
+}
+
+#[test]
+fn suspended_presentation_resumes_at_the_clock_without_replaying_backlog() {
+    let Some(path) = common::sample("h264-1080p30-44k.mp4") else {
+        return;
+    };
+    for options in [no_audio(), PlayerOptions::default()] {
+        let mut p = Player::open(&path, options).unwrap();
+        p.play();
+        wait_for_frame(&mut p, Duration::from_secs(5)).expect("no initial frame");
+        collect_frames(&mut p, Duration::from_millis(300));
+        // Simulate a UI which stops drawing while the playback clock runs.
+        std::thread::sleep(Duration::from_millis(1400));
+        assert!(p.poll_frame().is_none(), "presented an obsolete frame");
+        let target = p.position();
+        assert!(target > 1.0, "clock did not advance: {target}");
+        let resumed = wait_for_frame(&mut p, Duration::from_secs(5)).expect("no resync frame");
+        assert!(
+            (resumed - target).abs() < 0.1,
+            "replayed backlog: {resumed} vs {target}"
+        );
+        let normal = collect_frames(&mut p, Duration::from_millis(500));
+        let advanced = last(&normal, "resynchronized playback") - resumed;
+        assert!(
+            advanced > 0.15 && advanced < 0.9,
+            "catch-up playback: {advanced}"
+        );
+    }
+}
+
+#[test]
+fn metadata_streams_from_the_player_while_paused_and_after_seek() {
+    let Some(path) = common::gopro_sample("hero5.mp4") else {
+        return;
+    };
+    let mut p = Player::open(&path, no_audio()).unwrap();
+    assert!(p.info().telemetry.is_some());
+    let rx = p.take_telemetry().unwrap();
+    wait_for_frame(&mut p, Duration::from_secs(5)).expect("no preview");
+    let first = rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let actionlay_media::player::TelemetryEvent::Packet { packet, .. } = first else {
+        panic!("no metadata packet")
+    };
+    assert!(packet.pts < 1.1);
+    assert!(!packet.data.is_empty());
+    std::thread::sleep(Duration::from_millis(100));
+    assert!(rx.try_iter().all(|event|matches!(event,actionlay_media::player::TelemetryEvent::Packet {packet,..} if packet.pts<5.0)),"read metadata from the whole file");
+    p.seek(15.0, true);
+    assert!(p.is_paused());
+    assert!((wait_for_frame(&mut p, Duration::from_secs(5)).unwrap() - 15.0).abs() < 0.1);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut found = false;
+    while Instant::now() < deadline {
+        if let Ok(actionlay_media::player::TelemetryEvent::Packet { packet, .. }) =
+            rx.recv_timeout(Duration::from_millis(50))
+            && (12.0..18.0).contains(&packet.pts)
+        {
+            found = true;
+            break;
+        }
+    }
+    assert!(found, "seek did not deliver metadata from its new position");
 }

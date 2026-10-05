@@ -1,0 +1,337 @@
+{
+  "version": 1,
+  "name": "Training",
+  "design_aspect": "16:9",
+  "nodes": [
+    {
+      "id": "clock",
+      "type": "frame",
+      "anchor": "top-left",
+      "size": [
+        300,
+        112
+      ],
+      "children": [
+        {
+          "id": "date",
+          "type": "datetime",
+          "anchor": "top-left",
+          "offset": [
+            20,
+            14
+          ],
+          "format": "%a %d %b %Y",
+          "size": 26,
+          "color": "secondary"
+        },
+        {
+          "id": "time",
+          "type": "datetime",
+          "anchor": "bottom-left",
+          "offset": [
+            20,
+            -12
+          ],
+          "format": "%H:%M:%S",
+          "size": 52,
+          "weight": "bold"
+        }
+      ],
+      "offset_relative": [
+        0.018,
+        0.025
+      ]
+    },
+    {
+      "id": "gps",
+      "type": "frame",
+      "anchor": "top-right",
+      "size": [
+        330,
+        112
+      ],
+      "children": [
+        {
+          "id": "gps-lock",
+          "type": "gps_lock_icon",
+          "anchor": "left",
+          "offset": [
+            18,
+            0
+          ],
+          "size": 44
+        },
+        {
+          "id": "lat",
+          "type": "metric",
+          "metric": "lat",
+          "anchor": "top-right",
+          "offset": [
+            -20,
+            16
+          ],
+          "format": "{value:.5}°",
+          "size": 32,
+          "weight": "medium"
+        },
+        {
+          "id": "lon",
+          "type": "metric",
+          "metric": "lon",
+          "anchor": "bottom-right",
+          "offset": [
+            -20,
+            -16
+          ],
+          "format": "{value:.5}°",
+          "size": 32,
+          "weight": "medium"
+        }
+      ],
+      "offset_relative": [
+        -0.018,
+        0.025
+      ]
+    },
+    {
+      "id": "speed",
+      "type": "frame",
+      "anchor": "bottom-left",
+      "size": [
+        340,
+        196
+      ],
+      "children": [
+        {
+          "id": "speed-icon",
+          "type": "icon",
+          "icon": "speed",
+          "anchor": "top-left",
+          "offset": [
+            20,
+            18
+          ],
+          "size": 34
+        },
+        {
+          "id": "speed-label",
+          "type": "text",
+          "text": "SPEED",
+          "anchor": "top-left",
+          "offset": [
+            62,
+            22
+          ],
+          "size": 24,
+          "color": "secondary",
+          "weight": "medium"
+        },
+        {
+          "id": "speed-value",
+          "type": "metric",
+          "metric": "speed",
+          "anchor": "bottom-left",
+          "offset": [
+            18,
+            -6
+          ],
+          "size": 120
+        },
+        {
+          "id": "speed-unit",
+          "type": "metric_unit",
+          "metric": "speed",
+          "anchor": "bottom-right",
+          "offset": [
+            -20,
+            -20
+          ],
+          "size": 30
+        }
+      ],
+      "offset_relative": [
+        0.018,
+        -0.025
+      ]
+    },
+    {
+      "id": "training",
+      "type": "frame",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.018,
+        -0.025
+      ],
+      "size": [
+        600,
+        282
+      ],
+      "children": [
+        {
+          "id": "training-label",
+          "type": "text",
+          "text": "TRAINING",
+          "offset": [
+            22,
+            16
+          ],
+          "size": 24,
+          "color": "secondary",
+          "weight": "medium"
+        },
+        {
+          "id": "heart-label",
+          "type": "text",
+          "text": "HEART RATE",
+          "offset": [
+            22,
+            60
+          ],
+          "size": 17,
+          "color": "secondary",
+          "weight": "medium"
+        },
+        {
+          "id": "heart",
+          "type": "metric",
+          "metric": "hr",
+          "offset": [
+            400,
+            51
+          ],
+          "size": 34,
+          "format": "{value:.0} bpm",
+          "weight": "medium"
+        },
+        {
+          "id": "heart-zones",
+          "type": "zone_bar",
+          "metric": "hr",
+          "max": 200,
+          "size": [
+            556,
+            18
+          ],
+          "offset": [
+            22,
+            96
+          ],
+          "show_value": false,
+          "track": "#ffffff18",
+          "zones": [
+            {
+              "up_to": 130,
+              "color": "#79bbff"
+            },
+            {
+              "up_to": 163,
+              "color": "#77e3b5"
+            },
+            {
+              "up_to": 183,
+              "color": "#ffd56b"
+            },
+            {
+              "up_to": 200,
+              "color": "#ff7878"
+            }
+          ]
+        },
+        {
+          "id": "power-label",
+          "type": "text",
+          "text": "POWER",
+          "offset": [
+            22,
+            143
+          ],
+          "size": 17,
+          "color": "secondary",
+          "weight": "medium"
+        },
+        {
+          "id": "power",
+          "type": "metric",
+          "metric": "power",
+          "offset": [
+            400,
+            134
+          ],
+          "size": 34,
+          "format": "{value:.0} W",
+          "weight": "medium"
+        },
+        {
+          "id": "power-zones",
+          "type": "zone_bar",
+          "metric": "power",
+          "max": 600,
+          "size": [
+            556,
+            18
+          ],
+          "offset": [
+            22,
+            179
+          ],
+          "show_value": false,
+          "track": "#ffffff18",
+          "zones": [
+            {
+              "up_to": 130,
+              "color": "#79bbff"
+            },
+            {
+              "up_to": 160,
+              "color": "#77e3b5"
+            },
+            {
+              "up_to": 200,
+              "color": "#ffd56b"
+            },
+            {
+              "up_to": 600,
+              "color": "#ff7878"
+            }
+          ]
+        },
+        {
+          "id": "cadence-label",
+          "type": "text",
+          "text": "CADENCE",
+          "offset": [
+            22,
+            230
+          ],
+          "size": 17,
+          "color": "secondary",
+          "weight": "medium"
+        },
+        {
+          "id": "cadence",
+          "type": "metric",
+          "metric": "cadence",
+          "offset": [
+            144,
+            219
+          ],
+          "size": 34,
+          "format": "{value:.0} rpm",
+          "weight": "medium"
+        },
+        {
+          "id": "alt",
+          "type": "metric",
+          "metric": "alt",
+          "offset": [
+            400,
+            219
+          ],
+          "size": 34,
+          "format": "{value:.0} {unit}",
+          "weight": "medium"
+        }
+      ]
+    }
+  ]
+}

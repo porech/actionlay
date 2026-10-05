@@ -1,8 +1,18 @@
 //! Reads a video's GPMF track and builds its telemetry off the UI thread (spec §3).
+use actionlay_media::player::TelemetryEvent;
+use std::collections::BTreeMap;
+#[cfg(test)]
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, PoisonError, mpsc};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
+    mpsc,
+};
+use std::time::{Duration, Instant};
 
-use actionlay_media::gpmf::{GpmfPacket, read_gpmf_packets};
+use actionlay_media::gpmf::GpmfPacket;
+#[cfg(test)]
+use actionlay_media::gpmf::read_gpmf_packets;
 use actionlay_telemetry::{RawPacket, Telemetry, TelemetryOptions};
 
 pub struct Loaded {
@@ -34,6 +44,7 @@ pub fn options(duration: f64) -> TelemetryOptions {
 
 /// Never fails: without usable telemetry the video gets `Telemetry::empty` and the
 /// overlay shows its designed empty states. `duration` is the video's (from the probe).
+#[cfg(test)]
 pub fn load(path: &Path, duration: f64) -> Loaded {
     let empty = |warning: Option<String>| Loaded {
         telemetry: Telemetry::empty(duration),
@@ -62,24 +73,118 @@ pub fn load(path: &Path, duration: f64) -> Loaded {
     }
 }
 
-/// Serializes loads: `read_gpmf_packets` lowers and restores FFmpeg's process-wide log
-/// level, so two overlapping loads could restore it in the wrong order.
-static LOADING: Mutex<()> = Mutex::new(());
+/// The latest snapshot only; a hidden window cannot accumulate heavy snapshots.
+/// Dropping the handle cancels its decoder, without blocking another video's load.
+pub struct StreamLoad {
+    latest: Arc<Mutex<Option<Loaded>>>,
+    cancelled: Arc<AtomicBool>,
+}
 
-/// Loads the telemetry on a background thread; the receiver gets exactly one `Loaded`.
-/// Loads run one at a time: a load started while another runs waits for it (off the UI
-/// thread); the result of a load whose receiver was dropped is discarded.
-pub fn spawn(path: PathBuf, duration: f64) -> mpsc::Receiver<Loaded> {
-    let (tx, rx) = mpsc::channel();
+impl StreamLoad {
+    pub fn take_update(&self) -> Option<Loaded> {
+        self.latest.lock().unwrap().take()
+    }
+}
+
+impl Drop for StreamLoad {
+    fn drop(&mut self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+    }
+}
+
+pub fn spawn(
+    input: mpsc::Receiver<TelemetryEvent>,
+    duration: f64,
+    expected: Option<usize>,
+    wake: impl Fn() + Send + 'static,
+) -> StreamLoad {
+    let latest = Arc::new(Mutex::new(None));
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let load = StreamLoad {
+        latest: latest.clone(),
+        cancelled: cancelled.clone(),
+    };
     std::thread::Builder::new()
         .name("telemetry".into())
         .spawn(move || {
-            let _one_at_a_time = LOADING.lock().unwrap_or_else(PoisonError::into_inner);
-            // The receiver may be gone (another video was opened): nothing to do.
-            let _ = tx.send(load(&path, duration));
+            let mut packets = BTreeMap::new();
+            let mut dirty = false;
+            let mut complete = false;
+            let mut published = false;
+            let mut last = Instant::now();
+            loop {
+                if cancelled.load(Ordering::SeqCst) {
+                    return;
+                }
+                let event = input.recv_timeout(Duration::from_millis(50));
+                let disconnected = matches!(event, Err(mpsc::RecvTimeoutError::Disconnected));
+                match event {
+                    Ok(TelemetryEvent::Packet { timestamp, packet }) => {
+                        if let std::collections::btree_map::Entry::Vacant(e) =
+                            packets.entry(timestamp)
+                        {
+                            e.insert(packet);
+                            dirty = true;
+                        }
+                        complete |= expected.is_some_and(|n| packets.len() >= n);
+                    }
+                    Ok(TelemetryEvent::End { from_start }) => {
+                        let all = expected.map_or(from_start, |n| packets.len() >= n);
+                        if all && !complete {
+                            dirty = true;
+                            complete = true;
+                        }
+                    }
+                    Err(_) => {}
+                }
+                if dirty
+                    && (!published
+                        || complete
+                        || disconnected
+                        || last.elapsed() >= Duration::from_millis(250))
+                {
+                    let mut raw = to_raw(packets.values().cloned().collect());
+                    // Some muxers omit durations. Never fill across an unread seek gap.
+                    for i in 0..raw.len() {
+                        if raw[i].duration <= 0.0 {
+                            raw[i].duration = if i + 1 < raw.len() {
+                                (raw[i + 1].pts - raw[i].pts).clamp(0.0, 1.0)
+                            } else {
+                                1.0
+                            };
+                        }
+                    }
+                    let telemetry = if complete {
+                        Telemetry::from_gpmf_packets_with(&raw, &options(duration))
+                    } else {
+                        Telemetry::from_gpmf_packets_progressive(&raw)
+                    };
+                    let update = match telemetry {
+                        Ok(telemetry) => Loaded {
+                            telemetry,
+                            warning: None,
+                        },
+                        Err(e) => Loaded {
+                            telemetry: Telemetry::empty(duration),
+                            warning: Some(format!("telemetry not decoded: {e}")),
+                        },
+                    };
+                    if cancelled.load(Ordering::SeqCst) {
+                        return;
+                    }
+                    *latest.lock().unwrap() = Some(update);
+                    wake();
+                    dirty = false;
+                    published = true;
+                    last = Instant::now();
+                }
+                if disconnected {
+                    return;
+                }
+            }
         })
         .expect("spawn telemetry thread");
-    rx
+    load
 }
 
 #[cfg(test)]
@@ -105,6 +210,85 @@ mod tests {
 
     fn speed() -> Metric {
         Metric::from_id("speed").unwrap()
+    }
+
+    fn update(loader: &StreamLoad) -> Loaded {
+        let end = Instant::now() + Duration::from_secs(3);
+        loop {
+            if let Some(update) = loader.take_update() {
+                return update;
+            }
+            assert!(Instant::now() < end, "no progressive update");
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+    #[test]
+    fn progressive_packets_show_early_deduplicate_seeks_and_match_full_track() {
+        let Some(path) = sample("gopro/hero5.mp4") else {
+            return;
+        };
+        let packets = read_gpmf_packets(&path).unwrap();
+        let duration = actionlay_media::probe::probe(&path).unwrap().duration;
+        let (tx, rx) = mpsc::channel();
+        let loader = spawn(rx, duration, Some(packets.len()), || {});
+        let send = |i: usize| {
+            tx.send(TelemetryEvent::Packet {
+                timestamp: i as i64,
+                packet: packets[i].clone(),
+            })
+            .unwrap()
+        };
+        send(0);
+        let first = update(&loader);
+        assert!(first.telemetry.is_loaded_at(0.1));
+        assert!(!first.telemetry.is_loaded_at(15.0));
+        send(20);
+        let skipped = update(&loader);
+        assert!(skipped.telemetry.is_loaded_at(packets[20].pts + 0.1));
+        assert!(!skipped.telemetry.is_loaded_at(10.0));
+        assert_eq!(
+            skipped
+                .telemetry
+                .sample(packets[20].pts + 0.1)
+                .get(Metric::Odo),
+            Value::Absent
+        );
+        for i in 0..packets.len() {
+            send(i);
+            send(i);
+        }
+        tx.send(TelemetryEvent::End { from_start: false }).unwrap();
+        drop(tx);
+        // Decoder coalesces updates: allow it to consume all queued packets.
+        let end = Instant::now() + Duration::from_secs(3);
+        let mut final_update = update(&loader);
+        while !final_update.telemetry.is_loaded_at(duration - 0.01) {
+            assert!(Instant::now() < end);
+            final_update = update(&loader);
+        }
+        let reference = load(&path, duration).telemetry;
+        assert_eq!(final_update.telemetry.gps_points(), reference.gps_points());
+        for t in [0.1, 10.0, 20.0, duration - 0.01] {
+            assert_eq!(final_update.telemetry.sample(t), reference.sample(t));
+        }
+    }
+    #[test]
+    fn replacing_a_waiting_stream_never_blocks_the_next_file() {
+        let Some(path) = sample("gopro/hero5.mp4") else {
+            return;
+        };
+        let packets = read_gpmf_packets(&path).unwrap();
+        let (_slow, rx) = mpsc::channel();
+        let old = spawn(rx, 34.0, Some(34), || {});
+        drop(old);
+        let (tx, rx) = mpsc::channel();
+        let current = spawn(rx, 34.0, Some(34), || {});
+        tx.send(TelemetryEvent::Packet {
+            timestamp: 0,
+            packet: packets[0].clone(),
+        })
+        .unwrap();
+        assert!(update(&current).telemetry.is_loaded_at(0.1));
     }
 
     #[test]
@@ -152,10 +336,7 @@ mod tests {
             return;
         };
         let duration = actionlay_media::probe::probe(&path).unwrap().duration;
-        let rx = spawn(path, duration);
-        let loaded = rx
-            .recv_timeout(std::time::Duration::from_secs(60))
-            .expect("telemetry thread answers");
+        let loaded = load(&path, duration);
         assert!(loaded.warning.is_none(), "{:?}", loaded.warning);
         let tel = &loaded.telemetry;
         assert!(tel.start_utc().is_some());

@@ -26,12 +26,24 @@ pub struct Common {
     /// [x, y] from the anchor in layout units (positive = right/down). Default [0, 0].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub offset: Option<[f32; 2]>,
+    /// Additional offset as fractions of the parent's width and height.
+    /// [0.02, -0.02] gives a 2% inset at a bottom-left anchor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offset_relative: Option<[f32; 2]>,
     /// 0..=1, multiplies down the tree. Default 1.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub opacity: Option<f32>,
     /// Default true.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub visible: Option<bool>,
+}
+
+impl Common {
+    pub fn offset_in(&self, parent: crate::geom::Rect) -> [f32; 2] {
+        let [x, y] = self.offset.unwrap_or([0.0, 0.0]);
+        let [rx, ry] = self.offset_relative.unwrap_or([0.0, 0.0]);
+        [x + rx * parent.w, y + ry * parent.h]
+    }
 }
 
 /// What a data widget shows when its metric is absent (spec §4.4.1).
@@ -208,6 +220,101 @@ pub struct GpsLockIconNode {
     pub extra: Extra,
 }
 
+/// Direction in which a bar fills; vertical bars default to a tall bounding box.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum BarDirection {
+    #[default]
+    LeftToRight,
+    RightToLeft,
+    BottomToTop,
+    TopToBottom,
+}
+
+/// Linear indicator. Range limits are in the displayed unit, after conversion.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct BarNode {
+    #[serde(flatten)]
+    pub common: Common,
+    pub metric: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub units: Option<String>,
+    /// Defaults to [320, 40] horizontally, [40, 320] vertically.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<[f32; 2]>,
+    /// Defaults to 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    /// Defaults to 100. Values outside the range saturate the indicator.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+    /// Value from which the fill grows. Default zero, clamped into the range;
+    /// negative acceleration therefore fills towards the braking side.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baseline: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direction: Option<BarDirection>,
+    /// Defaults to the theme's accent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fill: Option<ColorRef>,
+    /// Defaults to the theme's panel.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub track: Option<ColorRef>,
+    /// Corner radius, in layout units. Default 6.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub radius: Option<f32>,
+    #[serde(default, skip_serializing_if = "border_unset")]
+    pub border: Option<BorderOpt>,
+    /// Draw the formatted value centred on the bar. Default true.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub show_value: Option<bool>,
+    /// Default "{value:.0} {unit}".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value_style: Option<TextStyleOpt>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when_absent: Option<WhenAbsent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stale_secs: Option<f32>,
+    #[serde(flatten)]
+    pub extra: Extra,
+}
+
+impl BarNode {
+    pub fn size(&self) -> [f32; 2] {
+        self.size
+            .unwrap_or(match self.direction.unwrap_or_default() {
+                BarDirection::LeftToRight | BarDirection::RightToLeft => [320.0, 40.0],
+                BarDirection::BottomToTop | BarDirection::TopToBottom => [40.0, 320.0],
+            })
+    }
+
+    pub fn range(&self) -> (f64, f64) {
+        (self.min.unwrap_or(0.0), self.max.unwrap_or(100.0))
+    }
+}
+
+/// An upper zone boundary, in the bar's displayed units. Boundaries must be strictly
+/// increasing from min, with the last equal to max.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct BarZone {
+    pub up_to: f64,
+    pub color: ColorRef,
+    #[serde(flatten)]
+    pub extra: Extra,
+}
+
+/// A bar whose filled portion passes through coloured zones. The default zones
+/// divide the range into thirds: green, theme accent, red.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ZoneBarNode {
+    #[serde(flatten)]
+    pub bar: BarNode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zones: Option<Vec<BarZone>>,
+}
+
 /// Node types this version understands.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -220,10 +327,12 @@ pub enum Widget {
     Datetime(DatetimeNode),
     Icon(IconNode),
     GpsLockIcon(GpsLockIconNode),
+    Bar(BarNode),
+    ZoneBar(ZoneBarNode),
 }
 
 impl Widget {
-    pub const TYPES: [&'static str; 8] = [
+    pub const TYPES: [&'static str; 10] = [
         "group",
         "frame",
         "text",
@@ -232,6 +341,8 @@ impl Widget {
         "datetime",
         "icon",
         "gps_lock_icon",
+        "bar",
+        "zone_bar",
     ];
 
     pub fn common(&self) -> &Common {
@@ -244,6 +355,8 @@ impl Widget {
             Widget::Datetime(n) => &n.common,
             Widget::Icon(n) => &n.common,
             Widget::GpsLockIcon(n) => &n.common,
+            Widget::Bar(n) => &n.common,
+            Widget::ZoneBar(n) => &n.bar.common,
         }
     }
 
@@ -257,6 +370,8 @@ impl Widget {
             Widget::Datetime(n) => &n.extra,
             Widget::Icon(n) => &n.extra,
             Widget::GpsLockIcon(n) => &n.extra,
+            Widget::Bar(n) => &n.extra,
+            Widget::ZoneBar(n) => &n.bar.extra,
         }
     }
 
@@ -270,6 +385,8 @@ impl Widget {
             Widget::Datetime(_) => "datetime",
             Widget::Icon(_) => "icon",
             Widget::GpsLockIcon(_) => "gps_lock_icon",
+            Widget::Bar(_) => "bar",
+            Widget::ZoneBar(_) => "zone_bar",
         }
     }
 
@@ -569,7 +686,9 @@ mod tests {
             {"type": "metric_unit", "metric": "speed", "units": "mph"},
             {"type": "datetime", "format": "%H:%M", "timezone": "utc"},
             {"type": "icon", "icon": "altitude", "size": 32, "color": "accent"},
-            {"type": "gps_lock_icon", "size": 40}
+            {"type": "gps_lock_icon", "size": 40},
+            {"type": "bar", "metric": "speed"},
+            {"type": "zone_bar", "metric": "hr"}
         ]);
         let parsed: Vec<Node> = serde_json::from_value(nodes).unwrap();
         let types: Vec<&str> = parsed.iter().map(Node::type_name).collect();

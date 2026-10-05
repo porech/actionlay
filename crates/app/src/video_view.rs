@@ -259,6 +259,14 @@ impl VideoView {
         *self.pending.lock().unwrap() = Some((frame, color));
     }
 
+    /// Hide the previous video's frame immediately, including before a newly
+    /// opened video delivers its first frame.
+    pub fn clear_video(&mut self) {
+        self.size = None;
+        *self.pending.lock().unwrap() = None;
+        self.clear_overlay();
+    }
+
     /// Overlay image for the next paint; a previous one not yet uploaded is recycled.
     pub fn upload_overlay(&mut self, pixmap: Pixmap) {
         if let Some(old) = lock(&self.overlay).replace(pixmap) {

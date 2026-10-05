@@ -30,11 +30,23 @@ pub struct MediaInfo {
     pub duration: f64,
     pub video: VideoInfo,
     pub audio: Option<AudioInfo>,
+    pub telemetry: Option<TelemetryInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TelemetryInfo {
+    pub stream_index: usize,
+    pub time_base: f64,
+    pub packet_count: Option<usize>,
 }
 
 pub fn probe(path: &Path) -> Result<MediaInfo, MediaError> {
     ffmpeg_info::init();
     let input = ffmpeg::format::input(path)?;
+    describe(&input)
+}
+
+pub(crate) fn describe(input: &ffmpeg::format::context::Input) -> Result<MediaInfo, MediaError> {
     let duration = input.duration().max(0) as f64 / f64::from(ffmpeg::ffi::AV_TIME_BASE);
 
     let vstream = input
@@ -89,9 +101,18 @@ pub fn probe(path: &Path) -> Result<MediaInfo, MediaError> {
             }
         });
 
+    let telemetry = input
+        .streams()
+        .find(crate::gpmf::is_gpmd)
+        .map(|s| TelemetryInfo {
+            stream_index: s.index(),
+            time_base: f64::from(s.time_base()),
+            packet_count: usize::try_from(s.frames()).ok().filter(|n| *n > 0),
+        });
     Ok(MediaInfo {
         duration,
         video,
         audio,
+        telemetry,
     })
 }

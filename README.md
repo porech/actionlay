@@ -37,10 +37,25 @@ as a single executable for Windows, macOS and Linux.
   appears over it, following the video as you play, pause and seek. Press
   `O` to show or hide it. Where the video has no GPS (or the signal is lost),
   values dim and then show `—` instead of stale numbers.
+- **Buffered playback**: video, audio and GPMF share one progressive read.
+  A separate I/O thread reads 1 MiB blocks and keeps a 32 MiB cache across
+  seeks; compressed packets use a separate 32 MiB limit and read about
+  3 seconds ahead. Playback starts after about 2 seconds are ready (or
+  at EOF/the memory limit). During a source underrun both clocks wait and
+  the transport shows Buffering. A seek starts buffering from its target;
+  pause and opening another file cancel the pending playback action.
+  Telemetry appears as packets arrive, without scanning the whole video.
+  Unread ranges show empty values; the odometer waits for a complete prefix.
 - **Your own layout**: the dashboard is a JSON file. Drag a `.ovl.json` file
   onto the window to use it; ActionLay remembers the last one. The default
   layout is in `crates/layout/layouts/default.ovl.json`, and a JSON Schema for
   editing it is in `crates/layout/schema`. The visual editor comes in M4.
+- **Responsive telemetry presets**: Select Layout includes Default, Moto
+  (braking/acceleration bars) and Training (heart-rate/power zones), inspired
+  by the upstream dashboards. Widget sizes follow the video, and margins
+  use relative distances. Appearance controls change accent, panel opacity
+  and unit system across layouts and save immediately. Maps, charts and
+  circular gauges are still part of the remaining M3 work.
 
 ## Roadmap
 
@@ -85,11 +100,24 @@ Open a video by passing it on the command line:
 actionlay GX010123.MP4
 ```
 
-or drag the file into the window. To change the dashboard, drag a
-`.ovl.json` layout file into the window instead.
+or choose **File → Open Video…** (⌘O on macOS, Ctrl+O on Windows/Linux).
+When no video is open, clicking the welcome screen opens the system file
+picker too. Dragging a file into the window still works.
+
+On macOS, File is in the system menu bar; on Windows/Linux it is at the top
+of the window. **File → Select Layout…** shows the included dashboards,
+recent layouts and an option to open a `.ovl.json` file.
+**File → Recent Videos** lists the last ten successfully opened videos;
+**Clear Recent Videos** clears that list. History is saved immediately after
+each action.
+**File → Close Video** returns to the welcome screen. The layout stays selected.
 
 | Key | Action |
 |---|---|
+| ⌘O / Ctrl+O | Open video |
+| ⌘⇧O / Ctrl+Shift+O | Select layout |
+| ⌘W / Ctrl+W | Close video |
+| ⌘Q / Ctrl+Q | Quit |
 | Space | Play / pause |
 | → / ← | Next / previous frame |
 | O | Show / hide the telemetry overlay |
@@ -123,6 +151,9 @@ To run the tests, first generate the synthetic sample videos. This needs an
 ./scripts/make-synthetic-samples.sh
 ./scripts/fetch-gopro-samples.sh     # public GoPro samples, ~33 MB
 cargo test --workspace -- --test-threads=1
+
+# Limited playback/seek diagnostics using the UI's player and telemetry decoder:
+cargo run --release -p actionlay-app --example playback-check -- /path/to/video.mp4 240
 ```
 
 ## Contributing

@@ -66,6 +66,22 @@ pub struct Initial {
 /// The last layout used if it still loads, else the bundled default.
 pub fn initial(prefs: &Prefs) -> Initial {
     let Some(path) = &prefs.last_layout else {
+        if let Some(id) = prefs.last_builtin.as_deref() {
+            if let Some(preset) = actionlay_layout::catalog::find(id) {
+                return Initial {
+                    layout: preset.layout(),
+                    notice: None,
+                    fallback: false,
+                };
+            }
+            return Initial {
+                layout: default_layout(),
+                notice: Some(format!(
+                    "layout `{id}` is no longer included — using the default layout"
+                )),
+                fallback: true,
+            };
+        }
         return Initial {
             layout: default_layout(),
             notice: None,
@@ -89,6 +105,27 @@ pub fn initial(prefs: &Prefs) -> Initial {
     }
 }
 
+/// Appearance changes are applied to a fresh copy of the selected layout, so reset
+/// returns to that preset/file's own theme. Preferences are global across layouts.
+pub fn apply_appearance(layout: &mut Layout, appearance: Option<&crate::prefs::Appearance>) {
+    let Some(a) = appearance else { return };
+    if let Some(units) = a.units {
+        layout.units = Some(units);
+    }
+    if a.accent.is_some() || a.panel_opacity.is_some() {
+        let theme = layout.theme.get_or_insert_default();
+        let mut panel = theme.resolve().panel;
+        let palette = theme.palette.get_or_insert_default();
+        if let Some(accent) = a.accent {
+            palette.accent = Some(accent);
+        }
+        if let Some(opacity) = a.panel_opacity.filter(|v| v.is_finite()) {
+            panel.a = (opacity.clamp(0.0, 1.0) * 255.0).round() as u8;
+            palette.panel = Some(panel);
+        }
+    }
+}
+
 /// Scale mode for a video of `width × height` pixels (spec §4.2): `Fit` only when the
 /// layout's sized widgets would leave the frame or collide at the `Height` scale (e.g.
 /// 9:16 footage under the default 16:9 layout), see
@@ -101,6 +138,49 @@ pub fn scale_mode_for(width: u32, height: u32, layout: &Layout) -> ScaleMode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn selected_builtin_is_restored_and_unknown_builtin_falls_back() {
+        let prefs = Prefs {
+            last_builtin: Some("moto".into()),
+            ..Default::default()
+        };
+        let loaded = initial(&prefs);
+        assert_eq!(
+            loaded.layout,
+            actionlay_layout::catalog::find("moto").unwrap().layout()
+        );
+        assert!(!loaded.fallback);
+        let prefs = Prefs {
+            last_builtin: Some("removed".into()),
+            ..Default::default()
+        };
+        let loaded = initial(&prefs);
+        assert!(loaded.fallback);
+        assert_eq!(loaded.layout, default_layout());
+    }
+
+    #[test]
+    fn appearance_overrides_preserve_source_and_reset_to_its_own_defaults() {
+        let original = actionlay_layout::catalog::find("moto").unwrap().layout();
+        let mut styled = original.clone();
+        let accent = actionlay_layout::color::Color::rgba(10, 20, 30, 255);
+        apply_appearance(
+            &mut styled,
+            Some(&crate::prefs::Appearance {
+                accent: Some(accent),
+                panel_opacity: Some(0.5),
+                units: Some(actionlay_layout::model::Units::Imperial),
+            }),
+        );
+        let theme = styled.theme.unwrap().resolve();
+        assert_eq!(theme.accent, accent);
+        assert_eq!(theme.panel.a, 128);
+        assert_eq!(styled.units, Some(actionlay_layout::model::Units::Imperial));
+        let mut reset = original.clone();
+        apply_appearance(&mut reset, None);
+        assert_eq!(reset, original);
+    }
 
     fn temp_layout(name: &str, text: &str) -> PathBuf {
         let p =
@@ -144,6 +224,7 @@ mod tests {
         let path = temp_layout("last", &mine.to_json().unwrap());
         let i = initial(&Prefs {
             last_layout: Some(path.clone()),
+            ..Default::default()
         });
         std::fs::remove_file(&path).ok();
         assert_eq!(i.layout.name.as_deref(), Some("mine"));
@@ -159,6 +240,7 @@ mod tests {
         );
         let i = initial(&Prefs {
             last_layout: Some(path.clone()),
+            ..Default::default()
         });
         std::fs::remove_file(&path).ok();
         assert_eq!(i.layout, default_layout());
@@ -170,6 +252,7 @@ mod tests {
 
         let gone = initial(&Prefs {
             last_layout: Some(path.clone()),
+            ..Default::default()
         });
         assert_eq!(gone.layout, default_layout());
         assert!(gone.fallback);

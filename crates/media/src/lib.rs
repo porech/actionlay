@@ -7,6 +7,7 @@ pub mod ffmpeg_info;
 pub mod frame;
 pub mod gpmf;
 pub mod hw;
+mod input;
 pub mod player;
 pub mod present;
 pub mod probe;

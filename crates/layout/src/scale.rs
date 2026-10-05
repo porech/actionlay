@@ -72,7 +72,7 @@ fn placed(layout: &Layout, root: Rect) -> Vec<Rect> {
             Some(place(
                 root,
                 c.anchor.unwrap_or_default(),
-                c.offset.unwrap_or([0.0, 0.0]),
+                c.offset_in(root),
                 size,
             ))
         })
@@ -82,6 +82,8 @@ fn placed(layout: &Layout, root: Rect) -> Vec<Rect> {
 fn known_size(w: &Widget) -> Option<[f32; 2]> {
     let size = match w {
         Widget::Frame(f) => f.size,
+        Widget::Bar(b) => b.size(),
+        Widget::ZoneBar(b) => b.bar.size(),
         Widget::Group(g) => g.size?,
         Widget::Icon(i) => [i.size?; 2],
         Widget::GpsLockIcon(i) => [i.size?; 2],

@@ -573,3 +573,117 @@ fn renderer_is_send() {
     fn assert_send<T: Send>() {}
     assert_send::<Renderer>();
 }
+
+fn bar_pixels(mut node: serde_json::Value, value: Value) -> Pixmap {
+    node["metric"] = json!("alt");
+    node["offset"] = json!([20, 20]);
+    node["show_value"] = json!(false);
+    node["track"] = json!("#00000000");
+    node["radius"] = json!(12);
+    renderer().render(
+        &layout(json!([node])),
+        &snap(GpsLock::Lock3d, &[("alt", value)]),
+        200,
+        1080,
+    )
+}
+
+#[test]
+fn bars_clip_fill_to_corners_and_clamp_after_unit_conversion() {
+    let b = json!({"type":"bar","size":[100,40],"fill":"#ff0000","max":100});
+    let half = bar_pixels(b.clone(), Value::Present(50.0));
+    assert_eq!(half.pixel(40, 40).unwrap().red(), 255);
+    assert_eq!(half.pixel(100, 40).unwrap().alpha(), 0);
+    assert_eq!(half.pixel(20, 20).unwrap().alpha(), 0);
+    let full = bar_pixels(b.clone(), Value::Present(150.0));
+    assert_eq!(full.pixel(110, 40).unwrap().red(), 255);
+    assert_eq!(full.pixel(119, 20).unwrap().alpha(), 0);
+    assert_eq!(max_alpha(&bar_pixels(b.clone(), Value::Present(-1.0))), 0);
+    let feet = bar_pixels(
+        json!({"type":"bar","size":[100,40],"fill":"#ff0000","units":"ft","max":100}),
+        Value::Present(15.24),
+    );
+    assert_eq!(feet.data(), half.data());
+    let stale = bar_pixels(
+        b.clone(),
+        Value::Stale {
+            value: 50.0,
+            age: 1.0,
+        },
+    );
+    assert!((110..=116).contains(&stale.pixel(40, 40).unwrap().alpha()));
+    assert_eq!(
+        max_alpha(&bar_pixels(
+            b,
+            Value::Stale {
+                value: 50.0,
+                age: 4.0
+            }
+        )),
+        0
+    );
+}
+
+#[test]
+fn negative_bars_grow_from_zero_and_reverse_and_vertical_directions_work() {
+    let brake = json!({"type":"bar","size":[100,40],"fill":"#ff0000","min":-3,"max":0});
+    assert_eq!(
+        max_alpha(&bar_pixels(brake.clone(), Value::Present(0.0))),
+        0
+    );
+    let half = bar_pixels(brake, Value::Present(-1.5));
+    assert_eq!(half.pixel(30, 40).unwrap().alpha(), 0);
+    assert_eq!(half.pixel(110, 40).unwrap().red(), 255);
+    let reverse = bar_pixels(
+        json!({"type":"bar","size":[100,40],"direction":"right_to_left","fill":"#ff0000"}),
+        Value::Present(50.0),
+    );
+    assert_eq!(reverse.data(), half.data());
+    for (direction, filled, empty) in [
+        ("bottom_to_top", (40, 100), (40, 30)),
+        ("top_to_bottom", (40, 30), (40, 100)),
+    ] {
+        let image = bar_pixels(
+            json!({"type":"bar","size":[40,100],"direction":direction,"fill":"#ff0000"}),
+            Value::Present(50.0),
+        );
+        assert_eq!(image.pixel(filled.0, filled.1).unwrap().red(), 255);
+        assert_eq!(image.pixel(empty.0, empty.1).unwrap().alpha(), 0);
+    }
+}
+
+#[test]
+fn zone_bars_keep_threshold_colours_and_missing_data_policy() {
+    let node = json!({"type":"zone_bar","size":[100,40],"zones":[{"up_to":50,"color":"#00ff00"},{"up_to":100,"color":"#ff0000"}]});
+    let image = bar_pixels(node, Value::Present(80.0));
+    assert_eq!(image.pixel(40, 40).unwrap().green(), 255);
+    assert_eq!(image.pixel(90, 40).unwrap().red(), 255);
+    assert_eq!(image.pixel(110, 40).unwrap().alpha(), 0);
+    let hidden = layout(json!([{"type":"zone_bar","metric":"hr","when_absent":"hide"}]));
+    assert_eq!(
+        max_alpha(&draw(&hidden, &Telemetry::empty(10.0).sample(1.0))),
+        0
+    );
+    let present_gap = snap(GpsLock::NoLock, &[("hr", Value::Absent)]);
+    assert!(max_alpha(&draw(&hidden, &present_gap)) > 0);
+}
+
+#[test]
+fn presets_render_proportionally_when_the_video_is_resized() {
+    for preset in actionlay_layout::catalog::PRESETS {
+        assert!(diagnose(&preset.layout()).is_empty(), "{}", preset.id);
+        let l = layout(
+            json!([{"type":"bar","metric":"alt","max":100,"size":[300,60],"anchor":"bottom-right","offset_relative":[-0.05,-0.05],"show_value":false,"fill":"#ff0000","track":"#00000000","radius":0}]),
+        );
+        let snap = snap(GpsLock::Lock3d, &[("alt", Value::Present(100.0))]);
+        let small = renderer().render(&l, &snap, 640, 360);
+        let large = renderer().render(&l, &snap, 1280, 720);
+        // right/bottom inset is 5% of video dimensions; bar grows 2x with the video.
+        assert_eq!(small.pixel(607, 341).unwrap().red(), 255);
+        assert_eq!(large.pixel(1215, 683).unwrap().red(), 255);
+        assert_eq!(small.pixel(609, 341).unwrap().alpha(), 0);
+        assert_eq!(large.pixel(1217, 683).unwrap().alpha(), 0);
+        assert_eq!(small.pixel(507, 331).unwrap().alpha(), 0);
+        assert_eq!(large.pixel(1015, 663).unwrap().alpha(), 0);
+    }
+}
