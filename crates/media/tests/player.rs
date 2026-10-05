@@ -2,6 +2,15 @@ mod common;
 use actionlay_media::player::{Player, PlayerOptions};
 use std::time::{Duration, Instant};
 
+// Route audible integration checks to a virtual output when requested.
+fn open(
+    path: &std::path::Path,
+    options: PlayerOptions,
+) -> Result<Player, actionlay_media::MediaError> {
+    let device = std::env::var("ACTIONLAY_TEST_AUDIO_DEVICE").ok();
+    Player::open_with_audio_device(path, options, device.as_deref())
+}
+
 fn wait_for_frame(p: &mut Player, timeout: Duration) -> Option<f64> {
     let end = Instant::now() + timeout;
     while Instant::now() < end {
@@ -38,7 +47,7 @@ fn shows_first_frame_while_paused() {
     let Some(path) = common::sample("hevc8-1440p100-sync.mp4") else {
         return;
     };
-    let mut p = Player::open(&path, no_audio()).unwrap();
+    let mut p = open(&path, no_audio()).unwrap();
     assert!(p.is_paused());
     let pts = wait_for_frame(&mut p, Duration::from_secs(5)).expect("no first frame");
     assert!(pts < 0.02);
@@ -49,7 +58,7 @@ fn plays_file_without_audio() {
     let Some(path) = common::sample("hevc8-1080p30-noaudio.mp4") else {
         return;
     };
-    let mut p = Player::open(&path, PlayerOptions::default()).unwrap();
+    let mut p = open(&path, PlayerOptions::default()).unwrap();
     assert!(!p.stats().audio_active);
     p.play();
     wait_for_frame(&mut p, Duration::from_secs(5)).expect("no preview frame");
@@ -63,7 +72,7 @@ fn seek_clamps_and_discards_stale_frames() {
     let Some(path) = common::sample("hevc8-1440p100-sync.mp4") else {
         return;
     };
-    let mut p = Player::open(&path, no_audio()).unwrap();
+    let mut p = open(&path, no_audio()).unwrap();
     wait_for_frame(&mut p, Duration::from_secs(5));
     // rapid seeks: only the last one must win
     p.seek(2.0, false);
@@ -86,7 +95,7 @@ fn frame_step_moves_one_frame() {
     let Some(path) = common::sample("hevc8-1440p100-sync.mp4") else {
         return;
     };
-    let mut p = Player::open(&path, no_audio()).unwrap();
+    let mut p = open(&path, no_audio()).unwrap();
     p.seek(3.0, true);
     let a = wait_for_frame(&mut p, Duration::from_secs(5)).unwrap();
     p.step(1);
@@ -113,7 +122,7 @@ fn pause_and_resume_with_audio_keeps_advancing() {
     let Some(path) = common::sample("h264-1080p30-44k.mp4") else {
         return;
     };
-    let mut p = Player::open(&path, PlayerOptions::default()).unwrap();
+    let mut p = open(&path, PlayerOptions::default()).unwrap();
     eprintln!("audio_active = {}", p.stats().audio_active);
     p.play();
     let first = collect_frames(&mut p, Duration::from_millis(700));
@@ -148,7 +157,7 @@ fn speed_change_with_audio_keeps_advancing() {
     let Some(path) = common::sample("h264-1080p30-44k.mp4") else {
         return;
     };
-    let mut p = Player::open(&path, PlayerOptions::default()).unwrap();
+    let mut p = open(&path, PlayerOptions::default()).unwrap();
     p.play();
     let start = wait_for_frame(&mut p, Duration::from_secs(5)).expect("no first frame");
     let normal = collect_frames(&mut p, Duration::from_millis(1000));
@@ -178,7 +187,7 @@ fn plays_to_the_end_and_pauses() {
     let Some(path) = common::sample("h264-1080p30-44k.mp4") else {
         return;
     };
-    let mut p = Player::open(&path, PlayerOptions::default()).unwrap();
+    let mut p = open(&path, PlayerOptions::default()).unwrap();
     p.seek(9.5, true);
     wait_for_frame(&mut p, Duration::from_secs(5)).expect("no frame after seek");
     p.play();
@@ -201,7 +210,7 @@ fn drop_does_not_hang() {
         return;
     };
     for play in [false, true] {
-        let mut p = Player::open(&path, PlayerOptions::default()).unwrap();
+        let mut p = open(&path, PlayerOptions::default()).unwrap();
         if play {
             p.play();
         }
@@ -223,7 +232,7 @@ fn suspended_presentation_resumes_at_the_clock_without_replaying_backlog() {
         return;
     };
     for options in [no_audio(), PlayerOptions::default()] {
-        let mut p = Player::open(&path, options).unwrap();
+        let mut p = open(&path, options).unwrap();
         p.play();
         wait_for_frame(&mut p, Duration::from_secs(5)).expect("no initial frame");
         collect_frames(&mut p, Duration::from_millis(300));
@@ -251,7 +260,7 @@ fn metadata_streams_from_the_player_while_paused_and_after_seek() {
     let Some(path) = common::gopro_sample("hero5.mp4") else {
         return;
     };
-    let mut p = Player::open(&path, no_audio()).unwrap();
+    let mut p = open(&path, no_audio()).unwrap();
     assert!(p.info().telemetry.is_some());
     let rx = p.take_telemetry().unwrap();
     wait_for_frame(&mut p, Duration::from_secs(5)).expect("no preview");

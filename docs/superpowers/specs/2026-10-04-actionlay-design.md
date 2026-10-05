@@ -221,7 +221,7 @@ Video and chapters, layout reference, GPX/FIT, sync offsets, scale mode, privacy
 
 **Maps**
 - Configurable providers (OSM and the others from the original), API keys in preferences.
-- Shared disk cache; background prefetch of the tiles of the route area when the video is opened.
+- Shared disk cache; request only visible viewport tiles in the background. Route-area bulk prefetch is disabled to comply with the OSM tile policy.
 - Compliance with the OSM usage policy (identifying user-agent, rate limit, no bulk downloads) and visible attribution.
 - Offline: cached tiles are used, grey tiles where missing, no blocking errors.
 

@@ -36,11 +36,16 @@ pub enum Metric {
     GearFront,
     GearRear,
     Sdps,
+    GpsPacket,
+    GpsPacketIndex,
+    Heading,
+    AccelLon,
+    AccelLat,
 }
 
 impl Metric {
     /// Number of metrics.
-    pub const COUNT: usize = 32;
+    pub const COUNT: usize = 37;
 
     /// Every metric, in declaration order (`ALL[m.index()] == m`).
     pub const ALL: [Metric; Metric::COUNT] = [
@@ -76,6 +81,11 @@ impl Metric {
         Metric::GearFront,
         Metric::GearRear,
         Metric::Sdps,
+        Metric::GpsPacket,
+        Metric::GpsPacketIndex,
+        Metric::Heading,
+        Metric::AccelLon,
+        Metric::AccelLat,
     ];
 
     pub fn index(self) -> usize {
@@ -116,6 +126,11 @@ impl Metric {
             Metric::GearFront => "gear.front",
             Metric::GearRear => "gear.rear",
             Metric::Sdps => "sdps",
+            Metric::GpsPacket => "gps-packet",
+            Metric::GpsPacketIndex => "gps-packet-index",
+            Metric::Heading => "heading",
+            Metric::AccelLon => "accel.lon",
+            Metric::AccelLat => "accel.lat",
         }
     }
 
@@ -127,15 +142,17 @@ impl Metric {
         use Metric::*;
         match self {
             Speed | CSpeed => Quantity::Speed,
-            Accel | AcclX | AcclY | AcclZ => Quantity::Acceleration,
+            Accel | AccelLon | AccelLat | AcclX | AcclY | AcclZ => Quantity::Acceleration,
             Gradient | CGrad => Quantity::Ratio,
             Alt => Quantity::Altitude,
             Odo | COdo | Dist => Quantity::Distance,
-            Azi | Cog | OriPitch | OriRoll | OriYaw => Quantity::Angle,
+            Azi | Cog | Heading | OriPitch | OriRoll | OriYaw => Quantity::Angle,
             Lat | Lon => Quantity::Coordinate,
             Temp => Quantity::Temperature,
             // Gravity is a unit vector in g, as in the original.
-            GpsDop | GpsLock | GravX | GravY | GravZ => Quantity::Dimensionless,
+            GpsDop | GpsLock | GpsPacket | GpsPacketIndex | GravX | GravY | GravZ => {
+                Quantity::Dimensionless
+            }
             Hr | Cadence | Power | Respiration | GearFront | GearRear | Sdps => {
                 Quantity::Dimensionless
             }

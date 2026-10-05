@@ -129,9 +129,36 @@ impl AudioOutput {
     pub const CAPACITY_SECONDS: f64 = 0.5;
 
     pub fn open() -> Result<Self, MediaError> {
-        let device = cpal::default_host()
-            .default_output_device()
-            .ok_or_else(|| MediaError::Audio("no output device".into()))?;
+        Self::open_on(None)
+    }
+
+    pub fn devices() -> Result<Vec<String>, MediaError> {
+        let mut names: Vec<_> = cpal::default_host()
+            .output_devices()
+            .map_err(|e| MediaError::Audio(e.to_string()))?
+            .filter_map(|d| d.description().ok().map(|d| d.name().to_owned()))
+            .collect();
+        names.sort();
+        names.dedup();
+        Ok(names)
+    }
+
+    /// An explicit device never silently falls back to another output.
+    pub fn open_on(name: Option<&str>) -> Result<Self, MediaError> {
+        let host = cpal::default_host();
+        let device = if let Some(name) = name {
+            host.output_devices()
+                .map_err(|e| MediaError::Audio(e.to_string()))?
+                .find(|d| d.description().is_ok_and(|d| d.name() == name))
+        } else {
+            host.default_output_device()
+        }
+        .ok_or_else(|| {
+            MediaError::Audio(format!(
+                "output device unavailable: {}",
+                name.unwrap_or("system default")
+            ))
+        })?;
         let supported = device
             .default_output_config()
             .map_err(|e| MediaError::Audio(e.to_string()))?;

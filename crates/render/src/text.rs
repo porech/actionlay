@@ -6,7 +6,15 @@ use cosmic_text::{
     Attrs, Buffer, CacheKey, CacheKeyFlags, Command, Family, FontSystem, Metrics, Shaping,
     SwashCache, Weight, Wrap, fontdb,
 };
-use tiny_skia::{Path, PathBuilder};
+use std::collections::HashMap;
+use tiny_skia::{Path, PathBuilder, Transform};
+type RunKey = (String, u32, u16);
+#[derive(Clone)]
+struct ShapedRun {
+    size: (f32, f32),
+    path: Option<Path>,
+    missing: u64,
+}
 
 /// The only font family available to layouts in M2.
 pub const FAMILY: &str = "Roboto";
@@ -23,6 +31,8 @@ pub(crate) struct TextEngine {
     buffer: Buffer,
     /// The last `layout` produced nothing to draw.
     empty: bool,
+    runs: HashMap<RunKey, ShapedRun>,
+    current: Option<ShapedRun>,
     missing: u64,
 }
 
@@ -40,6 +50,8 @@ impl TextEngine {
             swash: SwashCache::new(),
             buffer,
             empty: true,
+            runs: HashMap::new(),
+            current: None,
             missing: 0,
         }
     }
@@ -50,6 +62,12 @@ impl TextEngine {
         if !(px.is_finite() && px >= 0.5) {
             self.empty = true;
             return (0.0, 0.0);
+        }
+        let key = (text.to_owned(), px.to_bits(), weight.value());
+        if let Some(run) = self.runs.get(&key) {
+            self.empty = false;
+            self.current = Some(run.clone());
+            return run.size;
         }
         self.buffer
             .set_metrics_and_size(Metrics::new(px, px), None, None);
@@ -64,12 +82,35 @@ impl TextEngine {
             lines += 1;
         }
         self.empty = false;
-        (width, px * lines as f32)
+        let size = (width, px * lines as f32);
+        let missing = self.missing;
+        let path = self.outline_at(0.0, 0.0);
+        let run = ShapedRun {
+            size,
+            path,
+            missing: self.missing - missing,
+        };
+        self.missing = missing;
+        if self.runs.len() >= 512 {
+            self.runs.clear();
+        }
+        self.runs.insert(key, run.clone());
+        self.current = Some(run);
+        size
     }
 
     /// Outline of the last laid-out text, with the top-left corner of its box at (x, y).
     /// `None` when there is nothing to draw.
     pub fn path_at(&mut self, x: f32, y: f32) -> Option<Path> {
+        if self.empty {
+            return None;
+        }
+        let run = self.current.as_ref()?;
+        self.missing += run.missing;
+        run.path.clone()?.transform(Transform::from_translate(x, y))
+    }
+
+    fn outline_at(&mut self, x: f32, y: f32) -> Option<Path> {
         if self.empty {
             return None;
         }
@@ -108,6 +149,9 @@ impl TextEngine {
     /// Drops cached glyph outlines (they are per font size; call when the output size changes).
     pub fn reset_cache(&mut self) {
         self.swash = SwashCache::new();
+        self.runs.clear();
+        self.current = None;
+        self.empty = true;
     }
 }
 

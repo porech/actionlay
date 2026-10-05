@@ -8,12 +8,11 @@ top: speed, altitude, maps, heart rate and more. You can also design the
 dashboard visually and export the result. It is free, open source, and ships
 as a single executable for Windows, macOS and Linux.
 
-> **Status: early prototype (milestones M1 and M2 done).** ActionLay plays
-> GoPro footage with hardware decoding and draws a live telemetry overlay
-> (speed, altitude, gradient, distance, coordinates, date and time, GPS
-> status) on top of it. The other dashboard widgets, the layout editor and
-> the export are being built next; see the [roadmap](#roadmap). Expect rough
-> edges.
+> **Status: early prototype (milestones M1–M3 done).** ActionLay plays
+> GoPro footage with hardware decoding and a live telemetry dashboard, including
+> maps, charts, circular instruments and a G-meter. Upstream XML layouts can be
+> imported. The visual editor and video export are next; see the
+> [roadmap](#roadmap). Expect rough edges.
 
 ## What works today
 
@@ -57,7 +56,23 @@ as a single executable for Windows, macOS and Linux.
   and unit system across layouts and save immediately. Moto includes a needle
   speedometer and a GPS course compass. Circular gauges also support arcs and
   donuts, and compasses support rotating roses or simple arrows. Styling is
-  editable in layout JSON; maps, charts, the G-meter and XML import remain M3 work.
+  editable in layout JSON, including optional per-compass smoothing and thresholds.
+- **Maps, charts and G-meter**: Default includes a moving map; Moto adds a route
+  map and a friction circle; Training includes an elevation/gradient chart. Map
+  providers, attribution, API keys and offline mode are configurable. Visible
+  tiles are loaded asynchronously and cached on disk; no route bulk download.
+  Data gaps dim the last reading for a configurable time, then show an empty state.
+  G-meter mounting calibration uses causal IMU/GPS correlation; without confident
+  calibration it displays a labelled GPS estimate. Its rotation can be corrected
+  per widget.
+- **XML layout import**: open or drop an upstream XML file, confirm its reference
+  resolution, and save a native layout in the local library. Conversion notes
+  report native equivalents and unsupported controls. The thirteen pinned
+  upstream layouts are embedded alongside the three ActionLay presets.
+- **Settings → Audio…**: choose the system default or a specific output device.
+  The preference saves immediately; changing devices preserves playback position,
+  pause state and speed. An unavailable output produces a visible notice and
+  silent playback; it never routes an explicit selection to another device.
 
 ## Roadmap
 

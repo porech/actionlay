@@ -15,7 +15,7 @@ pub enum Dropped {
 /// A dropped `*.ovl.json` (any case) is a layout; anything else is opened as a video.
 pub fn classify(path: PathBuf) -> Dropped {
     let name = path.to_string_lossy().to_ascii_lowercase();
-    if name.ends_with(FILE_SUFFIX) {
+    if name.ends_with(FILE_SUFFIX) || name.ends_with(".xml") {
         Dropped::Layout(path)
     } else {
         Dropped::Video(path)

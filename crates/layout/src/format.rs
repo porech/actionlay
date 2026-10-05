@@ -8,6 +8,8 @@ pub const EMPTY: &str = "—";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Piece {
     Literal(String),
+    /// Minutes per distance displayed as m:ss.
+    Pace,
     /// The metric value with `decimals` digits; `sign` always prints `+`/`-`.
     Value {
         decimals: u8,
@@ -81,6 +83,7 @@ fn parse_field(field: &str) -> Result<Piece, &'static str> {
             decimals: 0,
             sign: false,
         }),
+        ("value", Some("pace")) => Ok(Piece::Pace),
         ("value", Some(spec)) => {
             let (sign, rest) = match spec.strip_prefix('+') {
                 Some(r) => (true, r),
@@ -110,6 +113,13 @@ pub fn apply(out: &mut String, pieces: &[Piece], value: Option<f64>, unit: &str)
         match piece {
             Piece::Literal(s) => out.push_str(s),
             Piece::Unit => out.push_str(unit),
+            Piece::Pace => match value.filter(|v| v.is_finite() && *v >= 0.0 && *v < 1e12) {
+                Some(v) => {
+                    let seconds = (v * 60.0).round() as u64;
+                    let _ = write!(out, "{}:{:02}", seconds / 60, seconds % 60);
+                }
+                None => out.push_str(EMPTY),
+            },
             Piece::Value { decimals, sign } => match value.filter(|v| v.is_finite()) {
                 None => out.push_str(EMPTY),
                 Some(v) => {

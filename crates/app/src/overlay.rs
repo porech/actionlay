@@ -329,6 +329,7 @@ impl Shared {
 /// Owns the overlay render thread; dropping it stops and joins the thread (after the
 /// render in progress, if any).
 pub struct OverlayWorker {
+    maps: actionlay_maps::TileStore,
     shared: Arc<Shared>,
     thread: Option<JoinHandle<()>>,
 }
@@ -336,20 +337,40 @@ pub struct OverlayWorker {
 impl OverlayWorker {
     /// `notify` is called on the render thread after each finished frame (the app
     /// passes `egui::Context::request_repaint`). Nothing renders until telemetry is set.
-    pub fn spawn(layout: Arc<Layout>, notify: impl Fn() + Send + 'static) -> Self {
+    pub fn spawn(layout: Arc<Layout>, notify: impl Fn() + Send + Sync + 'static) -> Self {
         let shared = Arc::new(Shared {
             state: Mutex::new(State::new(layout)),
             wake: Condvar::new(),
         });
+        let notify = Arc::new(notify);
+        let tile_notify = Arc::downgrade(&notify);
+        let maps = actionlay_maps::TileStore::new(
+            actionlay_maps::Settings {
+                online: false,
+                ..Default::default()
+            },
+            actionlay_maps::TileStore::default_cache_dir(),
+            move || {
+                if let Some(notify) = tile_notify.upgrade() {
+                    notify();
+                }
+            },
+        );
+        let worker_maps = maps.clone();
         let worker_shared = shared.clone();
         let thread = std::thread::Builder::new()
             .name("overlay".into())
-            .spawn(move || run(&worker_shared, &notify))
+            .spawn(move || run(&worker_shared, &*notify, worker_maps))
             .expect("spawn overlay thread");
         Self {
             shared,
             thread: Some(thread),
+            maps,
         }
+    }
+
+    pub fn maps(&self) -> &actionlay_maps::TileStore {
+        &self.maps
     }
 
     fn with_state<R>(&self, f: impl FnOnce(&mut State) -> R) -> R {
@@ -413,7 +434,7 @@ fn panic_message(payload: &(dyn std::any::Any + Send)) -> &str {
         .unwrap_or("unknown panic")
 }
 
-fn run(shared: &Shared, notify: &dyn Fn()) {
+fn run(shared: &Shared, notify: &dyn Fn(), maps: actionlay_maps::TileStore) {
     let mut renderer = Renderer::new();
     renderer.set_zone(Zone::System);
     loop {
@@ -438,9 +459,9 @@ fn run(shared: &Shared, notify: &dyn Fn()) {
             if let Some(hook) = &job.hook {
                 hook(&request);
             }
+            renderer.set_maps(maps.clone());
             renderer.set_scale_mode(job.scale_mode);
-            let snapshot = job.telemetry.sample(request.t);
-            renderer.render_into(&job.layout, &snapshot, &mut job.pixmap);
+            renderer.render_telemetry_into(&job.layout, &job.telemetry, request.t, &mut job.pixmap);
         }));
         if let Err(e) = rendered {
             log::error!(

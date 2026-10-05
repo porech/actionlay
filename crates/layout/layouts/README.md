@@ -56,10 +56,33 @@ the span: the default arc starts at 135° and sweeps 270°; a donut defaults to
 maximum 72), and `show_labels` controls their numeric labels.
 
 `compass` supports `mode: "rose"` and `"arrow"`. Use an angular metric, usually
-`cog` for GPS course; it represents direction of travel, rather than magnetic
+`heading` for causal GPS course; it represents direction of travel, rather than magnetic
 north from a sensor. Bearings wrap through 0°/360°. `rotate_rose: true` rotates
 the scale beneath an upward-facing pointer. An absent bearing shows the muted
 rose and a dash, with no direction arrow.
+
+Each compass can optionally set `smoothing` in its layout. Omitting it disables
+the filter. An object enables smoothing with these defaults: `seconds: 0.5`
+(response time), `deadband: 1.5` (degrees), `max_rate: 120` (degrees/second),
+and `min_speed: 1.5` (m/s; hold the last heading below this speed). Set
+`smoothing.enabled: false` to bypass the filter while keeping its thresholds.
+Zero response time, deadband or maximum rate disables that constraint. The Moto
+preset enables these defaults. Filtering wraps through north and is deterministic
+when seeking; the progressive-loading heading fix also works without smoothing.
+
+```json
+{
+  "type": "compass",
+  "metric": "heading",
+  "smoothing": {
+    "enabled": true,
+    "seconds": 0.5,
+    "deadband": 1.5,
+    "max_rate": 120,
+    "min_speed": 1.5
+  }
+}
+```
 
 Both widgets accept `diameter`, `thickness`, `fill`, `track`, `show_value`,
 `format`, `value_style`, `label_style`, `when_absent` and `stale_secs`, plus the
@@ -91,3 +114,43 @@ They use generated telemetry on a neutral background and are written to
 `target/preset-previews/` at 16:9, 4:3 and 9:16. They contain no private footage.
 Font packaging remains planned with the editor/package workflow (§6.4 of the
 design); the current renderer still uses embedded Roboto.
+
+## History widgets (M3)
+
+`chart` and `gradient_chart` accept a metric, display units, `size`, a time window
+(`seconds`, default 60), `samples` (2–2048), optional `min`/`max`, `journey`,
+`show_value`, stroke/fill/background colours, radius and text styling. Auto range
+fits the observed values with a margin. Gaps and unread seek ranges break lines;
+gradient charts colour ascent/descent via `positive`/`negative`.
+
+`map` accepts `mode` (`moving`, `journey`, `moving_journey`, `circuit`), `size`,
+`zoom` (0–19), route/marker/background colours, route width, corner radius,
+`opacity_tiles` and `label_style`. Circuit mode draws only the route. Map-provider
+configuration lives in the app preferences; identifying requests, visible
+attribution and a seven-day disk cache apply. Downloads cover only visible tiles,
+never route bulk prefetch. Offline misses remain a muted background. Preview
+renderers default to offline and can inject a TileStore explicitly.
+
+`g_meter` uses `accel.lon`/`accel.lat`; units default to G and can be `mps2`.
+It accepts diameter, range (default 1.5), rings, trail seconds, session peak markers,
+rotation in degrees, fill/track colours and value styling. A confident mounting
+calibration switches causally to gravity-corrected IMU readings. Otherwise the
+widget labels its GPS estimate. With no GRAV stream its gravity estimate is labelled.
+
+All three history widgets accept `when_absent` and `stale_secs` (default 3):
+missing data can hide the widget; temporary gaps dim their last reading and expire
+into an empty state. Resets remove overridden keys. Widget `required_metrics()`
+declarations support future editor availability warnings.
+
+The thirteen original XML layouts are embedded in `catalog::UPSTREAM_PRESETS`.
+Their [pinned fixtures and provenance](../tests/upstream/README.md) are checked
+against regenerated JSON by integration tests. Original Flaticon assets are
+replaced by semantic MIT Tabler icons; rendering differences are reported by the
+importer. Unknown components retain their source attributes in JSON.
+
+Generate offline synthetic previews and measure rendering with:
+
+```sh
+cargo run --release -p actionlay-render --example preview-m3
+cargo run --release -p actionlay-render --example m3-bench
+```

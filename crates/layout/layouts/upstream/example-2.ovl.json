@@ -1,0 +1,698 @@
+{
+  "version": 1,
+  "name": "example-2",
+  "design_aspect": "1920:1080",
+  "nodes": [
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.0052083335,
+        0.009259259
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "gps-dop",
+          "format": "{value:.0}",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.0052083335,
+        0.055555556
+      ],
+      "children": [
+        {
+          "type": "datetime",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.0052083335,
+        0.10185185
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "gps-packet",
+          "format": "{value:.0}",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.0052083335,
+        0.14814815
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "gps-packet-index",
+          "format": "{value:.0}",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.0052083335,
+        0.19444445
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "gps-lock",
+          "format": "{value:.0}",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "gps_lock_icon",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.052083332,
+        0.046296295
+      ],
+      "size": 64.0
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.47916666,
+        0.1388889
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "cadence",
+          "units": "none",
+          "size": 60.0,
+          "color": "#ff0000"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.47916666,
+        0.18518518
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "cadence",
+          "units": "none",
+          "size": 60.0,
+          "color": "#ff0000"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.47916666,
+        0.23148148
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "units": "pace_mile",
+          "format": "{value:pace}",
+          "size": 60.0,
+          "color": "#ff0000"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.47916666,
+        0.2777778
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "units": "mph",
+          "size": 60.0,
+          "color": "#ff0000"
+        }
+      ]
+    },
+    {
+      "type": "zone_bar",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.052083332,
+        0.1388889
+      ],
+      "metric": "hr",
+      "size": [
+        800.0,
+        75.0
+      ],
+      "min": 0.0,
+      "max": 200.0,
+      "show_value": false,
+      "zones": [
+        {
+          "up_to": 130.0,
+          "color": "#347aebc8"
+        },
+        {
+          "up_to": 163.0,
+          "color": "#43eb34c8"
+        },
+        {
+          "up_to": 183.0,
+          "color": "#f0e813c8"
+        },
+        {
+          "up_to": 200.0,
+          "color": "#cf1302c8"
+        }
+      ]
+    },
+    {
+      "type": "map",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.15625,
+        0.1388889
+      ],
+      "size": [
+        256.0,
+        256.0
+      ],
+      "mode": "circuit",
+      "zoom": 15,
+      "radius": 12.0
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.28645834,
+        -0.49074075
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "units": "mph",
+          "format": "{value:.0}",
+          "size": 60.0,
+          "color": "#ffffffa0"
+        }
+      ]
+    },
+    {
+      "type": "gauge",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.20833333,
+        0.37037036
+      ],
+      "metric": "speed",
+      "units": "mph",
+      "diameter": 256.0,
+      "value_style": {
+        "size": 26.0
+      },
+      "mode": "marker",
+      "max": 180.0,
+      "start_angle": 90.0,
+      "sweep_angle": 270.0,
+      "clockwise": true
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.390625,
+        -0.49074075
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "units": "mph",
+          "format": "{value:.0}",
+          "size": 60.0,
+          "color": "#ffffffa0"
+        }
+      ]
+    },
+    {
+      "type": "gauge",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.3125,
+        0.37037036
+      ],
+      "metric": "speed",
+      "units": "mph",
+      "diameter": 256.0,
+      "value_style": {
+        "size": 26.0
+      },
+      "mode": "marker",
+      "max": 180.0,
+      "start_angle": 90.0,
+      "sweep_angle": 270.0,
+      "clockwise": false
+    },
+    {
+      "type": "gauge",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.20833333,
+        -0.2074074
+      ],
+      "metric": "speed",
+      "units": "mph",
+      "diameter": 256.0,
+      "value_style": {
+        "size": 26.0
+      },
+      "mode": "needle",
+      "max": 180.0,
+      "start_angle": 90.0,
+      "sweep_angle": 270.0,
+      "clockwise": true
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.28645834,
+        -0.30555555
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "units": "mph",
+          "format": "{value:.0}",
+          "size": 60.0,
+          "color": "#ffffffa0"
+        }
+      ]
+    },
+    {
+      "type": "gauge",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.20833333,
+        0.2777778
+      ],
+      "metric": "speed",
+      "units": "mph",
+      "diameter": 256.0,
+      "value_style": {
+        "size": 26.0
+      },
+      "mode": "needle",
+      "max": 180.0,
+      "start_angle": 90.0,
+      "sweep_angle": 254.0,
+      "clockwise": false
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.28645834,
+        0.41666666
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "units": "mph",
+          "format": "{value:.0}",
+          "size": 60.0,
+          "color": "#ffffffa0"
+        }
+      ]
+    },
+    {
+      "type": "gauge",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.41666666,
+        -0.21296297
+      ],
+      "metric": "speed",
+      "units": "mph",
+      "diameter": 250.0,
+      "value_style": {
+        "size": 26.0
+      },
+      "mode": "arc",
+      "max": 180.0,
+      "start_angle": 90.0,
+      "sweep_angle": 270.0,
+      "clockwise": true
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.48177084,
+        -0.37962964
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "anchor": "top",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "units": "mph",
+          "format": "{value:.0}",
+          "size": 100.0,
+          "color": "#ffffffa0"
+        }
+      ]
+    },
+    {
+      "type": "gauge",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.41666666,
+        0.2777778
+      ],
+      "metric": "speed",
+      "units": "mph",
+      "diameter": 250.0,
+      "value_style": {
+        "size": 26.0
+      },
+      "mode": "arc",
+      "max": 180.0,
+      "start_angle": 90.0,
+      "sweep_angle": 254.0,
+      "clockwise": false
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.48177084,
+        0.3425926
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "anchor": "top",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "units": "mph",
+          "format": "{value:.0}",
+          "size": 100.0,
+          "color": "#ffffffa0"
+        }
+      ]
+    },
+    {
+      "type": "gauge",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.296875,
+        -0.21296297
+      ],
+      "metric": "speed",
+      "units": "mph",
+      "diameter": 250.0,
+      "value_style": {
+        "size": 26.0
+      },
+      "mode": "donut",
+      "max": 180.0,
+      "start_angle": 143.0,
+      "sweep_angle": 90.0,
+      "ticks": 8,
+      "show_labels": false,
+      "clockwise": true
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.36197916,
+        -0.37962964
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "anchor": "top",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "units": "mph",
+          "format": "{value:.0}",
+          "size": 100.0,
+          "color": "#ffffffa0"
+        }
+      ]
+    },
+    {
+      "type": "gauge",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.296875,
+        0.2777778
+      ],
+      "metric": "speed",
+      "units": "mph",
+      "diameter": 250.0,
+      "value_style": {
+        "size": 26.0
+      },
+      "mode": "donut",
+      "max": 180.0,
+      "start_angle": 45.0,
+      "sweep_angle": 90.0,
+      "ticks": 8,
+      "show_labels": false,
+      "clockwise": false
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.36197916,
+        0.3425926
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "anchor": "top",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "units": "mph",
+          "format": "{value:.0}",
+          "size": 100.0,
+          "color": "#ffffffa0"
+        }
+      ]
+    },
+    {
+      "type": "chart",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.3125,
+        -0.074074075
+      ],
+      "metric": "gradient",
+      "units": "none",
+      "size": [
+        256.0,
+        200.0
+      ],
+      "seconds": 100.0,
+      "samples": 1024,
+      "background": "#00000000",
+      "show_value": true
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.3125,
+        -0.18518518
+      ],
+      "children": [
+        {
+          "type": "text",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "Grad(%)",
+          "size": 32.0,
+          "color": "#ffffff80"
+        }
+      ]
+    },
+    {
+      "type": "chart",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.3125,
+        0.11111111
+      ],
+      "metric": "alt",
+      "units": "m",
+      "size": [
+        256.0,
+        200.0
+      ],
+      "seconds": 100.0,
+      "samples": 1024,
+      "background": "#00000000",
+      "show_value": true
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.3125,
+        0.0
+      ],
+      "children": [
+        {
+          "type": "text",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "Alt(m)",
+          "size": 32.0,
+          "color": "#ffffff80"
+        }
+      ]
+    },
+    {
+      "type": "chart",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.3125,
+        0.3425926
+      ],
+      "metric": "speed",
+      "units": "mph",
+      "size": [
+        256.0,
+        200.0
+      ],
+      "seconds": 100.0,
+      "samples": 1024,
+      "background": "#00000000",
+      "show_value": true
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.3125,
+        0.23148148
+      ],
+      "children": [
+        {
+          "type": "text",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "Speed(mph)",
+          "size": 32.0,
+          "color": "#ffffff80"
+        }
+      ]
+    }
+  ]
+}

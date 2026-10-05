@@ -5,6 +5,7 @@ use eframe::egui;
 pub enum Command {
     OpenVideo,
     SelectLayout,
+    AudioSettings,
     OpenLayoutFile,
     OpenRecentVideo(usize),
     ClearRecentVideos,
@@ -79,13 +80,16 @@ impl Menus {
                 &close,
             ],
         )?;
-        let menu = Menu::with_items(&[&app, &file])?;
+        let audio = MenuItem::with_id("audio-settings", "Audio…", true, None);
+        let settings = Submenu::with_items("Settings", true, &[&audio])?;
+        let menu = Menu::with_items(&[&app, &file, &settings])?;
         let (tx, commands) = std::sync::mpsc::channel();
         let ctx = ctx.clone();
         muda::MenuEvent::set_event_handler(Some(move |event: muda::MenuEvent| {
             let command = match event.id.0.as_str() {
                 "open-video" => Command::OpenVideo,
                 "select-layout" => Command::SelectLayout,
+                "audio-settings" => Command::AudioSettings,
                 "clear-recent-videos" => Command::ClearRecentVideos,
                 "close-video" => Command::CloseVideo,
                 "quit" => Command::Quit,
@@ -226,6 +230,12 @@ impl Menus {
                             command = Some(action);
                             ui.close();
                         }
+                    }
+                });
+                ui.menu_button("Settings", |ui| {
+                    if ui.button("Audio…").clicked() {
+                        command = Some(Command::AudioSettings);
+                        ui.close();
                     }
                 });
             });

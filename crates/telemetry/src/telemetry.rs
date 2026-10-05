@@ -119,6 +119,8 @@ impl Snapshot {
 
 #[derive(Debug, Clone)]
 pub struct Telemetry {
+    id: u64,
+    imu_acceleration: Option<f64>,
     loaded_ranges: Option<Vec<(f64, f64)>>,
     cumulative_until: Option<f64>,
     duration: f64,
@@ -142,7 +144,55 @@ fn axis_series(samples: &[Sample<3>], axis: usize, interp: Interp) -> Series {
     )
 }
 
+fn next_id() -> u64 {
+    static ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
 impl Telemetry {
+    pub fn has_imu_acceleration(&self) -> bool {
+        self.imu_acceleration.is_some()
+    }
+    pub fn imu_calibrated_at(&self) -> Option<f64> {
+        self.imu_acceleration
+    }
+    pub fn identity(&self) -> u64 {
+        self.id
+    }
+    pub fn metric_points(&self, metric: Metric) -> impl Iterator<Item = (f64, Option<f64>)> + '_ {
+        self.series[metric.index()].iter().flat_map(Series::points)
+    }
+    #[cfg(feature = "test-util")]
+    pub fn for_test(duration: f64, data: &[(Metric, Vec<(f64, f64)>)]) -> Self {
+        let mut t = Self::empty(duration);
+        for (m, pts) in data {
+            t.series[m.index()] = Some(Series::new(
+                if matches!(m, Metric::Cog | Metric::Heading) {
+                    Interp::Angle360
+                } else {
+                    Interp::Linear
+                },
+                pts.iter()
+                    .enumerate()
+                    .map(|(i, (x, v))| (*x, pts.get(i + 1).map_or(duration, |p| p.0), Some(*v))),
+            ));
+        }
+        t.availability = availability(&t.series, duration);
+        if let Some((_, pts)) = data.iter().find(|(m, _)| *m == Metric::Lat) {
+            t.track = pts
+                .iter()
+                .filter_map(|(x, lat)| {
+                    Some(TrackPoint {
+                        t: *x,
+                        lat: *lat,
+                        lon: t.sample_metric(Metric::Lon, *x).last_known()?,
+                        alt: t.sample_metric(Metric::Alt, *x).last_known().unwrap_or(0.0),
+                    })
+                })
+                .collect();
+        }
+        t
+    }
+
     /// A progressively read track: never extrapolate through unread file ranges,
     /// or invent an odometer when the beginning of the journey is missing.
     pub fn from_gpmf_packets_progressive(packets: &[RawPacket]) -> Result<Self, TelemetryError> {
@@ -250,6 +300,14 @@ impl Telemetry {
             set(Metric::Gradient, gps_series(g, Linear, |p| p.derived.cgrad));
             set(Metric::Azi, gps_series(g, Angle180, |p| p.derived.azi));
             set(Metric::Cog, gps_series(g, Angle360, |p| p.derived.cog));
+            set(
+                Metric::GpsPacket,
+                gps_series(g, Step, |p| Some(p.packet as f64)),
+            );
+            set(
+                Metric::GpsPacketIndex,
+                gps_series(g, Step, |p| Some(p.index as f64)),
+            );
             set(Metric::GpsDop, gps_series(g, Step, |p| Some(p.dop)));
             set(
                 Metric::GpsLock,
@@ -297,8 +355,11 @@ impl Telemetry {
                 s.hold_last_until(timeline, MAX_BRIDGE);
             }
         }
+        let imu_acceleration = crate::vehicle::add(g, &mut series);
         let availability = availability(&series, timeline);
         Telemetry {
+            id: next_id(),
+            imu_acceleration,
             loaded_ranges: None,
             cumulative_until: None,
             duration: ex.duration,
@@ -315,6 +376,8 @@ impl Telemetry {
     pub fn empty(duration: f64) -> Telemetry {
         let series = vec![None; Metric::COUNT];
         Telemetry {
+            id: next_id(),
+            imu_acceleration: None,
             loaded_ranges: None,
             cumulative_until: None,
             duration,
@@ -341,18 +404,21 @@ impl Telemetry {
         &self.availability
     }
 
+    /// Samples a single metric without constructing an entire snapshot (charts/trails).
+    pub fn sample_metric(&self, m: Metric, t: f64) -> Value {
+        if !self.is_loaded_at(t)
+            || (matches!(m, Metric::Odo | Metric::COdo)
+                && self.cumulative_until.is_some_and(|until| t >= until))
+        {
+            return Value::Absent;
+        }
+        self.series[m.index()]
+            .as_ref()
+            .map_or(Value::Absent, |s| s.sample(t))
+    }
+
     pub fn sample(&self, t: f64) -> Snapshot {
-        let values: [Value; Metric::COUNT] = std::array::from_fn(|i| {
-            if !self.is_loaded_at(t)
-                || (matches!(Metric::ALL[i], Metric::Odo | Metric::COdo)
-                    && self.cumulative_until.is_some_and(|until| t >= until))
-            {
-                return Value::Absent;
-            }
-            self.series[i]
-                .as_ref()
-                .map_or(Value::Absent, |s| s.sample(t))
-        });
+        let values = std::array::from_fn(|i| self.sample_metric(Metric::ALL[i], t));
         let gps_lock = values[Metric::GpsLock.index()]
             .last_known()
             .map_or(GpsLock::Unknown, |code| GpsLock::from_fix(code as u32));

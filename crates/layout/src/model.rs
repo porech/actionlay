@@ -363,6 +363,7 @@ pub enum GaugeMode {
     Arc,
     Needle,
     Donut,
+    Marker,
 }
 
 /// Circular indicator. Range limits are in display units, as for bars.
@@ -385,6 +386,10 @@ pub struct GaugeNode {
     pub ticks: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub show_labels: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clockwise: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zones: Option<Vec<BarZone>>,
 }
 impl GaugeNode {
     pub fn range(&self) -> (f64, f64) {
@@ -409,8 +414,24 @@ pub enum CompassMode {
     Arrow,
 }
 
-/// Compass for an angular metric (usually GPS course `cog`). Heading is in degrees,
-/// clockwise from north. A rotating rose keeps the heading pointer facing upwards.
+/// Optional per-widget smoothing. Omitting the object disables the filter;
+/// `enabled: false` bypasses it while preserving configured thresholds.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct HeadingFilter {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seconds: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deadband: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_rate: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_speed: Option<f64>,
+}
+
+/// Compass for an angular metric (usually causal GPS `heading`). Heading is in
+/// degrees, clockwise from north. A rotating rose keeps its pointer facing upwards.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct CompassNode {
     #[serde(flatten)]
@@ -419,6 +440,143 @@ pub struct CompassNode {
     pub mode: Option<CompassMode>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rotate_rose: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub smoothing: Option<HeadingFilter>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ChartNode {
+    #[serde(flatten)]
+    pub common: Common,
+    pub metric: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub units: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<[f32; 2]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seconds: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub samples: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fill: Option<ColorRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stroke: Option<ColorRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background: Option<ColorRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub radius: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stroke_width: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub journey: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub show_value: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value_style: Option<TextStyleOpt>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub positive: Option<ColorRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub negative: Option<ColorRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when_absent: Option<WhenAbsent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stale_secs: Option<f64>,
+    #[serde(flatten)]
+    pub extra: Extra,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct MapNode {
+    #[serde(flatten)]
+    pub common: Common,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<[f32; 2]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<MapMode>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zoom: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub radius: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub route: Option<ColorRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub route_width: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub marker: Option<ColorRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background: Option<ColorRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opacity_tiles: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when_absent: Option<WhenAbsent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label_style: Option<TextStyleOpt>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stale_secs: Option<f64>,
+    #[serde(flatten)]
+    pub extra: Extra,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct GMeterNode {
+    #[serde(flatten)]
+    pub common: Common,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diameter: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub range: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub units: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rings: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trail_secs: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub show_peaks: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rotation: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fill: Option<ColorRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub track: Option<ColorRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value_style: Option<TextStyleOpt>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when_absent: Option<WhenAbsent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stale_secs: Option<f64>,
+    #[serde(flatten)]
+    pub extra: Extra,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MapMode {
+    #[default]
+    Moving,
+    Journey,
+    MovingJourney,
+    Circuit,
+}
+
+impl ChartNode {
+    pub fn size(&self) -> [f32; 2] {
+        self.size.unwrap_or([420.0, 160.0])
+    }
+}
+impl MapNode {
+    pub fn size(&self) -> [f32; 2] {
+        self.size.unwrap_or([300.0, 240.0])
+    }
+}
+impl GMeterNode {
+    pub fn diameter(&self) -> f32 {
+        self.diameter.unwrap_or(240.0)
+    }
 }
 
 /// Node types this version understands.
@@ -437,10 +595,14 @@ pub enum Widget {
     ZoneBar(ZoneBarNode),
     Gauge(GaugeNode),
     Compass(CompassNode),
+    Chart(ChartNode),
+    GradientChart(ChartNode),
+    Map(MapNode),
+    GMeter(GMeterNode),
 }
 
 impl Widget {
-    pub const TYPES: [&'static str; 12] = [
+    pub const TYPES: [&'static str; 16] = [
         "group",
         "frame",
         "text",
@@ -453,6 +615,10 @@ impl Widget {
         "zone_bar",
         "gauge",
         "compass",
+        "chart",
+        "gradient_chart",
+        "map",
+        "g_meter",
     ];
 
     pub fn common(&self) -> &Common {
@@ -469,6 +635,39 @@ impl Widget {
             Widget::ZoneBar(n) => &n.bar.common,
             Widget::Gauge(n) => &n.dial.common,
             Widget::Compass(n) => &n.dial.common,
+            Widget::Chart(n) | Widget::GradientChart(n) => &n.common,
+            Widget::Map(n) => &n.common,
+            Widget::GMeter(n) => &n.common,
+        }
+    }
+
+    /// Metric IDs needed by this configured widget, shared by availability
+    /// warnings and empty-state handling. Containers declare no own inputs.
+    pub fn required_metrics(&self) -> Vec<&str> {
+        match self {
+            Self::Metric(n) => vec![&n.metric],
+            Self::MetricUnit(n) => vec![&n.metric],
+            Self::Bar(n) => vec![&n.metric],
+            Self::ZoneBar(n) => vec![&n.bar.metric],
+            Self::Gauge(n) => vec![&n.dial.metric],
+            Self::Compass(n) => {
+                let mut required = vec![n.dial.metric.as_str()];
+                if matches!(n.dial.metric.as_str(), "heading" | "cog")
+                    && n.smoothing.as_ref().is_some_and(|f| {
+                        f.enabled != Some(false) && f.min_speed.unwrap_or(1.5) > 0.0
+                    })
+                {
+                    required.push("speed");
+                }
+                required
+            }
+            Self::Chart(n) => vec![&n.metric],
+            Self::GradientChart(n) => vec![&n.metric, "gradient"],
+            Self::Map(_) => vec!["lat", "lon"],
+            Self::GMeter(_) => vec!["accel.lon", "accel.lat"],
+            Self::GpsLockIcon(_) => vec!["gps-lock"],
+            Self::Datetime(_) => vec!["timestamp"],
+            _ => vec![],
         }
     }
 
@@ -486,6 +685,9 @@ impl Widget {
             Widget::ZoneBar(n) => &n.bar.extra,
             Widget::Gauge(n) => &n.dial.extra,
             Widget::Compass(n) => &n.dial.extra,
+            Widget::Chart(n) | Widget::GradientChart(n) => &n.extra,
+            Widget::Map(n) => &n.extra,
+            Widget::GMeter(n) => &n.extra,
         }
     }
 
@@ -503,6 +705,10 @@ impl Widget {
             Widget::ZoneBar(_) => "zone_bar",
             Widget::Gauge(_) => "gauge",
             Widget::Compass(_) => "compass",
+            Widget::Chart(_) => "chart",
+            Widget::GradientChart(_) => "gradient_chart",
+            Widget::Map(_) => "map",
+            Widget::GMeter(_) => "g_meter",
         }
     }
 
@@ -806,7 +1012,11 @@ mod tests {
             {"type": "bar", "metric": "speed"},
             {"type": "zone_bar", "metric": "hr"},
             {"type": "gauge", "metric": "speed"},
-            {"type": "compass", "metric": "cog"}
+            {"type": "compass", "metric": "cog"},
+            {"type": "chart", "metric": "speed"},
+            {"type": "gradient_chart", "metric": "alt"},
+            {"type": "map"},
+            {"type": "g_meter"}
         ]);
         let parsed: Vec<Node> = serde_json::from_value(nodes).unwrap();
         let types: Vec<&str> = parsed.iter().map(Node::type_name).collect();

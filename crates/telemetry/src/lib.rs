@@ -13,6 +13,7 @@ mod telemetry;
 mod test_support;
 pub mod units;
 mod value;
+mod vehicle;
 
 pub use extract::{Derived, GpsPoint};
 pub use lock::LockOptions;

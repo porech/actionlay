@@ -106,3 +106,51 @@ fn circular_instruments_reject_invalid_geometry_and_round_trip_styles() {
         assert!(again.warnings.is_empty());
     }
 }
+
+#[test]
+fn native_preset_panels_do_not_overlap_in_landscape_square_or_portrait() {
+    use actionlay_layout::{
+        Node, Widget,
+        geom::{Aspect, place, root_box, scale_factor},
+    };
+    for preset in PRESETS {
+        let layout = preset.layout();
+        for (w, h) in [(1920, 1080), (1440, 1080), (1080, 1080), (1080, 1920)] {
+            let mode = auto_scale_mode(&layout, w, h);
+            let scale = scale_factor(
+                mode,
+                w as f32,
+                h as f32,
+                layout.design_aspect.unwrap_or(Aspect::WIDESCREEN).ratio(),
+            );
+            let root = root_box(w as f32, h as f32, scale);
+            let boxes: Vec<_> = layout
+                .nodes
+                .iter()
+                .filter_map(|n| {
+                    let Node::Known(widget) = n else { return None };
+                    let size = match widget {
+                        Widget::Frame(f) => f.size,
+                        Widget::Chart(c) | Widget::GradientChart(c) => c.size(),
+                        Widget::Map(m) => m.size(),
+                        _ => return None,
+                    };
+                    let c = widget.common();
+                    Some(place(
+                        root,
+                        c.anchor.unwrap_or_default(),
+                        c.offset_in(root),
+                        size,
+                    ))
+                })
+                .collect();
+            for (i, a) in boxes.iter().enumerate() {
+                for b in &boxes[i + 1..] {
+                    let overlaps =
+                        a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+                    assert!(!overlaps, "{} {w}x{h}: {a:?} overlaps {b:?}", preset.id);
+                }
+            }
+        }
+    }
+}

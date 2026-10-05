@@ -4,6 +4,7 @@ pub mod catalog;
 pub mod color;
 pub mod format;
 pub mod geom;
+pub mod import;
 pub mod model;
 pub mod scale;
 pub mod style;

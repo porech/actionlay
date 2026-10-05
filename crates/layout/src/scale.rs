@@ -82,6 +82,9 @@ fn placed(layout: &Layout, root: Rect) -> Vec<Rect> {
 fn known_size(w: &Widget) -> Option<[f32; 2]> {
     let size = match w {
         Widget::Frame(f) => f.size,
+        Widget::Chart(c) | Widget::GradientChart(c) => c.size(),
+        Widget::Map(m) => m.size(),
+        Widget::GMeter(g) => [g.diameter(); 2],
         Widget::Gauge(g) => [g.dial.diameter(); 2],
         Widget::Compass(c) => [c.dial.diameter(); 2],
         Widget::Bar(b) => b.size(),

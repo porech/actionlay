@@ -591,7 +591,7 @@ fn default_layout_ink_stays_inside_its_panels() {
                         let r = place(
                             root,
                             c.anchor.unwrap_or_default(),
-                            c.offset.unwrap_or_default(),
+                            c.offset_in(root),
                             f.size,
                         );
                         Some(Rect::new(

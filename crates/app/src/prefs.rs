@@ -17,6 +17,10 @@ pub struct Appearance {
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Prefs {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio_device: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub maps: Option<actionlay_maps::Settings>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_layout: Option<PathBuf>,
     #[serde(default)]
     pub recent_videos: Vec<PathBuf>,
@@ -90,6 +94,7 @@ mod tests {
     fn preset_and_appearance_survive_immediate_save() {
         let path = temp("appearance");
         let prefs = Prefs {
+            audio_device: Some("BlackHole 2ch".into()),
             last_builtin: Some("training".into()),
             appearance: Some(Appearance {
                 accent: Some(actionlay_layout::color::Color::rgba(10, 20, 30, 255)),

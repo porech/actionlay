@@ -120,7 +120,7 @@
         {
           "id": "course-compass",
           "type": "compass",
-          "metric": "cog",
+          "metric": "heading",
           "diameter": 166,
           "offset": [
             20,
@@ -129,6 +129,12 @@
           "thickness": 6,
           "value_style": {
             "size": 24
+          },
+          "smoothing": {
+            "seconds": 0.5,
+            "deadband": 1.5,
+            "max_rate": 120,
+            "min_speed": 1.5
           }
         }
       ]
@@ -335,6 +341,57 @@
           ],
           "size": 28
         }
+      ]
+    },
+    {
+      "id": "motion",
+      "type": "frame",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.018,
+        -0.38
+      ],
+      "size": [
+        340,
+        260
+      ],
+      "children": [
+        {
+          "type": "text",
+          "text": "G-METER",
+          "offset": [
+            20,
+            12
+          ],
+          "size": 20,
+          "color": "secondary"
+        },
+        {
+          "id": "g-meter",
+          "type": "g_meter",
+          "diameter": 210,
+          "anchor": "bottom",
+          "offset": [
+            0,
+            -10
+          ],
+          "trail_secs": 2,
+          "range": 1.5
+        }
+      ]
+    },
+    {
+      "id": "route",
+      "type": "map",
+      "mode": "moving_journey",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.15,
+        0.16
+      ],
+      "size": [
+        300,
+        224
       ]
     }
   ]

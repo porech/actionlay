@@ -1,0 +1,1290 @@
+{
+  "version": 1,
+  "name": "example",
+  "design_aspect": "1920:1080",
+  "nodes": [
+    {
+      "type": "chart",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.20833333,
+        -0.033333335
+      ],
+      "metric": "speed",
+      "size": [
+        256.0,
+        64.0
+      ],
+      "seconds": 60.0,
+      "samples": 256,
+      "show_value": true
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.13541667,
+        0.027777778
+      ],
+      "children": [
+        {
+          "type": "datetime",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "format": "%Y/%m/%d",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.13541667,
+        0.05
+      ],
+      "children": [
+        {
+          "type": "datetime",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "format": "%H:%M:%S.%f",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.010416667,
+        0.033333335
+      ],
+      "children": [
+        {
+          "type": "text",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "GPS INFO",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.14375,
+        0.055555556
+      ],
+      "children": [
+        {
+          "type": "text",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "Lat:",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.077083334,
+        0.055555556
+      ],
+      "children": [
+        {
+          "type": "text",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "Lon:",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.08229167,
+        0.055555556
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "lat",
+          "format": "{value:.6}",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.010416667,
+        0.055555556
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "lon",
+          "format": "{value:.6}",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.008333334,
+        -0.25925925
+      ],
+      "children": [
+        {
+          "type": "metric_unit",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.008333334,
+        -0.25925925
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "units": "mph",
+          "format": "{value:.0}",
+          "size": 160.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.15104167,
+        -0.09259259
+      ],
+      "children": [
+        {
+          "type": "text",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "SLOPE(%)",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "icon",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.114583336,
+        -0.033333335
+      ],
+      "icon": "gradient",
+      "size": 64.0
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.15104167,
+        -0.075925924
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "gradient",
+          "format": "{value:.1}",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.046875,
+        -0.24074075
+      ],
+      "children": [
+        {
+          "type": "metric_unit",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "temp",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "icon",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        0.05625,
+        -0.18148148
+      ],
+      "icon": "temperature",
+      "size": 64.0
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.046875,
+        -0.22407408
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "temp",
+          "format": "{value:.0}",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.046875,
+        -0.16666667
+      ],
+      "children": [
+        {
+          "type": "text",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "RPM",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "icon",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        0.05625,
+        -0.107407406
+      ],
+      "icon": "speed",
+      "size": 64.0
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.046875,
+        -0.15
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "cadence",
+          "format": "{value:.0}",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.046875,
+        -0.09259259
+      ],
+      "children": [
+        {
+          "type": "text",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "BPM",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "icon",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        0.05625,
+        -0.033333335
+      ],
+      "icon": "heart",
+      "size": 64.0
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.046875,
+        -0.075925924
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "hr",
+          "format": "{value:.0}",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "map",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.010416667,
+        0.09259259
+      ],
+      "size": [
+        256.0,
+        256.0
+      ],
+      "mode": "moving",
+      "zoom": 16,
+      "radius": 12.0
+    },
+    {
+      "type": "map",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.010416667,
+        -0.11481482
+      ],
+      "size": [
+        256.0,
+        256.0
+      ],
+      "mode": "moving",
+      "zoom": 16,
+      "radius": 35.0
+    },
+    {
+      "type": "map",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.010416667,
+        0.34814814
+      ],
+      "size": [
+        256.0,
+        256.0
+      ],
+      "mode": "journey",
+      "zoom": 15,
+      "radius": 12.0
+    },
+    {
+      "type": "map",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.16666667,
+        -0.11481482
+      ],
+      "size": [
+        256.0,
+        256.0
+      ],
+      "mode": "journey",
+      "zoom": 15,
+      "radius": 128.0
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.41666666,
+        0.44444445
+      ],
+      "children": [
+        {
+          "type": "text",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "(C) Some Copyright Message",
+          "size": 32.0,
+          "color": "#ffff00"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.41666666,
+        0.44444445
+      ],
+      "children": [
+        {
+          "type": "text",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "(C) Some Copyright Message",
+          "size": 48.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.27083334,
+        0.1388889
+      ],
+      "children": [
+        {
+          "type": "text",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "Vertical Message",
+          "size": 32.0,
+          "color": "#00ffff"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.41666666,
+        -0.44444445
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "format": "{value:.1}",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.46875,
+        -0.44444445
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "units": "mph",
+          "format": "{value:.1}",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.47916666,
+        -0.44444445
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "units": "kmh",
+          "format": "{value:.1}",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.42708334,
+        -0.44444445
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "units": "mps",
+          "format": "{value:.1}",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.375,
+        -0.44444445
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "units": "knots",
+          "format": "{value:.1}",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.41666666,
+        -0.39814815
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "hr",
+          "format": "{value:.4}",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.44270834,
+        -0.35185185
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "hr",
+          "format": "{value:.5}",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.44270834,
+        -0.30555555
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "odo",
+          "units": "mi",
+          "format": "{value:.2}",
+          "size": 32.0,
+          "color": "#ffff00"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.49479166,
+        -0.30555555
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "odo",
+          "units": "km",
+          "format": "{value:.2}",
+          "size": 32.0,
+          "color": "#ffff00"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.453125,
+        -0.30555555
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "power",
+          "units": "none",
+          "format": "{value:.2}",
+          "size": 32.0,
+          "color": "#ffff00"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.453125,
+        -0.25925925
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "power",
+          "format": "{value:.2}",
+          "size": 32.0,
+          "color": "#ffff00"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.13020833,
+        0.2777778
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "alt",
+          "format": "{value:.1}",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.13020833,
+        0.32407406
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "alt",
+          "units": "ft",
+          "format": "{value:.1}",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.13020833,
+        0.37037036
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "alt",
+          "units": "mi",
+          "format": "{value:.1}",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.13020833,
+        0.41666666
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "alt",
+          "units": "nmi",
+          "format": "{value:.1}",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.13020833,
+        -0.35185185
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "lat",
+          "format": "{value:.5}",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.13020833,
+        -0.30555555
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "lon",
+          "format": "{value:.5}",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.49479166,
+        0.046296295
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "accl.x",
+          "units": "none",
+          "format": "{value:.2}",
+          "size": 32.0,
+          "color": "#ff00ff"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.47916666,
+        0.046296295
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "accl.y",
+          "units": "g",
+          "format": "{value:.2}",
+          "size": 32.0,
+          "color": "#ff00ff"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.453125,
+        0.046296295
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "accl.z",
+          "units": "g",
+          "format": "{value:.2}",
+          "size": 32.0,
+          "color": "#ff00ff"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.49479166,
+        0.1388889
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "grav.x",
+          "format": "{value:.2}",
+          "size": 32.0,
+          "color": "#ffff00"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.47916666,
+        0.1388889
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "grav.y",
+          "format": "{value:.2}",
+          "size": 32.0,
+          "color": "#ffff00"
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.453125,
+        0.1388889
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "grav.z",
+          "format": "{value:.2}",
+          "size": 32.0,
+          "color": "#ffff00"
+        }
+      ]
+    },
+    {
+      "type": "bar",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.026041666,
+        -0.44444445
+      ],
+      "metric": "accl.x",
+      "size": [
+        400.0,
+        50.0
+      ],
+      "min": 0.0,
+      "max": 100.0,
+      "show_value": false
+    },
+    {
+      "type": "bar",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.026041666,
+        -0.39814815
+      ],
+      "metric": "accl.y",
+      "units": "g",
+      "size": [
+        400.0,
+        50.0
+      ],
+      "min": 0.0,
+      "max": 100.0,
+      "show_value": false
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.47916666,
+        0.23148148
+      ],
+      "children": [
+        {
+          "type": "datetime",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "format": "%Y/%m/%d",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.47916666,
+        0.2777778
+      ],
+      "children": [
+        {
+          "type": "datetime",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "format": "%H:%M:%S.%f",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.47916666,
+        0.32407406
+      ],
+      "children": [
+        {
+          "type": "datetime",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "format": "%H:%M:%S.%f",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "icon",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.033333335,
+        0.09259259
+      ],
+      "icon": "altitude",
+      "size": 128.0
+    },
+    {
+      "type": "icon",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.13333334,
+        0.09259259
+      ],
+      "icon": "altitude",
+      "size": 128.0
+    },
+    {
+      "type": "frame",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.078125,
+        0.1388889
+      ],
+      "opacity": 0.6,
+      "size": [
+        150.0,
+        150.0
+      ],
+      "radius": 12.0,
+      "children": [
+        {
+          "type": "map",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "size": [
+            256.0,
+            256.0
+          ],
+          "mode": "moving",
+          "zoom": 16,
+          "radius": 12.0
+        }
+      ]
+    },
+    {
+      "type": "map",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.13020833,
+        0.23148148
+      ],
+      "size": [
+        512.0,
+        512.0
+      ],
+      "mode": "circuit",
+      "zoom": 15,
+      "radius": 12.0
+    },
+    {
+      "type": "compass",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.26041666,
+        0.09259259
+      ],
+      "metric": "heading",
+      "diameter": 300.0,
+      "mode": "rose",
+      "rotate_rose": true,
+      "smoothing": {
+        "seconds": 0.5,
+        "deadband": 1.5,
+        "max_rate": 120.0,
+        "min_speed": 1.5
+      }
+    },
+    {
+      "type": "compass",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.35416666,
+        0.09259259
+      ],
+      "metric": "heading",
+      "diameter": 300.0,
+      "mode": "rose",
+      "rotate_rose": true,
+      "smoothing": {
+        "seconds": 0.5,
+        "deadband": 1.5,
+        "max_rate": 120.0,
+        "min_speed": 1.5
+      }
+    },
+    {
+      "type": "compass",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.44270834,
+        0.09259259
+      ],
+      "metric": "heading",
+      "diameter": 200.0,
+      "mode": "arrow",
+      "rotate_rose": false,
+      "smoothing": {
+        "seconds": 0.5,
+        "deadband": 1.5,
+        "max_rate": 120.0,
+        "min_speed": 1.5
+      }
+    },
+    {
+      "type": "gauge",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.36458334,
+        -0.022222223
+      ],
+      "metric": "speed",
+      "diameter": 256.0,
+      "value_style": {
+        "size": 26.0
+      },
+      "mode": "needle",
+      "max": 180.0,
+      "start_angle": 135.0,
+      "sweep_angle": 270.0,
+      "clockwise": true,
+      "zones": [
+        {
+          "up_to": 10.0,
+          "color": "#ffffff"
+        },
+        {
+          "up_to": 103.0,
+          "color": "#64dca5"
+        },
+        {
+          "up_to": 126.0,
+          "color": "#ffffff"
+        },
+        {
+          "up_to": 180.0,
+          "color": "#ffb300"
+        }
+      ]
+    },
+    {
+      "type": "gauge",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.36875,
+        -0.022222223
+      ],
+      "metric": "speed",
+      "diameter": 256.0,
+      "value_style": {
+        "size": 26.0
+      },
+      "mode": "needle",
+      "max": 180.0,
+      "start_angle": 135.0,
+      "sweep_angle": 270.0,
+      "clockwise": true,
+      "zones": [
+        {
+          "up_to": 10.0,
+          "color": "#ffffff"
+        },
+        {
+          "up_to": 103.0,
+          "color": "#64dca5"
+        },
+        {
+          "up_to": 126.0,
+          "color": "#ffffff"
+        },
+        {
+          "up_to": 180.0,
+          "color": "#ffb300"
+        }
+      ]
+    }
+  ]
+}

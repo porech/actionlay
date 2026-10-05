@@ -306,24 +306,22 @@ const ORIGINAL_METRIC_IDS: [&str; 28] = [
 ];
 
 /// Deliberately not metrics (plan, "deliberate differences"): the time of day
-/// is `Snapshot::utc`, packet and index are debugging data in `gps_points()`.
+/// is `Snapshot::utc`. M3 exposes packet and index as metrics for XML import.
 /// `pace`, `format` and `dp` are not accessor ids either (pace is a format
 /// string and format/dp are widget attributes in layout_xml.py), so they must
 /// never be mistaken for metrics.
-const LEFT_OUT: [&str; 6] = [
-    "timestamp",
-    "gps-packet",
-    "gps-packet-index",
-    "pace",
-    "format",
-    "dp",
-];
+const LEFT_OUT: [&str; 4] = ["timestamp", "pace", "format", "dp"];
 
 #[test]
 fn every_metric_of_the_original_exists() {
-    let all = ORIGINAL_METRIC_IDS
-        .iter()
-        .chain(&["ori.yaw", "lat", "lon", "sdps"]);
+    let all = ORIGINAL_METRIC_IDS.iter().chain(&[
+        "ori.yaw",
+        "lat",
+        "lon",
+        "sdps",
+        "gps-packet",
+        "gps-packet-index",
+    ]);
     for id in all {
         let m = Metric::from_id(id).unwrap_or_else(|| panic!("no metric {id}"));
         assert_eq!(m.id(), *id);

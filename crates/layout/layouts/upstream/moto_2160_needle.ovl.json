@@ -1,0 +1,357 @@
+{
+  "version": 1,
+  "name": "moto_2160_needle",
+  "design_aspect": "3840:2160",
+  "nodes": [
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.008333334,
+        0.014814815
+      ],
+      "children": [
+        {
+          "type": "datetime",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "format": "%d.%m.%Y",
+          "size": 24.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.008333334,
+        0.041666668
+      ],
+      "children": [
+        {
+          "type": "datetime",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "format": "%H:%M:%S",
+          "size": 32.0
+        }
+      ]
+    },
+    {
+      "type": "icon",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.008333334,
+        0.083333336
+      ],
+      "icon": "altitude",
+      "size": 48.0
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.0421875,
+        0.083333336
+      ],
+      "children": [
+        {
+          "type": "text",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "ALT (m)",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.036979165,
+        0.10185185
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "alt",
+          "format": "{value:.1}",
+          "size": 26.0
+        }
+      ]
+    },
+    {
+      "type": "icon",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.008333334,
+        0.1388889
+      ],
+      "icon": "gradient",
+      "size": 48.0
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.0421875,
+        0.1388889
+      ],
+      "children": [
+        {
+          "type": "text",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "SLP (%)",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.044791665,
+        0.1574074
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "gradient",
+          "format": "{value:.1}",
+          "size": 26.0
+        }
+      ]
+    },
+    {
+      "type": "gauge",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.008333334,
+        -0.12407407
+      ],
+      "metric": "speed",
+      "units": "kmh",
+      "diameter": 256.0,
+      "value_style": {
+        "size": 16.0
+      },
+      "mode": "needle",
+      "max": 180.0,
+      "start_angle": 135.0,
+      "sweep_angle": 270.0,
+      "clockwise": true
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.075,
+        -0.16666667
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "anchor": "top",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "units": "kmh",
+          "format": "{value:.0}",
+          "size": 36.0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.075,
+        -0.21296297
+      ],
+      "children": [
+        {
+          "type": "text",
+          "anchor": "top",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "km/h",
+          "size": 18.0
+        }
+      ]
+    },
+    {
+      "type": "bar",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.008333334,
+        -0.083333336
+      ],
+      "metric": "accel",
+      "size": [
+        128.0,
+        40.0
+      ],
+      "min": -3.0,
+      "max": 0.0,
+      "fill": "#ff9d9d",
+      "show_value": false
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.041145835,
+        -0.11018518
+      ],
+      "children": [
+        {
+          "type": "text",
+          "anchor": "top",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "BRAKE",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "bar",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.07447917,
+        -0.083333336
+      ],
+      "metric": "accel",
+      "size": [
+        128.0,
+        40.0
+      ],
+      "min": 0.0,
+      "max": 3.0,
+      "fill": "#9d9dff",
+      "show_value": false
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.10729167,
+        -0.11018518
+      ],
+      "children": [
+        {
+          "type": "text",
+          "anchor": "top",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "THROTTLE",
+          "size": 16.0
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.008333334,
+        0.014814815
+      ],
+      "opacity": 0.6,
+      "size": [
+        256.0,
+        256.0
+      ],
+      "radius": 20.0,
+      "children": [
+        {
+          "type": "map",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "size": [
+            256.0,
+            256.0
+          ],
+          "mode": "moving",
+          "zoom": 15,
+          "radius": 6.0
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.008333334,
+        0.25185186
+      ],
+      "opacity": 0.6,
+      "size": [
+        256.0,
+        256.0
+      ],
+      "radius": 20.0,
+      "children": [
+        {
+          "type": "map",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "size": [
+            256.0,
+            256.0
+          ],
+          "mode": "moving_journey",
+          "zoom": 14,
+          "radius": 6.0
+        }
+      ]
+    },
+    {
+      "type": "chart",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.0036458333,
+        -0.0055555557
+      ],
+      "metric": "speed",
+      "units": "kmh",
+      "size": [
+        128.0,
+        64.0
+      ],
+      "seconds": 60.0,
+      "samples": 512,
+      "fill": "#00bfff80",
+      "background": "#00000080",
+      "show_value": false
+    }
+  ]
+}

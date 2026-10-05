@@ -1,6 +1,7 @@
 //! ActionLay overlay renderer: (layout, snapshot, size) → premultiplied RGBA (spec §4.5).
 //! CPU only (tiny-skia), embedded fonts and icons: same output on every machine.
 mod dials;
+mod history;
 mod icons;
 mod scene;
 mod shapes;
@@ -15,9 +16,9 @@ use actionlay_layout::geom::{Aspect, ScaleMode, root_box, scale_factor};
 use actionlay_layout::model::{Node, Units, WhenAbsent, Widget};
 use actionlay_layout::style::{ResolvedTheme, TextStyleOpt, Theme};
 use actionlay_layout::validate::Issue;
-use actionlay_telemetry::Snapshot;
 use actionlay_telemetry::metric::Metric;
 use actionlay_telemetry::units::{Unit, UnitSystem, units_for};
+use actionlay_telemetry::{Snapshot, Telemetry};
 use chrono::{DateTime, FixedOffset, Local, Offset, TimeZone, Utc};
 use tiny_skia::Pixmap;
 
@@ -68,6 +69,9 @@ pub struct Renderer {
     stats: RenderStats,
     scratch: String,
     last_size: (u32, u32),
+    headings: history::HeadingCache,
+    statics: history::StaticCache,
+    maps: actionlay_maps::TileStore,
 }
 
 impl Default for Renderer {
@@ -87,7 +91,14 @@ impl Renderer {
             stats: RenderStats::default(),
             scratch: String::new(),
             last_size: (0, 0),
+            headings: Default::default(),
+            statics: Default::default(),
+            maps: actionlay_maps::TileStore::offline(),
         }
+    }
+
+    pub fn set_maps(&mut self, maps: actionlay_maps::TileStore) {
+        self.maps = maps;
     }
 
     pub fn set_zone(&mut self, zone: Zone) {
@@ -117,6 +128,27 @@ impl Renderer {
 
     /// Clears `target` and draws the overlay at its size (premultiplied RGBA).
     pub fn render_into(&mut self, layout: &Layout, snap: &Snapshot, target: &mut Pixmap) {
+        self.render_scene(layout, snap, None, target);
+    }
+
+    pub fn render_telemetry_into(
+        &mut self,
+        layout: &Layout,
+        telemetry: &Telemetry,
+        t: f64,
+        target: &mut Pixmap,
+    ) {
+        let snap = telemetry.sample(t);
+        self.render_scene(layout, &snap, Some(telemetry), target);
+    }
+
+    fn render_scene(
+        &mut self,
+        layout: &Layout,
+        snap: &Snapshot,
+        telemetry: Option<&Telemetry>,
+        target: &mut Pixmap,
+    ) {
         let start = Instant::now();
         let size = (target.width(), target.height());
         if size != self.last_size {
@@ -143,6 +175,8 @@ impl Renderer {
         };
         let ctx = Ctx {
             snap,
+            telemetry,
+            maps: &self.maps,
             theme: &theme,
             system,
             scale,
@@ -155,6 +189,8 @@ impl Renderer {
             formats: &mut self.formats,
             stats: &mut stats,
             scratch: &mut self.scratch,
+            headings: &mut self.headings,
+            statics: &mut self.statics,
         };
         scene::draw_nodes(
             &mut painter,
@@ -233,6 +269,27 @@ fn diagnose_node(node: &Node, path: String, issues: &mut Vec<Issue>) {
         None => path,
     };
     match w {
+        Widget::Chart(c) | Widget::GradientChart(c) => {
+            check_metric(
+                &c.metric,
+                c.units.as_deref(),
+                "chart shows No data",
+                &path,
+                issues,
+            );
+            if let Some(style) = &c.value_style {
+                check_style(style, &path, issues);
+            }
+        }
+        Widget::GMeter(g) => {
+            check_metric(
+                "accel.lon",
+                g.units.as_deref(),
+                "G-meter shows No data",
+                &path,
+                issues,
+            );
+        }
         Widget::Gauge(actionlay_layout::model::GaugeNode { dial: d, .. })
         | Widget::Compass(actionlay_layout::model::CompassNode { dial: d, .. }) => {
             check_metric(

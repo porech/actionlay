@@ -175,19 +175,38 @@ pub struct Player {
 
 impl Player {
     pub fn open(path: &Path, options: PlayerOptions) -> Result<Self, MediaError> {
-        let cancelled = Arc::new(AtomicBool::new(false));
-        let input = crate::input::open(path, cancelled.clone())?;
-        Self::from_input(input, options, cancelled)
+        Self::open_with_audio_device(path, options, None)
     }
 
+    pub fn open_with_audio_device(
+        path: &Path,
+        options: PlayerOptions,
+        device: Option<&str>,
+    ) -> Result<Self, MediaError> {
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let input = crate::input::open(path, cancelled.clone())?;
+        Self::from_input_with_device(input, options, cancelled, device)
+    }
+
+    #[cfg(test)]
     fn from_input(
         input: ffmpeg::format::context::Input,
         options: PlayerOptions,
         cancelled: Arc<AtomicBool>,
     ) -> Result<Self, MediaError> {
+        let device = std::env::var("ACTIONLAY_TEST_AUDIO_DEVICE").ok();
+        Self::from_input_with_device(input, options, cancelled, device.as_deref())
+    }
+
+    fn from_input_with_device(
+        input: ffmpeg::format::context::Input,
+        options: PlayerOptions,
+        cancelled: Arc<AtomicBool>,
+        device: Option<&str>,
+    ) -> Result<Self, MediaError> {
         let info = crate::probe::describe(&input)?;
         let audio = if options.audio && info.audio.is_some() {
-            match AudioOutput::open() {
+            match AudioOutput::open_on(device) {
                 Ok(out) => {
                     out.set_muted(true); // starts paused
                     Some(Arc::new(Mutex::new(out)))

@@ -1,0 +1,507 @@
+{
+  "version": 1,
+  "name": "default-2688x1512",
+  "design_aspect": "2688:1512",
+  "nodes": [
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.096726194,
+        0.01984127
+      ],
+      "children": [
+        {
+          "type": "datetime",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "format": "%Y/%m/%d",
+          "size": 11.428572
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-left",
+      "offset_relative": [
+        0.096726194,
+        0.035714287
+      ],
+      "children": [
+        {
+          "type": "datetime",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "format": "%H:%M:%S.%f",
+          "size": 22.857143
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.06696428,
+        0.015873017
+      ],
+      "opacity": 0.4,
+      "size": [
+        22.857143,
+        22.857143
+      ],
+      "fill": "#00000080",
+      "radius": 3.5714285,
+      "children": [
+        {
+          "type": "gps_lock_icon",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "size": 22.857143
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.16294643,
+        0.023809524
+      ],
+      "children": [
+        {
+          "type": "text",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "GPS INFO",
+          "size": 11.428572
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.16294643,
+        0.03968254
+      ],
+      "children": [
+        {
+          "type": "text",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "Lat:",
+          "size": 11.428572
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.11532738,
+        0.03968254
+      ],
+      "children": [
+        {
+          "type": "text",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "Lon:",
+          "size": 11.428572
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.11904762,
+        0.03968254
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "lat",
+          "format": "{value:.6}",
+          "size": 11.428572
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.067708336,
+        0.03968254
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "lon",
+          "format": "{value:.6}",
+          "size": 11.428572
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.005952381,
+        -0.20634921
+      ],
+      "children": [
+        {
+          "type": "metric_unit",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "size": 11.428572
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.005952381,
+        -0.20634921
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "speed",
+          "format": "{value:.0}",
+          "size": 114.28571
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.1078869,
+        -0.08730159
+      ],
+      "children": [
+        {
+          "type": "text",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "SLOPE(%)",
+          "size": 11.428572
+        }
+      ]
+    },
+    {
+      "type": "icon",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.08184524,
+        -0.044973545
+      ],
+      "icon": "gradient",
+      "size": 45.714287
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.1078869,
+        -0.07539683
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "gradient",
+          "format": "{value:.0}",
+          "size": 22.857143
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.03199405,
+        -0.08730159
+      ],
+      "children": [
+        {
+          "type": "metric_unit",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "alt",
+          "size": 11.428572
+        }
+      ]
+    },
+    {
+      "type": "icon",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.005952381,
+        -0.044973545
+      ],
+      "icon": "altitude",
+      "size": 45.714287
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.03199405,
+        -0.07539683
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "alt",
+          "format": "{value:.0}",
+          "size": 22.857143
+        }
+      ]
+    },
+    {
+      "type": "gradient_chart",
+      "anchor": "bottom-left",
+      "offset_relative": [
+        0.14880952,
+        -0.044973545
+      ],
+      "metric": "alt",
+      "size": [
+        182.85715,
+        45.714287
+      ],
+      "seconds": 60.0,
+      "samples": 256,
+      "show_value": true
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.04017857,
+        -0.20634921
+      ],
+      "children": [
+        {
+          "type": "metric_unit",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "temp",
+          "size": 11.428572
+        }
+      ]
+    },
+    {
+      "type": "icon",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        0.03348214,
+        -0.16402116
+      ],
+      "icon": "temperature",
+      "size": 45.714287
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.04017857,
+        -0.19444445
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "temp",
+          "format": "{value:.0}",
+          "size": 22.857143
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.04017857,
+        -0.15343915
+      ],
+      "children": [
+        {
+          "type": "text",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "RPM",
+          "size": 11.428572
+        }
+      ]
+    },
+    {
+      "type": "icon",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        0.03348214,
+        -0.11111111
+      ],
+      "icon": "speed",
+      "size": 45.714287
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.04017857,
+        -0.14153439
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "cadence",
+          "format": "{value:.0}",
+          "size": 22.857143
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.04017857,
+        -0.1005291
+      ],
+      "children": [
+        {
+          "type": "text",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "text": "BPM",
+          "size": 11.428572
+        }
+      ]
+    },
+    {
+      "type": "icon",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        0.03348214,
+        -0.05820106
+      ],
+      "icon": "heart",
+      "size": 45.714287
+    },
+    {
+      "type": "group",
+      "anchor": "bottom-right",
+      "offset_relative": [
+        -0.04017857,
+        -0.088624336
+      ],
+      "children": [
+        {
+          "type": "metric",
+          "anchor": "top-right",
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "metric": "hr",
+          "format": "{value:.0}",
+          "size": 22.857143
+        }
+      ]
+    },
+    {
+      "type": "map",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.020089285,
+        0.06613757
+      ],
+      "size": [
+        274.2857,
+        274.2857
+      ],
+      "mode": "moving",
+      "zoom": 17,
+      "radius": 25.0
+    },
+    {
+      "type": "map",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.020089285,
+        0.33068782
+      ],
+      "size": [
+        274.2857,
+        274.2857
+      ],
+      "mode": "journey",
+      "zoom": 15,
+      "radius": 25.0
+    }
+  ]
+}

@@ -72,6 +72,10 @@ impl Series {
         s
     }
 
+    pub(crate) fn points(&self) -> impl Iterator<Item = (f64, Option<f64>)> + '_ {
+        self.t.iter().copied().zip(self.v.iter().copied())
+    }
+
     /// True when valid samples k and k+1 are close enough to be joined.
     fn bridged(&self, k: usize) -> bool {
         k + 1 < self.t.len()

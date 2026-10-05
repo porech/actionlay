@@ -8,6 +8,7 @@ publish.workspace = true
 [dependencies]
 actionlay-layout = { path = "../layout" }
 actionlay-telemetry = { path = "../telemetry" }
+actionlay-maps = { path = "../maps" }
 tiny-skia.workspace = true
 cosmic-text.workspace = true
 resvg.workspace = true

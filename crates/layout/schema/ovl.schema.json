@@ -282,6 +282,233 @@
       },
       "type": "object"
     },
+    "ChartNode": {
+      "additionalProperties": true,
+      "description": "Parameters every node has.",
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anchor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: top-left."
+        },
+        "background": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fill": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "journey": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "max": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "metric": {
+          "type": "string"
+        },
+        "min": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "negative": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "offset": {
+          "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "offset_relative": {
+          "description": "Additional offset as fractions of the parent's width and height.\n[0.02, -0.02] gives a 2% inset at a bottom-left anchor.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "opacity": {
+          "description": "0..=1, multiplies down the tree. Default 1.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "positive": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "radius": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "samples": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "seconds": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "show_value": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "size": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "stale_secs": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "stroke": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stroke_width": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value_style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextStyleOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "visible": {
+          "description": "Default true.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "when_absent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WhenAbsent"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "metric"
+      ],
+      "type": "object"
+    },
     "Color": {
       "pattern": "^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
       "type": "string"
@@ -299,7 +526,7 @@
     },
     "CompassNode": {
       "additionalProperties": true,
-      "description": "Compass for an angular metric (usually GPS course `cog`). Heading is in degrees,\nclockwise from north. A rotating rose keeps the heading pointer facing upwards.",
+      "description": "Compass for an angular metric (usually causal GPS `heading`). Heading is in\ndegrees, clockwise from north. A rotating rose keeps its pointer facing upwards.",
       "properties": {
         "anchor": {
           "anyOf": [
@@ -414,6 +641,16 @@
           "type": [
             "boolean",
             "null"
+          ]
+        },
+        "smoothing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HeadingFilter"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "stale_secs": {
@@ -770,11 +1007,178 @@
       ],
       "type": "object"
     },
+    "GMeterNode": {
+      "additionalProperties": true,
+      "description": "Parameters every node has.",
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anchor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: top-left."
+        },
+        "diameter": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fill": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "offset": {
+          "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "offset_relative": {
+          "description": "Additional offset as fractions of the parent's width and height.\n[0.02, -0.02] gives a 2% inset at a bottom-left anchor.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "opacity": {
+          "description": "0..=1, multiplies down the tree. Default 1.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "range": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "rings": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "rotation": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "show_peaks": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "stale_secs": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "track": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trail_secs": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value_style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextStyleOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "visible": {
+          "description": "Default true.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "when_absent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WhenAbsent"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
     "GaugeMode": {
       "enum": [
         "arc",
         "needle",
-        "donut"
+        "donut",
+        "marker"
       ],
       "type": "string"
     },
@@ -792,6 +1196,12 @@
             }
           ],
           "description": "Default: top-left."
+        },
+        "clockwise": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "diameter": {
           "format": "float",
@@ -989,6 +1399,15 @@
               "type": "null"
             }
           ]
+        },
+        "zones": {
+          "items": {
+            "$ref": "#/$defs/BarZone"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
         }
       },
       "required": [
@@ -1174,6 +1593,46 @@
       },
       "type": "object"
     },
+    "HeadingFilter": {
+      "description": "Optional per-widget smoothing. Omitting the object disables the filter;\n`enabled: false` bypasses it while preserving configured thresholds.",
+      "properties": {
+        "deadband": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "max_rate": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min_speed": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "seconds": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
     "IconNode": {
       "additionalProperties": true,
       "description": "Parameters every node has.",
@@ -1267,6 +1726,195 @@
       "required": [
         "icon"
       ],
+      "type": "object"
+    },
+    "MapMode": {
+      "enum": [
+        "moving",
+        "journey",
+        "moving_journey",
+        "circuit"
+      ],
+      "type": "string"
+    },
+    "MapNode": {
+      "additionalProperties": true,
+      "description": "Parameters every node has.",
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anchor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: top-left."
+        },
+        "background": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "label_style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextStyleOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "marker": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MapMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "offset": {
+          "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "offset_relative": {
+          "description": "Additional offset as fractions of the parent's width and height.\n[0.02, -0.02] gives a 2% inset at a bottom-left anchor.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "opacity": {
+          "description": "0..=1, multiplies down the tree. Default 1.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "opacity_tiles": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "radius": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "route": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "route_width": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "size": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "stale_secs": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "visible": {
+          "description": "Default true.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "when_absent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WhenAbsent"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zoom": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
       "type": "object"
     },
     "MetricNode": {
@@ -1731,6 +2379,58 @@
           "properties": {
             "type": {
               "const": "compass",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/ChartNode",
+          "properties": {
+            "type": {
+              "const": "chart",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/ChartNode",
+          "properties": {
+            "type": {
+              "const": "gradient_chart",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/MapNode",
+          "properties": {
+            "type": {
+              "const": "map",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/GMeterNode",
+          "properties": {
+            "type": {
+              "const": "g_meter",
               "type": "string"
             }
           },

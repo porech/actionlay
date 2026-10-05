@@ -274,6 +274,88 @@ impl Validator {
         self.common(&path, w.common());
         self.extra(&path, w.extra());
         match w {
+            Widget::Chart(c) | Widget::GradientChart(c) => {
+                if c.stale_secs.is_some_and(|v| !v.is_finite() || v < 0.0) {
+                    self.error(&path, "stale_secs must be non-negative and finite");
+                }
+                if c.metric.is_empty() {
+                    self.error(&path, "metric must not be empty");
+                }
+                for v in c.size() {
+                    self.positive(&path, "size", v);
+                }
+                if c.seconds
+                    .is_some_and(|v| !v.is_finite() || v <= 0.0 || v > 86400.0)
+                {
+                    self.error(&path, "seconds must be in 0..=86400");
+                }
+                if c.samples.is_some_and(|v| !(2..=2048).contains(&v)) {
+                    self.error(&path, "samples must be in 2..=2048");
+                }
+                if c.min.is_some_and(|v| !v.is_finite())
+                    || c.max.is_some_and(|v| !v.is_finite())
+                    || c.min
+                        .zip(c.max)
+                        .is_some_and(|(a, b)| b <= a || !(b - a).is_finite())
+                {
+                    self.error(&path, "invalid chart range");
+                }
+                if let Some(v) = c.radius {
+                    self.non_negative(&path, "radius", v);
+                }
+                if let Some(v) = c.stroke_width {
+                    self.positive(&path, "stroke_width", v);
+                }
+                if let Some(v) = &c.value_style {
+                    self.style(&path, v);
+                }
+            }
+            Widget::Map(m) => {
+                if let Some(style) = &m.label_style {
+                    self.style(&path, style);
+                }
+                if m.stale_secs.is_some_and(|v| !v.is_finite() || v < 0.0) {
+                    self.error(&path, "stale_secs must be non-negative and finite");
+                }
+                for v in m.size() {
+                    self.positive(&path, "size", v);
+                }
+                if m.zoom.is_some_and(|v| v > 19) {
+                    self.error(&path, "zoom must not exceed 19");
+                }
+                if let Some(v) = m.radius {
+                    self.non_negative(&path, "radius", v);
+                }
+                if let Some(v) = m.route_width {
+                    self.positive(&path, "route_width", v);
+                }
+                if let Some(v) = m.opacity_tiles {
+                    self.unit_interval(&path, "opacity_tiles", v);
+                }
+            }
+            Widget::GMeter(g) => {
+                if g.stale_secs.is_some_and(|v| !v.is_finite() || v < 0.0) {
+                    self.error(&path, "stale_secs must be non-negative and finite");
+                }
+                self.positive(&path, "diameter", g.diameter());
+                if g.range.is_some_and(|v| !v.is_finite() || v <= 0.0) {
+                    self.error(&path, "range must be positive and finite");
+                }
+                if g.rings.is_some_and(|v| !(1..=12).contains(&v)) {
+                    self.error(&path, "rings must be in 1..=12");
+                }
+                if g.trail_secs
+                    .is_some_and(|v| !v.is_finite() || !(0.0..=30.0).contains(&v))
+                {
+                    self.error(&path, "trail_secs must be in 0..=30");
+                }
+                if g.rotation.is_some_and(|v| !v.is_finite()) {
+                    self.error(&path, "rotation must be finite");
+                }
+                if let Some(v) = &g.value_style {
+                    self.style(&path, v);
+                }
+            }
             Widget::Gauge(g) => {
                 self.dial(&path, &g.dial);
                 let (min, max) = g.range();
@@ -290,8 +372,37 @@ impl Validator {
                 if g.ticks.is_some_and(|n| n > 72) {
                     self.error(&path, "ticks must not exceed 72");
                 }
+                if let Some(zones) = &g.zones {
+                    let mut previous = min;
+                    if zones.is_empty() {
+                        self.error(&path, "zones must not be empty");
+                    }
+                    for zone in zones {
+                        if !zone.up_to.is_finite() || zone.up_to <= previous || zone.up_to > max {
+                            self.error(&path, "gauge zones must increase strictly within range");
+                        }
+                        previous = zone.up_to;
+                    }
+                    if !zones.is_empty() && previous != max {
+                        self.error(&path, "last gauge zone must end at max");
+                    }
+                }
             }
-            Widget::Compass(c) => self.dial(&path, &c.dial),
+            Widget::Compass(c) => {
+                self.dial(&path, &c.dial);
+                if let Some(f) = &c.smoothing {
+                    for (key, v, limit) in [
+                        ("seconds", f.seconds, 30.0),
+                        ("deadband", f.deadband, 180.0),
+                        ("max_rate", f.max_rate, 3600.0),
+                        ("min_speed", f.min_speed, 100.0),
+                    ] {
+                        if v.is_some_and(|v| !v.is_finite() || v < 0.0 || v > limit) {
+                            self.error(&path, format!("invalid smoothing {key}"));
+                        }
+                    }
+                }
+            }
             Widget::Bar(b) => self.bar(&path, b),
             Widget::ZoneBar(z) => {
                 self.bar(&path, &z.bar);

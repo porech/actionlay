@@ -59,6 +59,8 @@ impl FormatCache {
 /// Per-frame inputs shared by every node.
 pub(crate) struct Ctx<'a> {
     pub snap: &'a Snapshot,
+    pub telemetry: Option<&'a actionlay_telemetry::Telemetry>,
+    pub maps: &'a actionlay_maps::TileStore,
     pub theme: &'a ResolvedTheme,
     pub system: UnitSystem,
     /// Pixels per layout unit.
@@ -75,6 +77,8 @@ pub(crate) struct Painter<'p> {
     pub stats: &'p mut RenderStats,
     /// Text of the widget being drawn (reused, no per-frame allocation).
     pub scratch: &'p mut String,
+    pub headings: &'p mut crate::history::HeadingCache,
+    pub statics: &'p mut crate::history::StaticCache,
 }
 
 /// Where a leaf widget goes: anchored in `parent` (layout units).
@@ -123,6 +127,10 @@ pub(crate) fn draw_nodes(p: &mut Painter, nodes: &[Node], parent: Rect, opacity:
                     ctx,
                 );
             }
+            Widget::Chart(c) => crate::history::draw_chart(p, c, false, at, ctx),
+            Widget::GradientChart(c) => crate::history::draw_chart(p, c, true, at, ctx),
+            Widget::Map(m) => crate::history::draw_map(p, m, at, ctx),
+            Widget::GMeter(g) => crate::history::draw_g_meter(p, g, at, ctx),
             Widget::Gauge(g) => crate::dials::draw_gauge(p, g, at, ctx),
             Widget::Compass(c) => crate::dials::draw_compass(p, c, at, ctx),
             Widget::Bar(b) => draw_bar(p, b, None, false, at, ctx),
@@ -153,7 +161,48 @@ pub(crate) fn draw_text(p: &mut Painter, style: &TextStyle, dim: bool, at: Place
         let r = place(at.parent, at.anchor, at.offset, [w_px / s, h_px / s]);
         if let Some(path) = p.text.path_at(r.x * s, r.y * s) {
             let alpha = at.opacity * if dim { ctx.theme.dim_opacity } else { 1.0 };
-            fill_text(p.pixmap, &path, style, alpha, s);
+            let [dx, dy] = style.shadow.offset;
+            let pad = style.outline.width * s + 1.0;
+            let bounds = path.bounds();
+            let left = (bounds.left() - pad + (dx * s).min(0.0)).floor();
+            let top = (bounds.top() - pad + (dy * s).min(0.0)).floor();
+            let width = (bounds.right() + pad + (dx * s).max(0.0) - left).ceil();
+            let height = (bounds.bottom() + pad + (dy * s).max(0.0) - top).ceil();
+            // Include fractional pixel phase: cached text must rasterise exactly
+            // like the uncached path at any anchor or output resolution.
+            let key = format!(
+                "text:{}:{style:?}:{s}:{alpha}:{}:{}",
+                p.scratch,
+                (r.x * s - left).to_bits(),
+                (r.y * s - top).to_bits()
+            );
+            if width <= 4096.0 && height <= 4096.0 && width > 0.0 && height > 0.0 {
+                let raster = if let Some(cached) = p.statics.get(&key) {
+                    Some(cached)
+                } else {
+                    Pixmap::new(width as u32, height as u32).map(|mut raster| {
+                        let local = path
+                            .clone()
+                            .transform(Transform::from_translate(-left, -top))
+                            .unwrap();
+                        fill_text(&mut raster, &local, style, alpha, s);
+                        p.statics.insert(key, &raster);
+                        raster
+                    })
+                };
+                if let Some(raster) = raster {
+                    p.pixmap.draw_pixmap(
+                        left as i32,
+                        top as i32,
+                        raster.as_ref(),
+                        &PixmapPaint::default(),
+                        Transform::identity(),
+                        None,
+                    );
+                }
+            } else {
+                fill_text(p.pixmap, &path, style, alpha, s);
+            }
         }
     }
     p.stats.text += start.elapsed();

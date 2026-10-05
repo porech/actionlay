@@ -84,11 +84,11 @@ fn arc(
     alpha: f32,
 ) {
     let (start, sweep) = angles;
-    if sweep <= 0.0 {
+    if sweep == 0.0 {
         return;
     }
     // Cubic segments of at most 45 degrees: resolution independent and smooth at 4K.
-    let steps = (sweep / 45.0).ceil() as u32;
+    let steps = (sweep.abs() / 45.0).ceil() as u32;
     let step = sweep / steps as f32;
     let mut b = PathBuilder::new();
     let first = point(center, radius, start);
@@ -107,7 +107,7 @@ fn arc(
             cy + radius * z.sin(),
         );
     }
-    if sweep == 360.0 {
+    if sweep.abs() == 360.0 {
         b.close();
     }
     if let Some(path) = b.finish() {
@@ -236,6 +236,11 @@ pub(crate) fn draw_gauge(p: &mut Painter, g: &GaugeNode, at: Placement, ctx: &Ct
         .map_or(Color::rgba(255, 255, 255, 38), |c| ctx.theme.color(c));
     let mode = g.mode.unwrap_or_default();
     let (start, sweep) = g.angles();
+    let sweep = if g.clockwise == Some(false) {
+        -sweep
+    } else {
+        sweep
+    };
     let t = Instant::now();
     arc(p, center, radius, (start, sweep), width, track, alpha);
     if mode != GaugeMode::Needle
@@ -269,25 +274,39 @@ pub(crate) fn draw_gauge(p: &mut Painter, g: &GaugeNode, at: Placement, ctx: &Ct
             alpha,
         );
     }
-    if mode == GaugeMode::Needle {
+    if matches!(mode, GaugeMode::Needle | GaugeMode::Marker) {
         // An empty gauge parks the dimmed needle at the minimum, and shows a dash.
         let a = start + sweep * value.map_or(0.0, |v| fraction(v, min, max));
-        line(
-            p,
-            point(center, -diameter * s * 0.05, a),
-            point(center, radius * 0.69, a),
-            diameter * s * 0.018,
-            fill,
-            alpha,
-        );
-        if let Some(path) = PathBuilder::from_circle(center[0], center[1], diameter * s * 0.025) {
-            p.pixmap.fill_path(
-                &path,
-                &paint(fill, alpha),
-                FillRule::Winding,
-                Transform::identity(),
-                None,
+        if mode == GaugeMode::Marker {
+            let tip = point(center, radius, a);
+            if let Some(path) = PathBuilder::from_circle(tip[0], tip[1], width * 0.65) {
+                p.pixmap.fill_path(
+                    &path,
+                    &paint(fill, alpha),
+                    FillRule::Winding,
+                    Transform::identity(),
+                    None,
+                );
+            }
+        } else {
+            line(
+                p,
+                point(center, -diameter * s * 0.05, a),
+                point(center, radius * 0.69, a),
+                diameter * s * 0.018,
+                fill,
+                alpha,
             );
+            if let Some(path) = PathBuilder::from_circle(center[0], center[1], diameter * s * 0.025)
+            {
+                p.pixmap.fill_path(
+                    &path,
+                    &paint(fill, alpha),
+                    FillRule::Winding,
+                    Transform::identity(),
+                    None,
+                );
+            }
         }
     }
     p.stats.shapes += t.elapsed();
@@ -296,7 +315,7 @@ pub(crate) fn draw_gauge(p: &mut Painter, g: &GaugeNode, at: Placement, ctx: &Ct
             if i % 2 != 0 && i != ticks {
                 continue;
             }
-            if sweep == 360.0 && i == ticks {
+            if sweep.abs() == 360.0 && i == ticks {
                 break;
             }
             let a = start + sweep * i as f32 / ticks as f32;
@@ -334,7 +353,18 @@ pub(crate) fn draw_compass(p: &mut Painter, c: &CompassNode, at: Placement, ctx:
     if shown == Shown::Hidden {
         return;
     }
-    let value = display(resolved, shown).map(|v| heading(v) as f64);
+    let mut value = display(resolved, shown).map(|v| heading(v) as f64);
+    if let (Some(tel), Some(filter), Some(r), Some(_)) = (
+        ctx.telemetry,
+        c.smoothing.as_ref().filter(|f| f.enabled != Some(false)),
+        resolved,
+        value,
+    ) {
+        value = p
+            .headings
+            .sample(tel, r.metric, ctx.snap.t, filter)
+            .or(value);
+    }
     let dim = !matches!(shown, Shown::Value(_));
     let alpha = at.opacity * if dim { ctx.theme.dim_opacity } else { 1.0 };
     let diameter = d.diameter();

@@ -306,3 +306,47 @@ fn rendering_is_deterministic_in_process() {
     let b = render(&default_layout(), &full(), 480, 270);
     assert_eq!(a.data(), b.data());
 }
+
+#[test]
+fn m3_history_widgets() {
+    let layout = Layout::from_json(r#"{"version":1,"nodes":[
+      {"type":"map","mode":"moving_journey","size":[360,260],"offset":[24,24]},
+      {"type":"gradient_chart","metric":"alt","seconds":6,"size":[620,240],"offset":[450,24]},
+      {"type":"g_meter","show_peaks":true,"diameter":340,"offset":[24,360]},
+      {"type":"compass","metric":"heading","diameter":280,"offset":[450,380],"smoothing":{"seconds":0.5}}
+    ]}"#).unwrap().layout;
+    let points = |m| {
+        (0..=180)
+            .map(|i| {
+                let t = i as f64 / 18.0;
+                let value = match m {
+                    Metric::Lat => 45.0 + 0.0001 * t,
+                    Metric::Lon => 9.0 + 0.0001 * (t * 0.2).sin(),
+                    Metric::Alt => 400.0 + 20.0 * (t * 0.5).sin(),
+                    Metric::Gradient => 8.0 * (t * 0.5).cos(),
+                    Metric::AccelLon => 4.0 * (t * 0.5).cos(),
+                    Metric::AccelLat => 6.0 * (t * 0.5).sin(),
+                    Metric::Heading => 30.0 + t * 4.0,
+                    _ => 10.0,
+                };
+                (t, value)
+            })
+            .collect()
+    };
+    let data = [
+        Metric::Lat,
+        Metric::Lon,
+        Metric::Alt,
+        Metric::Gradient,
+        Metric::AccelLon,
+        Metric::AccelLat,
+        Metric::Heading,
+        Metric::Speed,
+    ]
+    .map(|m| (m, points(m)));
+    let telemetry = Telemetry::for_test(10.1, &data);
+    let mut renderer = Renderer::new();
+    let mut image = Pixmap::new(960, 540).unwrap();
+    renderer.render_telemetry_into(&layout, &telemetry, 6.0, &mut image);
+    check("m3_history_widgets", &image);
+}

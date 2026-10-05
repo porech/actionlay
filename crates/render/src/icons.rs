@@ -18,10 +18,12 @@ pub enum IconId {
     GpsOff,
     Clock,
     Location,
+    Heart,
+    Power,
 }
 
 impl IconId {
-    pub const ALL: [IconId; 9] = [
+    pub const ALL: [IconId; 11] = [
         IconId::Speed,
         IconId::Altitude,
         IconId::Gradient,
@@ -31,6 +33,8 @@ impl IconId {
         IconId::GpsOff,
         IconId::Clock,
         IconId::Location,
+        IconId::Heart,
+        IconId::Power,
     ];
 
     /// Name used in layouts (`"icon": "altitude"`).
@@ -45,6 +49,8 @@ impl IconId {
             IconId::GpsOff => "gps-off",
             IconId::Clock => "clock",
             IconId::Location => "location",
+            IconId::Heart => "heart",
+            IconId::Power => "power",
         }
     }
 
@@ -63,6 +69,8 @@ impl IconId {
             IconId::GpsOff => include_str!("../assets/icons/satellite-off.svg"),
             IconId::Clock => include_str!("../assets/icons/clock.svg"),
             IconId::Location => include_str!("../assets/icons/map-pin.svg"),
+            IconId::Heart => include_str!("../assets/icons/heart.svg"),
+            IconId::Power => include_str!("../assets/icons/power.svg"),
         }
     }
 }

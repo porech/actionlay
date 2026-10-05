@@ -70,7 +70,7 @@
             -20,
             16
           ],
-          "format": "{value:.5}°",
+          "format": "{value:.5}\u00b0",
           "size": 32,
           "weight": "medium"
         },
@@ -83,7 +83,7 @@
             -20,
             -16
           ],
-          "format": "{value:.5}°",
+          "format": "{value:.5}\u00b0",
           "size": 32,
           "weight": "medium"
         }
@@ -332,6 +332,24 @@
           "weight": "medium"
         }
       ]
+    },
+    {
+      "id": "training-chart",
+      "type": "gradient_chart",
+      "metric": "alt",
+      "size": [
+        620,
+        160
+      ],
+      "anchor": "bottom",
+      "offset_relative": [
+        0,
+        -0.025
+      ],
+      "seconds": 60,
+      "value_style": {
+        "size": 22
+      }
     }
   ]
 }

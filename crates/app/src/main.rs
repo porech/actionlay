@@ -30,6 +30,10 @@ struct App {
     video_path: Option<PathBuf>,
     title_dirty: bool,
     select_layout: bool,
+    select_audio: bool,
+    audio_devices: Vec<String>,
+    map_revision: u64,
+    import_draft: Option<(PathBuf, [u32; 2])>,
     player: Option<Player>,
     view: VideoView,
     error: Option<String>,
@@ -67,6 +71,52 @@ struct App {
 }
 
 impl App {
+    fn audio_dialog(&mut self, ctx: &egui::Context) {
+        if !self.select_audio {
+            return;
+        }
+        let mut open = true;
+        let mut selected = self.prefs.audio_device.clone();
+        egui::Window::new("Audio output")
+            .open(&mut open)
+            .collapsible(false)
+            .show(ctx, |ui| {
+                ui.selectable_value(&mut selected, None, "System default");
+                for name in &self.audio_devices {
+                    ui.selectable_value(&mut selected, Some(name.clone()), name);
+                }
+                if let Some(name) = &selected
+                    && !self.audio_devices.contains(name)
+                {
+                    ui.colored_label(egui::Color32::YELLOW, format!("Unavailable: {name}"));
+                }
+                if ui.button("Refresh devices").clicked() {
+                    match actionlay_media::audio::AudioOutput::devices() {
+                        Ok(names) => self.audio_devices = names,
+                        Err(e) => self.error = Some(e.to_string()),
+                    }
+                }
+            });
+        self.select_audio = open;
+        if selected != self.prefs.audio_device {
+            self.prefs.audio_device = selected;
+            self.save_prefs();
+            if let Some(path) = self.video_path.clone() {
+                let (position, paused, speed) =
+                    self.player.as_ref().map_or((0.0, true, 1.0), |p| {
+                        (p.position(), p.is_paused(), p.speed())
+                    });
+                self.open(path);
+                if let Some(p) = &mut self.player {
+                    p.seek(position, true);
+                    p.set_speed(speed);
+                    if !paused {
+                        p.play();
+                    }
+                }
+            }
+        }
+    }
     fn appearance_controls(&mut self, ui: &mut egui::Ui) {
         use actionlay_layout::model::Units;
         let theme = self
@@ -122,6 +172,118 @@ impl App {
         }
     }
 
+    fn import_dialog(&mut self, ctx: &egui::Context) {
+        let Some((path, mut size)) = self.import_draft.clone() else {
+            return;
+        };
+        let mut open = true;
+        let mut import = false;
+        egui::Window::new("Import XML layout")
+            .open(&mut open)
+            .collapsible(false)
+            .show(ctx, |ui| {
+                ui.label(path.file_name().unwrap_or_default().to_string_lossy());
+                ui.label("Reference video resolution");
+                ui.horizontal(|ui| {
+                    ui.add(
+                        egui::DragValue::new(&mut size[0])
+                            .range(1..=16384)
+                            .prefix("Width "),
+                    );
+                    ui.add(
+                        egui::DragValue::new(&mut size[1])
+                            .range(1..=16384)
+                            .prefix("Height "),
+                    );
+                });
+                import = ui.button("Import into layout library").clicked();
+            });
+        self.import_draft = if open {
+            Some((path.clone(), size))
+        } else {
+            None
+        };
+        if import {
+            let result = (|| -> Result<(PathBuf, Option<String>), String> {
+                let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+                let name = path.file_name().unwrap_or_default().to_string_lossy();
+                let converted = actionlay_layout::import::xml(&text, &name, size)?;
+                let dir = directories::ProjectDirs::from("org", "ActionLay", "ActionLay")
+                    .ok_or("Layout library unavailable")?
+                    .data_dir()
+                    .join("layouts");
+                std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+                let stem = path.file_stem().unwrap_or_default().to_string_lossy();
+                let mut out = dir.join(format!("{stem}.ovl.json"));
+                let mut i = 2;
+                while out.exists() {
+                    out = dir.join(format!("{stem}-{i}.ovl.json"));
+                    i += 1;
+                }
+                converted.layout.save(&out).map_err(|e| e.to_string())?;
+                let notes = if converted.warnings.is_empty() {
+                    None
+                } else {
+                    Some(
+                        converted
+                            .warnings
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                            .join("; "),
+                    )
+                };
+                Ok((out, notes))
+            })();
+            match result {
+                Ok((out, notes)) => {
+                    self.import_draft = None;
+                    self.open_layout(out);
+                    self.layout_notice = notes;
+                }
+                Err(e) => self.error = Some(e),
+            }
+        }
+    }
+
+    fn map_controls(&mut self, ui: &mut egui::Ui) {
+        let mut maps = self.prefs.maps.clone().unwrap_or_default();
+        let mut changed = false;
+        ui.collapsing("Maps and privacy",|ui| {
+            changed|=ui.checkbox(&mut maps.online,"Download visible map tiles").changed();
+            ui.small("Cached tiles remain available with downloads disabled.");
+            ui.horizontal(|ui|{
+                for (name,url,attr) in [("OSM","https://tile.openstreetmap.org/{z}/{x}/{y}.png","© OpenStreetMap contributors"),
+                    ("CyclOSM","https://a.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png","© CyclOSM · OpenStreetMap contributors"),
+                    ("Thunderforest","https://a.tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey={api_key}","© Thunderforest · OpenStreetMap contributors"),
+                    ("Geoapify","https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey={api_key}","© Geoapify · OpenStreetMap contributors")] {
+                    if ui.small_button(name).clicked(){maps.url=url.into();maps.attribution=attr.into();changed=true;}
+                }
+            });
+            ui.label("Tile URL ({z}, {x}, {y}, optional {api_key})");changed|=ui.text_edit_singleline(&mut maps.url).changed();
+            ui.label("API key");changed|=ui.add(egui::TextEdit::singleline(&mut maps.api_key).password(true)).changed();
+            ui.label("Attribution");changed|=ui.text_edit_singleline(&mut maps.attribution).changed();
+            if !maps.valid(){ui.colored_label(egui::Color32::YELLOW,"Downloads wait for a valid URL and attribution.");}
+            ui.separator();ui.label("Privacy zones (hide map position and route)");
+            let mut remove=None;
+            for (i,zone) in maps.privacy.iter_mut().enumerate(){ui.horizontal(|ui|{
+                changed|=ui.add(egui::DragValue::new(&mut zone.lat).speed(0.0001).range(-85.0..=85.0).prefix("Lat ")).changed();
+                changed|=ui.add(egui::DragValue::new(&mut zone.lon).speed(0.0001).range(-180.0..=180.0).prefix("Lon ")).changed();
+                changed|=ui.add(egui::DragValue::new(&mut zone.radius_m).range(1.0..=100000.0).suffix(" m")).changed();
+                if ui.small_button("Remove").clicked(){remove=Some(i);}
+            });}
+            if let Some(i)=remove {maps.privacy.remove(i);changed=true;}
+            if ui.button("Add privacy zone at current position").clicked(){let snap=self.loaded_telemetry.as_ref().map(|t|t.sample(self.shown_t.unwrap_or(0.0)));
+                maps.privacy.push(actionlay_maps::PrivacyZone{lat:snap.as_ref().and_then(|s|s.get(actionlay_telemetry::Metric::Lat).last_known()).unwrap_or(0.0),lon:snap.as_ref().and_then(|s|s.get(actionlay_telemetry::Metric::Lon).last_known()).unwrap_or(0.0),radius_m:250.0});changed=true;
+            }
+        });
+        if changed {
+            self.overlay.maps().configure(maps.clone());
+            self.prefs.maps = Some(maps);
+            self.save_prefs();
+        }
+    }
+
     fn layout_chooser(&mut self, ctx: &egui::Context) {
         if !self.select_layout {
             return;
@@ -133,45 +295,101 @@ impl App {
         egui::Window::new("Select Layout")
             .open(&mut visible)
             .collapsible(false)
-            .resizable(false)
-            .default_width(480.0)
+            .resizable(true)
+            .default_width(580.0)
             .show(ctx, |ui| {
-                ui.heading("Included layouts");
-                for preset in actionlay_layout::catalog::PRESETS {
-                    let active = self.prefs.last_layout.is_none()
-                        && self.prefs.last_builtin.as_deref().unwrap_or("default") == preset.id;
-                    if ui.selectable_label(active, preset.name).clicked() {
-                        builtin = Some(preset.id);
-                    }
-                    ui.small(preset.description);
-                }
-                ui.separator();
-                self.appearance_controls(ui);
-                ui.separator();
-                ui.heading("Recent layouts");
                 egui::ScrollArea::vertical()
-                    .max_height(280.0)
+                    .max_height(650.0)
                     .show(ui, |ui| {
-                        if self.prefs.recent_layouts.is_empty() {
-                            ui.weak("No layouts loaded from file yet.");
-                        }
-                        for path in &self.prefs.recent_layouts {
-                            let name = path.file_name().unwrap_or_default().to_string_lossy();
-                            if ui
-                                .selectable_label(
-                                    self.prefs.last_layout.as_ref() == Some(path),
-                                    name,
-                                )
-                                .on_hover_text(path.display().to_string())
-                                .clicked()
-                            {
-                                selected = Some(path.clone());
+                        ui.heading("Included layouts");
+                        for preset in actionlay_layout::catalog::PRESETS {
+                            let active = self.prefs.last_layout.is_none()
+                                && self.prefs.last_builtin.as_deref().unwrap_or("default")
+                                    == preset.id;
+                            if ui.selectable_label(active, preset.name).clicked() {
+                                builtin = Some(preset.id);
                             }
-                            ui.small(path.display().to_string());
+                            ui.small(preset.description);
                         }
+                        ui.collapsing("Upstream layout library", |ui| {
+                            egui::ScrollArea::vertical()
+                                .max_height(240.0)
+                                .show(ui, |ui| {
+                                    for preset in actionlay_layout::catalog::UPSTREAM_PRESETS {
+                                        if ui
+                                            .selectable_label(
+                                                self.prefs.last_builtin.as_deref()
+                                                    == Some(preset.id),
+                                                preset.name,
+                                            )
+                                            .clicked()
+                                        {
+                                            builtin = Some(preset.id);
+                                        }
+                                    }
+                                });
+                        });
+                        ui.separator();
+                        self.appearance_controls(ui);
+                        self.map_controls(ui);
+                        ui.separator();
+                        ui.collapsing("Imported layouts", |ui| {
+                            if let Some(root) =
+                                directories::ProjectDirs::from("org", "ActionLay", "ActionLay")
+                            {
+                                let mut files: Vec<_> =
+                                    std::fs::read_dir(root.data_dir().join("layouts"))
+                                        .into_iter()
+                                        .flatten()
+                                        .filter_map(Result::ok)
+                                        .map(|e| e.path())
+                                        .filter(|p| {
+                                            p.is_file()
+                                                && p.to_string_lossy().ends_with(".ovl.json")
+                                        })
+                                        .collect();
+                                files.sort();
+                                for path in files {
+                                    let name =
+                                        path.file_name().unwrap_or_default().to_string_lossy();
+                                    if ui
+                                        .selectable_label(
+                                            self.prefs.last_layout.as_ref() == Some(&path),
+                                            name,
+                                        )
+                                        .clicked()
+                                    {
+                                        selected = Some(path);
+                                    }
+                                }
+                            }
+                        });
+                        ui.heading("Recent layouts");
+                        egui::ScrollArea::vertical()
+                            .max_height(280.0)
+                            .show(ui, |ui| {
+                                if self.prefs.recent_layouts.is_empty() {
+                                    ui.weak("No layouts loaded from file yet.");
+                                }
+                                for path in &self.prefs.recent_layouts {
+                                    let name =
+                                        path.file_name().unwrap_or_default().to_string_lossy();
+                                    if ui
+                                        .selectable_label(
+                                            self.prefs.last_layout.as_ref() == Some(path),
+                                            name,
+                                        )
+                                        .on_hover_text(path.display().to_string())
+                                        .clicked()
+                                    {
+                                        selected = Some(path.clone());
+                                    }
+                                    ui.small(path.display().to_string());
+                                }
+                            });
+                        ui.separator();
+                        browse = ui.button("Open layout from file…").clicked();
                     });
-                ui.separator();
-                browse = ui.button("Open layout from file…").clicked();
             });
         self.select_layout = visible;
         if let Some(id) = builtin {
@@ -196,6 +414,13 @@ impl App {
     fn command(&mut self, command: menus::Command, ctx: &egui::Context) {
         match command {
             menus::Command::SelectLayout => self.select_layout = true,
+            menus::Command::AudioSettings => {
+                match actionlay_media::audio::AudioOutput::devices() {
+                    Ok(names) => self.audio_devices = names,
+                    Err(e) => self.error = Some(e.to_string()),
+                }
+                self.select_audio = true;
+            }
             menus::Command::OpenRecentVideo(index) => {
                 if let Some(path) = self.prefs.recent_videos.get(index).cloned() {
                     self.open(path);
@@ -216,7 +441,7 @@ impl App {
                 let mut dialog = if layout {
                     rfd::FileDialog::new()
                         .set_title("Open Layout")
-                        .add_filter("Overlay layout (.ovl.json)", &["json"])
+                        .add_filter("Overlay layout (.ovl.json or XML)", &["json", "xml"])
                 } else {
                     rfd::FileDialog::new().set_title("Open Video").add_filter(
                         "Video",
@@ -250,7 +475,15 @@ impl App {
                 self.title_dirty = true;
                 self.telemetry_rx = None;
                 self.loaded_telemetry = None;
-                self.video_notice = None;
+                self.video_notice = if self
+                    .player
+                    .as_ref()
+                    .is_some_and(|p| p.info().audio.is_some() && !p.stats().audio_active)
+                {
+                    Some("Audio output unavailable; playback is silent. Select a device in Settings → Audio.".into())
+                } else {
+                    None
+                };
                 self.failure_notice = None;
                 self.error = None;
                 self.shown_t = None;
@@ -268,7 +501,11 @@ impl App {
     }
 
     fn open(&mut self, path: PathBuf) {
-        match Player::open(&path, PlayerOptions::default()) {
+        match Player::open_with_audio_device(
+            &path,
+            PlayerOptions::default(),
+            self.prefs.audio_device.as_deref(),
+        ) {
             Ok(p) => {
                 let info = p.info();
                 let metadata = info.telemetry.clone();
@@ -316,6 +553,16 @@ impl App {
     }
 
     fn open_layout(&mut self, path: PathBuf) {
+        if path
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("xml"))
+        {
+            let name = path.file_name().unwrap_or_default().to_string_lossy();
+            let size = actionlay_layout::import::reference_size(&name).unwrap_or([1920, 1080]);
+            self.import_draft = Some((path, size));
+            return;
+        }
+
         // remembered as an absolute path: the app may be started from anywhere
         let path = std::path::absolute(&path).unwrap_or(path);
         match layouts::load(&path) {
@@ -489,6 +736,11 @@ impl eframe::App for App {
             }
         }
         self.poll_telemetry();
+        let map_revision = self.overlay.maps().revision();
+        if map_revision != self.map_revision {
+            self.map_revision = map_revision;
+            self.layout_rev += 1;
+        }
 
         if !ui.ctx().egui_wants_keyboard_input()
             && ui
@@ -521,6 +773,7 @@ impl eframe::App for App {
                 ui.small(n);
             }
         });
+        self.audio_dialog(ui.ctx());
         let mut open_clicked = false;
         egui::CentralPanel::default().show(ui, |ui| {
             let rect = ui.available_rect_before_wrap();
@@ -571,6 +824,7 @@ impl eframe::App for App {
             self.command(menus::Command::OpenVideo, ui.ctx());
         }
         self.layout_chooser(ui.ctx());
+        self.import_dialog(ui.ctx());
         if self.title_dirty {
             let title = self
                 .video_path
@@ -621,11 +875,18 @@ fn main() -> eframe::Result {
             let layout = Arc::new(styled);
             let ctx = cc.egui_ctx.clone();
             let overlay = OverlayWorker::spawn(layout.clone(), move || ctx.request_repaint());
+            overlay
+                .maps()
+                .configure(prefs.maps.clone().unwrap_or_default());
             let mut app = App {
                 menus: menus::Menus::new(&cc.egui_ctx)?,
                 video_path: None,
                 title_dirty: false,
                 select_layout: false,
+                select_audio: false,
+                audio_devices: Vec::new(),
+                map_revision: 0,
+                import_draft: None,
                 player: None,
                 view: VideoView::new(rs),
                 error: None,
