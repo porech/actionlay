@@ -252,8 +252,7 @@ impl Validator {
             }
             Widget::Datetime(d) => {
                 if let Some(f) = &d.format
-                    && chrono::format::StrftimeItems::new(f)
-                        .any(|i| matches!(i, chrono::format::Item::Error))
+                    && !format::is_valid_strftime(f)
                 {
                     self.error(&path, format!("invalid strftime format `{f}`"));
                 }

@@ -6,18 +6,21 @@ use actionlay_telemetry::units::{self, Unit, UnitSystem};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum Shown {
-    /// Drawn normally: a present value, or the last value of a gap shorter than the grace.
+    /// Drawn normally: a present value.
     Value(f64),
+    /// The last value of a gap, drawn dimmed while the gap is within the grace time.
+    Dimmed(f64),
     /// Designed empty state ("—" in the widget's style, dimmed).
     Empty,
     /// Not drawn at all.
     Hidden,
 }
 
-/// The empty-state policy (spec §4.4.1, rulings P1 and "stale grace"):
+/// The empty-state policy (spec §4.4.1, rulings P1 and R6):
 /// - `Present` → the value;
-/// - `Stale` younger than `grace_secs` → the value, as if present (short gaps are
-///   normal between samples and must not flicker); older → the empty state;
+/// - `Stale` (a real gap: telemetry already bridges gaps up to 2 s as `Present`) →
+///   its last value dimmed while `age <= grace_secs`, then the empty state; a grace of
+///   0 gives the empty state at once;
 /// - `Absent` → the empty state, or hidden when the widget says `hide` and the video
 ///   never has the metric (`available` false). A gap is never a reason to hide.
 pub(crate) fn shown(
@@ -28,7 +31,11 @@ pub(crate) fn shown(
 ) -> Shown {
     match value {
         Value::Present(v) if v.is_finite() => Shown::Value(v),
-        Value::Stale { value, age } if value.is_finite() && age < grace_secs => Shown::Value(value),
+        Value::Stale { value, age }
+            if value.is_finite() && grace_secs > 0.0 && age <= grace_secs =>
+        {
+            Shown::Dimmed(value)
+        }
         Value::Absent if !available && when_absent == WhenAbsent::Hide => Shown::Hidden,
         Value::Present(_) | Value::Stale { .. } | Value::Absent => Shown::Empty,
     }
@@ -90,13 +97,14 @@ mod tests {
             shown(Value::Present(f64::NAN), true, 3.0, show),
             Shown::Empty
         );
-        // a short gap renders as present, a long one as the empty state
-        assert_eq!(shown(stale(1.0, 2.0), true, 3.0, show), Shown::Value(1.0));
-        assert_eq!(shown(stale(1.0, 3.0), true, 3.0, show), Shown::Empty);
+        // a gap shows the last value dimmed for the grace time, then the empty state
+        assert_eq!(shown(stale(1.0, 2.0), true, 3.0, show), Shown::Dimmed(1.0));
+        assert_eq!(shown(stale(1.0, 3.0), true, 3.0, show), Shown::Dimmed(1.0));
         assert_eq!(shown(stale(1.0, 3.5), true, 3.0, show), Shown::Empty);
         assert_eq!(shown(stale(f64::NAN, 0.5), true, 3.0, show), Shown::Empty);
         // grace 0: the empty state immediately (spec §4.4.1 alternative)
         assert_eq!(shown(stale(1.0, 0.1), true, 0.0, show), Shown::Empty);
+        assert_eq!(shown(stale(1.0, 0.0), true, 0.0, show), Shown::Empty);
         // before the first sample
         assert_eq!(shown(Value::Absent, true, 3.0, show), Shown::Empty);
         assert_eq!(shown(Value::Absent, false, 3.0, show), Shown::Empty);
@@ -104,7 +112,7 @@ mod tests {
         assert_eq!(shown(Value::Absent, false, 3.0, hide), Shown::Hidden);
         assert_eq!(shown(Value::Absent, true, 3.0, hide), Shown::Empty);
         assert_eq!(shown(stale(1.0, 9.0), true, 3.0, hide), Shown::Empty);
-        assert_eq!(shown(stale(1.0, 1.0), true, 3.0, hide), Shown::Value(1.0));
+        assert_eq!(shown(stale(1.0, 1.0), true, 3.0, hide), Shown::Dimmed(1.0));
     }
 
     #[test]

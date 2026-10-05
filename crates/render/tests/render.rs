@@ -122,34 +122,69 @@ fn hide_applies_only_to_metrics_the_video_never_has() {
     assert!(max_alpha(&draw(&date, &before_first)) > 0);
 }
 
+/// Spec §4.4.1 (ruling R6): during a gap the last value is shown dimmed for the grace
+/// time (`stale_secs`, default 3 s), then the empty state.
 #[test]
-fn short_gaps_render_as_present_then_become_the_empty_state() {
+fn stale_values_are_dimmed_then_become_the_empty_state() {
     let l = layout(json!([{"type": "metric", "metric": "speed", "size": 120, "stale_secs": 3}]));
     let at = |v: Value| draw(&l, &snap(GpsLock::NoLock, &[("speed", v)]));
     let stale = |age| Value::Stale { value: 13.4, age };
     let present = at(Value::Present(13.4));
-    let empty = at(Value::Absent);
+    let absent = at(Value::Absent);
     assert_eq!(max_alpha(&present), 255);
-    assert_ne!(present.data(), empty.data());
-    assert_eq!(at(stale(1.0)).data(), present.data(), "within the grace");
-    assert_eq!(at(stale(3.0)).data(), empty.data(), "grace elapsed");
-    assert_eq!(at(stale(10.0)).data(), empty.data());
+    let recent = at(stale(1.0));
+    assert!(max_alpha(&recent) <= DIM);
+    assert_ne!(
+        recent.data(),
+        absent.data(),
+        "recent stale value is still shown"
+    );
+    assert_ne!(
+        recent.data(),
+        present.data(),
+        "recent stale value is dimmed"
+    );
+    // dimmed = the same value at dim_opacity
+    let faded =
+        layout(json!([{"type": "metric", "metric": "speed", "size": 120, "opacity": 0.45}]));
+    let faded = draw(
+        &faded,
+        &snap(GpsLock::NoLock, &[("speed", Value::Present(13.4))]),
+    );
+    assert_eq!(recent.data(), faded.data());
+    assert_eq!(
+        at(stale(3.0)).data(),
+        recent.data(),
+        "the grace includes its end"
+    );
+    let old = at(stale(10.0));
+    assert_eq!(
+        old.data(),
+        absent.data(),
+        "old stale value shows the empty state"
+    );
+    assert_eq!(at(stale(3.1)).data(), absent.data());
     // default grace is 3 s
     let d = layout(json!([{"type": "metric", "metric": "speed", "size": 120}]));
     let at_d = |v: Value| draw(&d, &snap(GpsLock::NoLock, &[("speed", v)]));
-    assert_eq!(at_d(stale(2.9)).data(), present.data());
-    assert_eq!(at_d(stale(3.1)).data(), empty.data());
+    assert_eq!(at_d(stale(2.9)).data(), recent.data());
+    assert_eq!(at_d(stale(3.1)).data(), absent.data());
     // stale_secs 0: the empty state immediately
     let z = layout(json!([{"type": "metric", "metric": "speed", "size": 120, "stale_secs": 0}]));
     let at_z = |v: Value| draw(&z, &snap(GpsLock::NoLock, &[("speed", v)]));
-    assert_eq!(at_z(stale(0.1)).data(), empty.data());
-    // the unit next to the value dims with it
+    assert_eq!(at_z(stale(0.1)).data(), absent.data());
+    assert_eq!(at_z(stale(0.0)).data(), absent.data());
+    // the unit next to the value dims with it (metric_unit uses the default grace)
     let u = layout(json!([{"type": "metric_unit", "metric": "speed", "size": 120}]));
     let at_u = |v: Value| draw(&u, &snap(GpsLock::NoLock, &[("speed", v)]));
-    let unit_present = at_u(Value::Present(13.4));
-    assert!(max_alpha(&unit_present) > DIM);
-    assert_eq!(at_u(stale(1.0)).data(), unit_present.data());
-    assert!(max_alpha(&at_u(stale(5.0))) <= DIM);
+    assert!(max_alpha(&at_u(Value::Present(13.4))) > DIM);
+    let unit_recent = at_u(stale(1.0));
+    assert!(max_alpha(&unit_recent) <= DIM);
+    assert_eq!(
+        at_u(stale(5.0)).data(),
+        unit_recent.data(),
+        "unit stays, dimmed"
+    );
 }
 
 #[test]
@@ -505,6 +540,32 @@ fn diagnose_reports_unknown_names() {
         issues.iter().any(|i| i.contains("children[0] (e)")),
         "{issues:#?}"
     );
+}
+
+#[test]
+fn gps_lock_icon_picks_the_icon_and_colour_by_fix() {
+    let gps = layout(json!([{"type": "gps_lock_icon", "size": 80}]));
+    let icon = |name: &str, color: &str, opacity: f64| {
+        let l = layout(
+            json!([{"type": "icon", "icon": name, "color": color, "size": 80,
+            "opacity": opacity}]),
+        );
+        draw(&l, &snap(GpsLock::Lock3d, &[]))
+    };
+    let at = |lock| draw(&gps, &snap(lock, &[]));
+    assert_eq!(
+        at(GpsLock::Lock3d).data(),
+        icon("gps", "accent", 1.0).data()
+    );
+    assert_eq!(
+        at(GpsLock::Lock2d).data(),
+        icon("gps", "primary", 1.0).data()
+    );
+    // no fix: the crossed-out satellite, dimmed (not a dimmed `gps`)
+    let off = icon("gps-off", "primary", 0.45);
+    assert_ne!(off.data(), icon("gps", "primary", 0.45).data());
+    assert_eq!(at(GpsLock::NoLock).data(), off.data());
+    assert_eq!(at(GpsLock::Unknown).data(), off.data());
 }
 
 #[test]

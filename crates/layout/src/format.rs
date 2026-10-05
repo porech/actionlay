@@ -139,9 +139,25 @@ pub fn apply(out: &mut String, pieces: &[Piece], value: Option<f64>, unit: &str)
         }
     }
 }
+/// True when `fmt` is a valid strftime format (for `datetime` widgets). Validation
+/// rejects invalid ones; the renderer shows the empty state for them.
+pub fn is_valid_strftime(fmt: &str) -> bool {
+    !chrono::format::StrftimeItems::new(fmt).any(|i| matches!(i, chrono::format::Item::Error))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn strftime_validity() {
+        for ok in ["%H:%M:%S", "%a %d %b %Y", "", "plain %%"] {
+            assert!(is_valid_strftime(ok), "{ok}");
+        }
+        for bad in ["%H:%Q", "%", "%E"] {
+            assert!(!is_valid_strftime(bad), "{bad}");
+        }
+    }
 
     fn fmt(format: &str, value: Option<f64>, unit: &str) -> String {
         let mut out = String::new();

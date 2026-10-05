@@ -18,7 +18,6 @@ use actionlay_layout::style::{ResolvedTheme, TextKind, TextStyle, defaults};
 use actionlay_telemetry::units::UnitSystem;
 use actionlay_telemetry::{GpsLock, Snapshot};
 use chrono::FixedOffset;
-use chrono::format::{Item, StrftimeItems};
 use tiny_skia::{FillRule, LineJoin, Path, Pixmap, PixmapPaint, Stroke, Transform};
 
 use crate::icons::{IconCache, IconId};
@@ -200,11 +199,16 @@ fn draw_metric(p: &mut Painter, m: &MetricNode, at: Placement, ctx: &Ctx) {
         ),
         None => value::shown_unknown(when_absent),
     };
-    let display = match shown {
+    let (value, dim) = match shown {
         Shown::Hidden => return,
-        Shown::Value(v) => resolved.map(|r| r.display(v)).filter(|d| d.is_finite()),
-        Shown::Empty => None,
+        Shown::Value(v) => (Some(v), false),
+        Shown::Dimmed(v) => (Some(v), true),
+        Shown::Empty => (None, true),
     };
+    let display = value
+        .zip(resolved)
+        .map(|(v, r)| r.display(v))
+        .filter(|d| d.is_finite());
     let symbol = resolved.map_or("", |r| r.symbol);
     let fmt = m.format.as_deref().unwrap_or(defaults::METRIC_FORMAT);
     p.scratch.clear();
@@ -221,7 +225,8 @@ fn draw_metric(p: &mut Painter, m: &MetricNode, at: Placement, ctx: &Ctx) {
         }
     };
     let style = m.style.resolve(TextKind::Metric, ctx.theme);
-    draw_text(p, &style, display.is_none(), at, ctx);
+    // dimmed for a gap, and for the empty state (no value, or one that cannot be shown)
+    draw_text(p, &style, dim || display.is_none(), at, ctx);
 }
 
 fn draw_metric_unit(p: &mut Painter, m: &MetricUnitNode, at: Placement, ctx: &Ctx) {
@@ -229,6 +234,8 @@ fn draw_metric_unit(p: &mut Painter, m: &MetricUnitNode, at: Placement, ctx: &Ct
     let Some(r) = value::resolve(&m.metric, m.units.as_deref(), ctx.system) else {
         return;
     };
+    // metric_unit has no `stale_secs` of its own: it always uses the default grace
+    // (3 s), so next to a metric with a custom grace the two may dim at different times
     let grace = f64::from(defaults::STALE_SECS);
     let shown = value::shown(
         ctx.snap.get(r.metric),
@@ -239,7 +246,7 @@ fn draw_metric_unit(p: &mut Painter, m: &MetricUnitNode, at: Placement, ctx: &Ct
     let dim = match shown {
         Shown::Hidden => return,
         Shown::Value(v) => !r.display(v).is_finite(),
-        Shown::Empty => true,
+        Shown::Dimmed(_) | Shown::Empty => true,
     };
     if r.symbol.is_empty() {
         return;
@@ -250,11 +257,6 @@ fn draw_metric_unit(p: &mut Painter, m: &MetricUnitNode, at: Placement, ctx: &Ct
     draw_text(p, &style, dim, at, ctx);
 }
 
-/// True when `fmt` is a valid strftime format.
-pub(crate) fn strftime_ok(fmt: &str) -> bool {
-    !StrftimeItems::new(fmt).any(|i| matches!(i, Item::Error))
-}
-
 fn draw_datetime(p: &mut Painter, d: &DatetimeNode, at: Placement, ctx: &Ctx) {
     // `utc` is None only when the video has no time at all (the "never available" case)
     if ctx.snap.utc.is_none() && d.when_absent.unwrap_or_default() == WhenAbsent::Hide {
@@ -263,7 +265,7 @@ fn draw_datetime(p: &mut Painter, d: &DatetimeNode, at: Placement, ctx: &Ctx) {
     let fmt = d.format.as_deref().unwrap_or(defaults::DATETIME_FORMAT);
     p.scratch.clear();
     let present = match ctx.snap.utc {
-        Some(utc) if strftime_ok(fmt) => {
+        Some(utc) if format::is_valid_strftime(fmt) => {
             let offset = match d.timezone.unwrap_or_default() {
                 DateZone::Utc => FixedOffset::east_opt(0).expect("zero offset"),
                 DateZone::Local => ctx.zone.offset_at(utc),

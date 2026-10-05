@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use actionlay_layout::Layout;
 use actionlay_layout::format;
 use actionlay_layout::geom::{Aspect, ScaleMode, root_box, scale_factor};
-use actionlay_layout::model::{Node, Units, Widget};
+use actionlay_layout::model::{Node, Units, WhenAbsent, Widget};
 use actionlay_layout::style::{ResolvedTheme, TextStyleOpt, Theme};
 use actionlay_layout::validate::Issue;
 use actionlay_telemetry::Snapshot;
@@ -196,11 +196,18 @@ fn check_style(style: &TextStyleOpt, path: &str, issues: &mut Vec<Issue>) {
     }
 }
 
-fn check_metric(metric: &str, units: Option<&str>, path: &str, issues: &mut Vec<Issue>) {
+/// `if_unknown`: what the widget does with an unknown metric id (it is never available).
+fn check_metric(
+    metric: &str,
+    units: Option<&str>,
+    if_unknown: &str,
+    path: &str,
+    issues: &mut Vec<Issue>,
+) {
     let Some(m) = Metric::from_id(metric) else {
         issues.push(Issue::warning(
             path,
-            format!("unknown metric `{metric}`: shown as empty"),
+            format!("unknown metric `{metric}`: {if_unknown}"),
         ));
         return;
     };
@@ -226,20 +233,25 @@ fn diagnose_node(node: &Node, path: String, issues: &mut Vec<Issue>) {
     };
     match w {
         Widget::Metric(m) => {
-            check_metric(&m.metric, m.units.as_deref(), &path, issues);
+            let if_unknown = match m.when_absent.unwrap_or_default() {
+                WhenAbsent::Show => "shown as empty",
+                WhenAbsent::Hide => "the widget is hidden (when_absent: hide)",
+            };
+            check_metric(&m.metric, m.units.as_deref(), if_unknown, &path, issues);
             if let Some(Err(e)) = m.format.as_deref().map(format::parse) {
                 issues.push(Issue::warning(&path, format!("{e}: shown as empty")));
             }
             check_style(&m.style, &path, issues);
         }
         Widget::MetricUnit(m) => {
-            check_metric(&m.metric, m.units.as_deref(), &path, issues);
+            let if_unknown = "no unit is drawn";
+            check_metric(&m.metric, m.units.as_deref(), if_unknown, &path, issues);
             check_style(&m.style, &path, issues);
         }
         Widget::Text(t) => check_style(&t.style, &path, issues),
         Widget::Datetime(d) => {
             if let Some(f) = &d.format
-                && !scene::strftime_ok(f)
+                && !format::is_valid_strftime(f)
             {
                 issues.push(Issue::warning(
                     &path,
