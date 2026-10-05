@@ -70,7 +70,7 @@
             -20,
             16
           ],
-          "format": "{value:.5}°",
+          "format": "{value:.5}\u00b0",
           "size": 32,
           "weight": "medium"
         },
@@ -83,7 +83,7 @@
             -20,
             -16
           ],
-          "format": "{value:.5}°",
+          "format": "{value:.5}\u00b0",
           "size": 32,
           "weight": "medium"
         }
@@ -94,12 +94,52 @@
       ]
     },
     {
+      "id": "course",
+      "type": "frame",
+      "anchor": "top-right",
+      "offset_relative": [
+        -0.018,
+        0.16
+      ],
+      "size": [
+        206,
+        224
+      ],
+      "children": [
+        {
+          "type": "text",
+          "text": "COURSE",
+          "offset": [
+            20,
+            16
+          ],
+          "size": 20,
+          "weight": "medium",
+          "color": "secondary"
+        },
+        {
+          "id": "course-compass",
+          "type": "compass",
+          "metric": "cog",
+          "diameter": 166,
+          "offset": [
+            20,
+            48
+          ],
+          "thickness": 6,
+          "value_style": {
+            "size": 24
+          }
+        }
+      ]
+    },
+    {
       "id": "speed",
       "type": "frame",
       "anchor": "bottom-left",
       "size": [
         340,
-        224
+        352
       ],
       "children": [
         {
@@ -127,42 +167,24 @@
           "weight": "medium"
         },
         {
-          "id": "speed-value",
-          "type": "metric",
+          "id": "speed-gauge",
+          "type": "gauge",
           "metric": "speed",
-          "anchor": "bottom-left",
+          "diameter": 270,
           "offset": [
-            18,
-            -34
+            35,
+            62
           ],
-          "size": 120
-        },
-        {
-          "id": "speed-unit",
-          "type": "metric_unit",
-          "metric": "speed",
-          "anchor": "bottom-right",
-          "offset": [
-            -20,
-            -48
-          ],
-          "size": 30
-        },
-        {
-          "id": "speed-bar",
-          "type": "bar",
-          "metric": "speed",
+          "mode": "needle",
           "max": 220,
-          "size": [
-            300,
-            8
-          ],
-          "offset": [
-            20,
-            204
-          ],
-          "show_value": false,
-          "track": "#ffffff18"
+          "ticks": 10,
+          "value_style": {
+            "size": 36,
+            "weight": "bold"
+          },
+          "label_style": {
+            "color": "secondary"
+          }
         }
       ],
       "offset_relative": [

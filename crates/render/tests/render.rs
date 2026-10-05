@@ -55,6 +55,185 @@ fn lowest_drawn_row(p: &Pixmap) -> Option<u32> {
 /// shadow (89 × 0.45) composite to at most ~183; undimmed text reaches 255.
 const DIM: u8 = 190;
 
+fn instrument(ty: &str, metric: &str, mode: &str) -> Layout {
+    layout(
+        json!([{"type":ty,"metric":metric,"mode":mode,"diameter":300,
+        "fill":"#ff0000","track":"#00000000","show_value":false,
+        "label_style":{"color":"#00000000"}}]),
+    )
+}
+
+fn red_at(p: &Pixmap, x: u32, y: u32) -> bool {
+    (x - 2..=x + 2).any(|x| {
+        (y - 2..=y + 2).any(|y| {
+            let c = p.pixel(x, y).unwrap();
+            c.red() > 180 && c.green() < 20 && c.blue() < 20
+        })
+    })
+}
+
+#[test]
+fn compass_points_clockwise_from_north_and_wraps_on_seek() {
+    let l = instrument("compass", "cog", "arrow");
+    let mut r = renderer();
+    let make = |v| snap(GpsLock::Lock3d, &[("cog", Value::Present(v))]);
+    for (v, x, y) in [
+        (0.0, 150, 80),
+        (90.0, 220, 150),
+        (180.0, 150, 220),
+        (270.0, 80, 150),
+    ] {
+        let p = r.render(&l, &make(v), 1080, 1080);
+        assert!(red_at(&p, x, y), "heading {v}");
+    }
+    let north = r.render(&l, &make(0.0), 1080, 1080);
+    assert_eq!(north.data(), r.render(&l, &make(360.0), 1080, 1080).data());
+    assert_eq!(
+        r.render(&l, &make(-90.0), 1080, 1080).data(),
+        r.render(&l, &make(270.0), 1080, 1080).data()
+    );
+    let mut rotating = l.clone();
+    let Node::Known(Widget::Compass(c)) = &mut rotating.nodes[0] else {
+        panic!()
+    };
+    c.rotate_rose = Some(true);
+    assert!(red_at(
+        &r.render(&rotating, &make(90.0), 1080, 1080),
+        150,
+        80
+    ));
+}
+
+#[test]
+fn gauges_clamp_needles_and_convert_units_before_mapping_the_scale() {
+    let mut l = instrument("gauge", "speed", "needle");
+    let Node::Known(Widget::Gauge(g)) = &mut l.nodes[0] else {
+        panic!()
+    };
+    g.min = Some(0.0);
+    g.max = Some(36.0);
+    g.ticks = Some(0);
+    let mut r = renderer();
+    let make = |v| snap(GpsLock::Lock3d, &[("speed", Value::Present(v))]);
+    let middle = r.render(&l, &make(5.0), 1080, 1080); // 18 km/h, half of 36.
+    assert!(red_at(&middle, 150, 66));
+    let min = r.render(&l, &make(0.0), 1080, 1080);
+    assert_eq!(min.data(), r.render(&l, &make(-10.0), 1080, 1080).data());
+    let max = r.render(&l, &make(10.0), 1080, 1080);
+    assert_eq!(max.data(), r.render(&l, &make(50.0), 1080, 1080).data());
+    assert!(red_at(&max, 209, 209));
+    let Node::Known(Widget::Gauge(g)) = &mut l.nodes[0] else {
+        panic!()
+    };
+    g.dial.units = Some("mph".into());
+    g.max = Some(22.369362920544);
+    assert!(red_at(&r.render(&l, &make(5.0), 1080, 1080), 150, 66));
+}
+
+#[test]
+fn circular_instruments_distinguish_missing_stale_and_hidden_values() {
+    for (ty, metric, mode) in [("gauge", "speed", "arc"), ("compass", "cog", "rose")] {
+        let mut l = instrument(ty, metric, mode);
+        let Node::Known(w) = &mut l.nodes[0] else {
+            panic!()
+        };
+        let d = match w {
+            Widget::Gauge(g) => &mut g.dial,
+            Widget::Compass(c) => &mut c.dial,
+            _ => unreachable!(),
+        };
+        d.track = None;
+        d.show_value = Some(true);
+        let mut r = renderer();
+        let full = r.render(
+            &l,
+            &snap(GpsLock::Lock3d, &[(metric, Value::Present(90.0))]),
+            1080,
+            1080,
+        );
+        let stale = r.render(
+            &l,
+            &snap(
+                GpsLock::Lock3d,
+                &[(
+                    metric,
+                    Value::Stale {
+                        value: 90.0,
+                        age: 1.0,
+                    },
+                )],
+            ),
+            1080,
+            1080,
+        );
+        assert!(max_alpha(&full) > max_alpha(&stale));
+        let empty = Telemetry::empty(10.0).sample(1.0);
+        let missing = r.render(&l, &empty, 1080, 1080);
+        assert!(max_alpha(&missing) > 0);
+        assert_eq!(
+            missing.data(),
+            r.render(
+                &l,
+                &snap(
+                    GpsLock::Lock3d,
+                    &[(
+                        metric,
+                        Value::Stale {
+                            value: 90.0,
+                            age: 4.0
+                        }
+                    )]
+                ),
+                1080,
+                1080
+            )
+            .data()
+        );
+        let Node::Known(w) = &mut l.nodes[0] else {
+            panic!()
+        };
+        match w {
+            Widget::Gauge(g) => {
+                g.dial.when_absent = Some(actionlay_layout::model::WhenAbsent::Hide)
+            }
+            Widget::Compass(c) => {
+                c.dial.when_absent = Some(actionlay_layout::model::WhenAbsent::Hide)
+            }
+            _ => unreachable!(),
+        };
+        assert_eq!(max_alpha(&r.render(&l, &empty, 1080, 1080)), 0);
+    }
+    let wrong = instrument("compass", "speed", "arrow");
+    assert!(
+        diagnose(&wrong)
+            .iter()
+            .any(|i| i.message.contains("angular metric"))
+    );
+}
+
+#[test]
+fn donut_has_no_fill_at_minimum_and_a_complete_ring_at_maximum() {
+    let l = instrument("gauge", "hr", "donut");
+    let mut r = renderer();
+    let min = r.render(
+        &l,
+        &snap(GpsLock::Lock3d, &[("hr", Value::Present(0.0))]),
+        1080,
+        1080,
+    );
+    assert_eq!(max_alpha(&min), 0);
+    let max = r.render(
+        &l,
+        &snap(GpsLock::Lock3d, &[("hr", Value::Present(100.0))]),
+        1080,
+        1080,
+    );
+    for (x, y) in [(150, 24), (276, 150), (150, 276), (24, 150)] {
+        assert!(red_at(&max, x, y));
+    }
+    assert_eq!(max.pixel(150, 150).unwrap().alpha(), 0);
+}
+
 #[test]
 fn empty_snapshot_draws_dashes_and_no_lock() {
     let empty = Telemetry::empty(10.0).sample(1.0);

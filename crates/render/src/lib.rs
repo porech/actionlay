@@ -1,5 +1,6 @@
 //! ActionLay overlay renderer: (layout, snapshot, size) → premultiplied RGBA (spec §4.5).
 //! CPU only (tiny-skia), embedded fonts and icons: same output on every machine.
+mod dials;
 mod icons;
 mod scene;
 mod shapes;
@@ -232,6 +233,31 @@ fn diagnose_node(node: &Node, path: String, issues: &mut Vec<Issue>) {
         None => path,
     };
     match w {
+        Widget::Gauge(actionlay_layout::model::GaugeNode { dial: d, .. })
+        | Widget::Compass(actionlay_layout::model::CompassNode { dial: d, .. }) => {
+            check_metric(
+                &d.metric,
+                d.units.as_deref(),
+                "shown as empty or hidden by when_absent",
+                &path,
+                issues,
+            );
+            if let Widget::Compass(_) = w
+                && Metric::from_id(&d.metric)
+                    .is_some_and(|m| m.quantity() != actionlay_telemetry::units::Quantity::Angle)
+            {
+                issues.push(Issue::warning(
+                    &path,
+                    "compass requires an angular metric: shown as empty",
+                ));
+            }
+            for style in [&d.value_style, &d.label_style].into_iter().flatten() {
+                check_style(style, &path, issues);
+            }
+            if let Some(Err(e)) = d.format.as_deref().map(format::parse) {
+                issues.push(Issue::warning(&path, format!("{e}: shown as empty")));
+            }
+        }
         Widget::Bar(b) | Widget::ZoneBar(actionlay_layout::model::ZoneBarNode { bar: b, .. }) => {
             check_metric(
                 &b.metric,

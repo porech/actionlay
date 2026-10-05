@@ -54,8 +54,10 @@ as a single executable for Windows, macOS and Linux.
   (braking/acceleration bars) and Training (heart-rate/power zones), inspired
   by the upstream dashboards. Widget sizes follow the video, and margins
   use relative distances. Appearance controls change accent, panel opacity
-  and unit system across layouts and save immediately. Maps, charts and
-  circular gauges are still part of the remaining M3 work.
+  and unit system across layouts and save immediately. Moto includes a needle
+  speedometer and a GPS course compass. Circular gauges also support arcs and
+  donuts, and compasses support rotating roses or simple arrows. Styling is
+  editable in layout JSON; maps, charts, the G-meter and XML import remain M3 work.
 
 ## Roadmap
 

@@ -125,6 +125,31 @@ impl Validator {
         }
     }
 
+    fn dial(&mut self, path: &str, d: &crate::model::DialNode) {
+        if d.metric.is_empty() {
+            self.error(path, "metric must not be empty");
+        }
+        self.positive(path, "diameter", d.diameter());
+        self.positive(path, "thickness", d.thickness());
+        if d.thickness() > d.diameter() * 0.2 {
+            self.error(path, "thickness must not exceed 20% of diameter");
+        }
+        if let Some(secs) = d.stale_secs {
+            self.non_negative(path, "stale_secs", secs);
+        }
+        if let Some(f) = &d.format
+            && let Err(e) = format::parse(f)
+        {
+            self.error(path, e.to_string());
+        }
+        if let Some(style) = &d.value_style {
+            self.style(&format!("{path}.value_style"), style);
+        }
+        if let Some(style) = &d.label_style {
+            self.style(&format!("{path}.label_style"), style);
+        }
+    }
+
     fn error(&mut self, path: &str, message: impl Into<String>) {
         self.issues.push(Issue::error(path, message));
     }
@@ -249,6 +274,24 @@ impl Validator {
         self.common(&path, w.common());
         self.extra(&path, w.extra());
         match w {
+            Widget::Gauge(g) => {
+                self.dial(&path, &g.dial);
+                let (min, max) = g.range();
+                if !(min.is_finite() && max.is_finite() && max > min && (max - min).is_finite()) {
+                    self.error(&path, "range must be finite with max greater than min");
+                }
+                let (start, sweep) = g.angles();
+                if !start.is_finite() || !(-360.0..=360.0).contains(&start) {
+                    self.error(&path, "start_angle must be between -360 and 360");
+                }
+                if !(sweep.is_finite() && sweep > 0.0 && sweep <= 360.0) {
+                    self.error(&path, "sweep_angle must be greater than 0 and at most 360");
+                }
+                if g.ticks.is_some_and(|n| n > 72) {
+                    self.error(&path, "ticks must not exceed 72");
+                }
+            }
+            Widget::Compass(c) => self.dial(&path, &c.dial),
             Widget::Bar(b) => self.bar(&path, b),
             Widget::ZoneBar(z) => {
                 self.bar(&path, &z.bar);

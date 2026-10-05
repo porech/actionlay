@@ -290,6 +290,195 @@
       "pattern": "^(primary|secondary|accent|panel|#([0-9a-fA-F]{6}|[0-9a-fA-F]{8}))$",
       "type": "string"
     },
+    "CompassMode": {
+      "enum": [
+        "rose",
+        "arrow"
+      ],
+      "type": "string"
+    },
+    "CompassNode": {
+      "additionalProperties": true,
+      "description": "Compass for an angular metric (usually GPS course `cog`). Heading is in degrees,\nclockwise from north. A rotating rose keeps the heading pointer facing upwards.",
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anchor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: top-left."
+        },
+        "diameter": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fill": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "format": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "label_style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextStyleOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "metric": {
+          "type": "string"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CompassMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "offset": {
+          "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "offset_relative": {
+          "description": "Additional offset as fractions of the parent's width and height.\n[0.02, -0.02] gives a 2% inset at a bottom-left anchor.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "opacity": {
+          "description": "0..=1, multiplies down the tree. Default 1.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "rotate_rose": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "show_value": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "stale_secs": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "thickness": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "track": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value_style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextStyleOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "visible": {
+          "description": "Default true.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "when_absent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WhenAbsent"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "metric"
+      ],
+      "type": "object"
+    },
     "DateZone": {
       "oneOf": [
         {
@@ -578,6 +767,232 @@
       },
       "required": [
         "size"
+      ],
+      "type": "object"
+    },
+    "GaugeMode": {
+      "enum": [
+        "arc",
+        "needle",
+        "donut"
+      ],
+      "type": "string"
+    },
+    "GaugeNode": {
+      "additionalProperties": true,
+      "description": "Circular indicator. Range limits are in display units, as for bars.\nAngles run clockwise from the right; the default arc runs from 135° through 270°.",
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anchor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: top-left."
+        },
+        "diameter": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fill": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "format": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "label_style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextStyleOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "metric": {
+          "type": "string"
+        },
+        "min": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GaugeMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "offset": {
+          "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "offset_relative": {
+          "description": "Additional offset as fractions of the parent's width and height.\n[0.02, -0.02] gives a 2% inset at a bottom-left anchor.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "opacity": {
+          "description": "0..=1, multiplies down the tree. Default 1.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "show_labels": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "show_value": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "stale_secs": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "start_angle": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "sweep_angle": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "thickness": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ticks": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "track": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value_style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextStyleOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "visible": {
+          "description": "Default true.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "when_absent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WhenAbsent"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "metric"
       ],
       "type": "object"
     },
@@ -1290,6 +1705,32 @@
           "properties": {
             "type": {
               "const": "zone_bar",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/GaugeNode",
+          "properties": {
+            "type": {
+              "const": "gauge",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/CompassNode",
+          "properties": {
+            "type": {
+              "const": "compass",
               "type": "string"
             }
           },

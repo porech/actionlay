@@ -24,6 +24,7 @@ fn main() {
         ("hr", 168.0),
         ("power", 238.0),
         ("cadence", 87.0),
+        ("cog", 65.0),
     ]
     .map(|(m, v)| (Metric::from_id(m).unwrap(), Value::Present(v)));
     let snapshot = Snapshot::for_test(

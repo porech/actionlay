@@ -315,6 +315,112 @@ pub struct ZoneBarNode {
     pub zones: Option<Vec<BarZone>>,
 }
 
+/// Shared style and value policy of circular instruments. Sizes are in layout units.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct DialNode {
+    #[serde(flatten)]
+    pub common: Common,
+    pub metric: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub units: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diameter: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thickness: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fill: Option<ColorRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub track: Option<ColorRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub show_value: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value_style: Option<TextStyleOpt>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label_style: Option<TextStyleOpt>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when_absent: Option<WhenAbsent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stale_secs: Option<f32>,
+    #[serde(flatten)]
+    pub extra: Extra,
+}
+
+impl DialNode {
+    pub fn diameter(&self) -> f32 {
+        self.diameter.unwrap_or(270.0)
+    }
+    pub fn thickness(&self) -> f32 {
+        self.thickness.unwrap_or(10.0)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum GaugeMode {
+    #[default]
+    Arc,
+    Needle,
+    Donut,
+}
+
+/// Circular indicator. Range limits are in display units, as for bars.
+/// Angles run clockwise from the right; the default arc runs from 135° through 270°.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct GaugeNode {
+    #[serde(flatten)]
+    pub dial: DialNode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<GaugeMode>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_angle: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sweep_angle: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ticks: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub show_labels: Option<bool>,
+}
+impl GaugeNode {
+    pub fn range(&self) -> (f64, f64) {
+        (self.min.unwrap_or(0.0), self.max.unwrap_or(100.0))
+    }
+    pub fn angles(&self) -> (f32, f32) {
+        let donut = self.mode == Some(GaugeMode::Donut);
+        (
+            self.start_angle
+                .unwrap_or(if donut { -90.0 } else { 135.0 }),
+            self.sweep_angle
+                .unwrap_or(if donut { 360.0 } else { 270.0 }),
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CompassMode {
+    #[default]
+    Rose,
+    Arrow,
+}
+
+/// Compass for an angular metric (usually GPS course `cog`). Heading is in degrees,
+/// clockwise from north. A rotating rose keeps the heading pointer facing upwards.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct CompassNode {
+    #[serde(flatten)]
+    pub dial: DialNode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<CompassMode>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rotate_rose: Option<bool>,
+}
+
 /// Node types this version understands.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -329,10 +435,12 @@ pub enum Widget {
     GpsLockIcon(GpsLockIconNode),
     Bar(BarNode),
     ZoneBar(ZoneBarNode),
+    Gauge(GaugeNode),
+    Compass(CompassNode),
 }
 
 impl Widget {
-    pub const TYPES: [&'static str; 10] = [
+    pub const TYPES: [&'static str; 12] = [
         "group",
         "frame",
         "text",
@@ -343,6 +451,8 @@ impl Widget {
         "gps_lock_icon",
         "bar",
         "zone_bar",
+        "gauge",
+        "compass",
     ];
 
     pub fn common(&self) -> &Common {
@@ -357,6 +467,8 @@ impl Widget {
             Widget::GpsLockIcon(n) => &n.common,
             Widget::Bar(n) => &n.common,
             Widget::ZoneBar(n) => &n.bar.common,
+            Widget::Gauge(n) => &n.dial.common,
+            Widget::Compass(n) => &n.dial.common,
         }
     }
 
@@ -372,6 +484,8 @@ impl Widget {
             Widget::GpsLockIcon(n) => &n.extra,
             Widget::Bar(n) => &n.extra,
             Widget::ZoneBar(n) => &n.bar.extra,
+            Widget::Gauge(n) => &n.dial.extra,
+            Widget::Compass(n) => &n.dial.extra,
         }
     }
 
@@ -387,6 +501,8 @@ impl Widget {
             Widget::GpsLockIcon(_) => "gps_lock_icon",
             Widget::Bar(_) => "bar",
             Widget::ZoneBar(_) => "zone_bar",
+            Widget::Gauge(_) => "gauge",
+            Widget::Compass(_) => "compass",
         }
     }
 
@@ -688,7 +804,9 @@ mod tests {
             {"type": "icon", "icon": "altitude", "size": 32, "color": "accent"},
             {"type": "gps_lock_icon", "size": 40},
             {"type": "bar", "metric": "speed"},
-            {"type": "zone_bar", "metric": "hr"}
+            {"type": "zone_bar", "metric": "hr"},
+            {"type": "gauge", "metric": "speed"},
+            {"type": "compass", "metric": "cog"}
         ]);
         let parsed: Vec<Node> = serde_json::from_value(nodes).unwrap();
         let types: Vec<&str> = parsed.iter().map(Node::type_name).collect();

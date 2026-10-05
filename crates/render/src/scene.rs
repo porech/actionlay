@@ -37,7 +37,7 @@ pub(crate) struct FormatCache {
 const MAX_FORMATS: usize = 256;
 
 impl FormatCache {
-    fn get(&mut self, fmt: &str) -> Option<&[Piece]> {
+    pub(crate) fn get(&mut self, fmt: &str) -> Option<&[Piece]> {
         if !self.map.contains_key(fmt) {
             if self.map.len() >= MAX_FORMATS {
                 self.map.clear();
@@ -80,10 +80,10 @@ pub(crate) struct Painter<'p> {
 /// Where a leaf widget goes: anchored in `parent` (layout units).
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Placement {
-    parent: Rect,
-    anchor: Anchor,
-    offset: [f32; 2],
-    opacity: f32,
+    pub(crate) parent: Rect,
+    pub(crate) anchor: Anchor,
+    pub(crate) offset: [f32; 2],
+    pub(crate) opacity: f32,
 }
 
 pub(crate) fn draw_nodes(p: &mut Painter, nodes: &[Node], parent: Rect, opacity: f32, ctx: &Ctx) {
@@ -123,6 +123,8 @@ pub(crate) fn draw_nodes(p: &mut Painter, nodes: &[Node], parent: Rect, opacity:
                     ctx,
                 );
             }
+            Widget::Gauge(g) => crate::dials::draw_gauge(p, g, at, ctx),
+            Widget::Compass(c) => crate::dials::draw_compass(p, c, at, ctx),
             Widget::Bar(b) => draw_bar(p, b, None, false, at, ctx),
             Widget::ZoneBar(b) => draw_bar(p, &b.bar, b.zones.as_deref(), true, at, ctx),
             Widget::Metric(m) => draw_metric(p, m, at, ctx),
@@ -143,7 +145,7 @@ pub(crate) fn draw_nodes(p: &mut Painter, nodes: &[Node], parent: Rect, opacity:
 
 /// Draws `p.scratch` with `style`, anchored by its line box (not by its ink, so values
 /// do not jump as their digits change).
-fn draw_text(p: &mut Painter, style: &TextStyle, dim: bool, at: Placement, ctx: &Ctx) {
+pub(crate) fn draw_text(p: &mut Painter, style: &TextStyle, dim: bool, at: Placement, ctx: &Ctx) {
     let start = Instant::now();
     let s = ctx.scale;
     let (w_px, h_px) = p.text.layout(p.scratch, style.size * s, style.weight);

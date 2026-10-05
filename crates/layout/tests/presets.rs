@@ -77,3 +77,32 @@ fn relative_offsets_use_the_parent_dimensions_and_keep_scaled_offsets() {
     f.common.offset_relative = Some([f32::NAN, 0.0]);
     assert!(layout.to_json().is_err());
 }
+
+#[test]
+fn circular_instruments_reject_invalid_geometry_and_round_trip_styles() {
+    for node in [
+        json!({"type":"gauge","metric":"speed","min":100,"max":100}),
+        json!({"type":"gauge","metric":"speed","sweep_angle":0}),
+        json!({"type":"gauge","metric":"speed","sweep_angle":361}),
+        json!({"type":"gauge","metric":"speed","start_angle":1000}),
+        json!({"type":"gauge","metric":"speed","ticks":10000}),
+        json!({"type":"compass","metric":"cog","diameter":0}),
+        json!({"type":"compass","metric":"cog","thickness":-1}),
+        json!({"type":"compass","metric":"cog","diameter":100,"thickness":21}),
+        json!({"type":"compass","metric":"cog","stale_secs":-1}),
+    ] {
+        assert!(Layout::from_json(&json!({"version":1,"nodes":[node]}).to_string()).is_err());
+    }
+    for node in [
+        json!({"type":"gauge","metric":"speed","mode":"donut","diameter":220,"max":80,"ticks":0,
+            "fill":"accent","value_style":{"size":30},"label_style":{"color":"secondary"}}),
+        json!({"type":"compass","metric":"cog","mode":"arrow","rotate_rose":true,
+            "offset_relative":[0.1,0.1],"when_absent":"hide","format":"{value:.0}°"}),
+    ] {
+        let loaded = Layout::from_json(&json!({"version":1,"nodes":[node]}).to_string()).unwrap();
+        assert!(loaded.warnings.is_empty(), "{:?}", loaded.warnings);
+        let again = Layout::from_json(&loaded.layout.to_json().unwrap()).unwrap();
+        assert_eq!(loaded.layout, again.layout);
+        assert!(again.warnings.is_empty());
+    }
+}
