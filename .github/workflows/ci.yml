@@ -65,14 +65,14 @@ jobs:
 
       - name: Build FFmpeg (macOS/Linux)
         if: runner.os != 'Windows'
-        run: ./scripts/build-ffmpeg.sh ${{ matrix.target }}
+        run: make ffmpeg
 
       - name: Build FFmpeg (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
           if [ -f /usr/bin/link.exe ]; then mv /usr/bin/link.exe /usr/bin/link.exe.bak; fi
-          ./scripts/build-ffmpeg.sh ${{ matrix.target }}
+          make ffmpeg
 
       - name: Export FFMPEG_DIR
         run: echo "FFMPEG_DIR=$GITHUB_WORKSPACE/third_party/ffmpeg/${{ matrix.target }}" >> "$GITHUB_ENV"
@@ -102,7 +102,7 @@ jobs:
 
       - name: Synthetic samples (macOS/Linux)
         if: runner.os != 'Windows' && steps.samples-cache.outputs.cache-hit != 'true'
-        run: ./scripts/make-synthetic-samples.sh
+        run: make synthetic-samples
 
       - name: Export ACTIONLAY_SAMPLES (macOS/Linux)
         if: runner.os != 'Windows'
@@ -120,7 +120,8 @@ jobs:
 
       - name: Fetch GoPro samples
         if: steps.gopro-cache.outputs.cache-hit != 'true'
-        run: bash ./scripts/fetch-gopro-samples.sh
+        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
+        run: make gopro-samples
 
       - name: Require GoPro samples in tests
         run: echo "ACTIONLAY_REQUIRE_GOPRO_SAMPLES=1" >> "$GITHUB_ENV"
@@ -139,14 +140,20 @@ jobs:
             exit 1
           fi
 
-      - run: cargo fmt --all --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Check formatting
+        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
+        run: make fmt-check
+      - name: Run Clippy
+        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
+        run: make clippy
       # Player tests open the audio device and are timing-sensitive, so they
       # must not run concurrently. Every other test is fast; running the whole
       # workspace single-threaded keeps each test running exactly once (a
       # per-target split cannot exclude only tests/player.rs, and
       # `--exclude actionlay-media` fails while it is the only member).
-      - run: cargo test --workspace -- --test-threads=1
+      - name: Run workspace tests
+        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
+        run: make test
 
       - name: Upload golden image diffs
         if: failure()
@@ -157,7 +164,8 @@ jobs:
           if-no-files-found: ignore
 
       - name: Build release binaries
-        run: cargo build --release -p actionlay-app -p actionlay-media -p actionlay-telemetry-cli --bins
+        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
+        run: make build
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4

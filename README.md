@@ -129,17 +129,25 @@ audio/video offset and the time it takes to draw the overlay.
 ## Building from source
 
 You need Rust (the version is pinned in `rust-toolchain.toml` and installed
-automatically by rustup), Git, and the tools needed to build FFmpeg:
+automatically by rustup), Git, Make, and the tools needed to build FFmpeg:
 `nasm` and a C compiler. On Linux you also need the `libva` and ALSA
 development headers.
 
 ```bash
 git clone https://github.com/porech/actionlay.git
 cd actionlay
-./scripts/build-ffmpeg.sh            # builds a static FFmpeg into third_party/ (takes a few minutes)
-source scripts/env.sh                # tells cargo where that FFmpeg is
-cargo run --release -p actionlay-app -- path/to/video.mp4
+make run                           # builds FFmpeg if needed, then launches the app
+make run ARGS="path/to/video.mp4"   # optionally open a video on launch
 ```
+
+The Makefile sets `FFMPEG_DIR` automatically for each command. `make build`
+builds the release binaries in `target/release/`; `make check` checks formatting
+and runs Clippy, and `make fmt` formats Rust code. Run `make help` for all commands.
+The first FFmpeg build takes a few minutes; subsequent calls reuse it.
+CI uses the same Makefile targets on all three platforms.
+
+To use Cargo directly, run `bash scripts/build-ffmpeg.sh`, then
+`source scripts/env.sh` in your terminal before running Cargo commands.
 
 On Windows, build FFmpeg from an MSYS2 shell that inherits the Visual Studio
 environment. The exact steps are in [.github/workflows/ci.yml](.github/workflows/ci.yml).
@@ -148,11 +156,11 @@ To run the tests, first generate the synthetic sample videos. This needs an
 `ffmpeg` command with libx264 and libx265:
 
 ```bash
-./scripts/make-synthetic-samples.sh
-./scripts/fetch-gopro-samples.sh     # public GoPro samples, ~33 MB
-cargo test --workspace -- --test-threads=1
+make samples                       # synthetic clips + public GoPro samples (~33 MB)
+make test
 
 # Limited playback/seek diagnostics using the UI's player and telemetry decoder:
+source scripts/env.sh
 cargo run --release -p actionlay-app --example playback-check -- /path/to/video.mp4 240
 ```
 
