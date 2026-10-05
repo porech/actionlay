@@ -494,15 +494,7 @@ impl App {
                 self.title_dirty = true;
                 self.telemetry_rx = None;
                 self.loaded_telemetry = None;
-                self.video_notice = if self
-                    .player
-                    .as_ref()
-                    .is_some_and(|p| p.info().audio.is_some() && !p.stats().audio_active)
-                {
-                    Some("Audio output unavailable; playback is silent. Select a device in Settings → Audio.".into())
-                } else {
-                    None
-                };
+                self.video_notice = None;
                 self.failure_notice = None;
                 self.error = None;
                 self.shown_t = None;
@@ -550,7 +542,11 @@ impl App {
                 // its loader's result (if any) is discarded with the receiver
                 self.telemetry_rx = None;
                 self.loaded_telemetry = None;
-                self.video_notice = None;
+                self.video_notice = self.player.as_ref().and_then(|p| {
+                    (p.info().audio.is_some() && !p.stats().audio_active).then(|| {
+                        "Audio output unavailable; playback is silent. Select a device in Settings → Audio.".into()
+                    })
+                });
                 self.shown_t = None;
                 self.overlay_ready = false;
                 self.overlay_ms = None;
