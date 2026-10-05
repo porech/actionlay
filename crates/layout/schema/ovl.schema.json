@@ -1,0 +1,1310 @@
+{
+  "$defs": {
+    "Anchor": {
+      "description": "One of the 9 points of a box a node is attached to.",
+      "enum": [
+        "top-left",
+        "top",
+        "top-right",
+        "left",
+        "center",
+        "right",
+        "bottom-left",
+        "bottom",
+        "bottom-right"
+      ],
+      "type": "string"
+    },
+    "Aspect": {
+      "description": "Design aspect ratio W:H, e.g. \"16:9\"",
+      "pattern": "^[0-9]+(\\.[0-9]+)?:[0-9]+(\\.[0-9]+)?$",
+      "type": "string"
+    },
+    "BorderOpt": {
+      "additionalProperties": true,
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "width": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Color": {
+      "pattern": "^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
+      "type": "string"
+    },
+    "ColorRef": {
+      "pattern": "^(primary|secondary|accent|panel|#([0-9a-fA-F]{6}|[0-9a-fA-F]{8}))$",
+      "type": "string"
+    },
+    "DateZone": {
+      "oneOf": [
+        {
+          "enum": [
+            "utc"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "local",
+          "description": "Time zone of the machine (M2; per-video zones come later).",
+          "type": "string"
+        }
+      ]
+    },
+    "DatetimeNode": {
+      "additionalProperties": true,
+      "description": "Parameters every node has.",
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anchor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: top-left."
+        },
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "font": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "format": {
+          "description": "strftime, default \"%H:%M:%S\".",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "offset": {
+          "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "opacity": {
+          "description": "0..=1, multiplies down the tree. Default 1.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "outline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OutlineOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "shadow": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShadowOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "size": {
+          "description": "Font size = height of the text box, in layout units.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "timezone": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DateZone"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "visible": {
+          "description": "Default true.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "weight": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FontWeight"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "when_absent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WhenAbsent"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "FontWeight": {
+      "enum": [
+        "regular",
+        "medium",
+        "bold"
+      ],
+      "type": "string"
+    },
+    "FrameNode": {
+      "additionalProperties": true,
+      "description": "Group with a size, a background panel, a border and rounded corners.",
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anchor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: top-left."
+        },
+        "border": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BorderOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "children": {
+          "items": {
+            "$ref": "#/$defs/Node"
+          },
+          "type": "array"
+        },
+        "fill": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "offset": {
+          "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "opacity": {
+          "description": "0..=1, multiplies down the tree. Default 1.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "radius": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "size": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "visible": {
+          "description": "Default true.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "size"
+      ],
+      "type": "object"
+    },
+    "GpsLockIconNode": {
+      "additionalProperties": true,
+      "description": "Parameters every node has.",
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anchor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: top-left."
+        },
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Colour with a 3D lock (default: accent)."
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "offset": {
+          "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "opacity": {
+          "description": "0..=1, multiplies down the tree. Default 1.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "size": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "visible": {
+          "description": "Default true.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "GroupNode": {
+      "additionalProperties": true,
+      "description": "Container. With `size`, children anchor inside it; without, they are placed\nrelative to the group's origin (the original's `composite`).",
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anchor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: top-left."
+        },
+        "children": {
+          "items": {
+            "$ref": "#/$defs/Node"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "offset": {
+          "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "opacity": {
+          "description": "0..=1, multiplies down the tree. Default 1.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "size": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "visible": {
+          "description": "Default true.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "IconNode": {
+      "additionalProperties": true,
+      "description": "Parameters every node has.",
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anchor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: top-left."
+        },
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "icon": {
+          "description": "Name from the embedded icon set (see actionlay-render).",
+          "type": "string"
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "offset": {
+          "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "opacity": {
+          "description": "0..=1, multiplies down the tree. Default 1.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "size": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "visible": {
+          "description": "Default true.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "icon"
+      ],
+      "type": "object"
+    },
+    "MetricNode": {
+      "additionalProperties": true,
+      "description": "Parameters every node has.",
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anchor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: top-left."
+        },
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "font": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "format": {
+          "description": "Format mini-language, default \"{value:.0}\".",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "metric": {
+          "description": "Metric id, e.g. \"speed\" (spec §4.4).",
+          "type": "string"
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "offset": {
+          "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "opacity": {
+          "description": "0..=1, multiplies down the tree. Default 1.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "outline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OutlineOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "shadow": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShadowOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "size": {
+          "description": "Font size = height of the text box, in layout units.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "stale_secs": {
+          "description": "How long a stale value stays visible (dimmed) before the empty state. Default 3.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "units": {
+          "description": "Unit id overriding the layout's unit system, e.g. \"kmh\".",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "visible": {
+          "description": "Default true.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "weight": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FontWeight"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "when_absent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WhenAbsent"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "metric"
+      ],
+      "type": "object"
+    },
+    "MetricUnitNode": {
+      "additionalProperties": true,
+      "description": "Parameters every node has.",
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anchor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: top-left."
+        },
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "font": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "metric": {
+          "type": "string"
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "offset": {
+          "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "opacity": {
+          "description": "0..=1, multiplies down the tree. Default 1.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "outline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OutlineOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "shadow": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShadowOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "size": {
+          "description": "Font size = height of the text box, in layout units.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "visible": {
+          "description": "Default true.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "weight": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FontWeight"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "when_absent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WhenAbsent"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "metric"
+      ],
+      "type": "object"
+    },
+    "Node": {
+      "description": "Node types this version understands.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/GroupNode",
+          "properties": {
+            "type": {
+              "const": "group",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/FrameNode",
+          "properties": {
+            "type": {
+              "const": "frame",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/TextNode",
+          "properties": {
+            "type": {
+              "const": "text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/MetricNode",
+          "properties": {
+            "type": {
+              "const": "metric",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/MetricUnitNode",
+          "properties": {
+            "type": {
+              "const": "metric_unit",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/DatetimeNode",
+          "properties": {
+            "type": {
+              "const": "datetime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/IconNode",
+          "properties": {
+            "type": {
+              "const": "icon",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/GpsLockIconNode",
+          "properties": {
+            "type": {
+              "const": "gps_lock_icon",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "OutlineOpt": {
+      "additionalProperties": true,
+      "description": "Text outline (legibility over bright video). `width` in layout units; 0 disables it.",
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "width": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Palette": {
+      "additionalProperties": true,
+      "properties": {
+        "accent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Color"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Icons, highlights."
+        },
+        "panel": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Color"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Background of frames."
+        },
+        "primary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Color"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Main text colour."
+        },
+        "secondary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Color"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Labels and units."
+        }
+      },
+      "type": "object"
+    },
+    "ShadowOpt": {
+      "additionalProperties": true,
+      "description": "Hard drop shadow. `offset` in layout units.",
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "offset": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "TextNode": {
+      "additionalProperties": true,
+      "description": "Parameters every node has.",
+      "properties": {
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anchor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default: top-left."
+        },
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "font": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "offset": {
+          "description": "[x, y] from the anchor in layout units (positive = right/down). Default [0, 0].",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "opacity": {
+          "description": "0..=1, multiplies down the tree. Default 1.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "outline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OutlineOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "shadow": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShadowOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "size": {
+          "description": "Font size = height of the text box, in layout units.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "text": {
+          "type": "string"
+        },
+        "visible": {
+          "description": "Default true.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "weight": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FontWeight"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "type": "object"
+    },
+    "Theme": {
+      "additionalProperties": true,
+      "description": "Layout header theme (spec §4.1, §4.3.2).",
+      "properties": {
+        "dim_opacity": {
+          "description": "Alpha multiplier of stale values and empty states (0..=1).",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "font": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OutlineOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "palette": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Palette"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "shadow": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShadowOpt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Units": {
+      "description": "Default unit system of a layout (spec §4.4).",
+      "enum": [
+        "metric",
+        "imperial"
+      ],
+      "type": "string"
+    },
+    "WhenAbsent": {
+      "description": "What a data widget shows when its metric is absent (spec §4.4.1).\n\n`Hide` hides the widget only when the video never has the metric\n(`Snapshot::is_available` is false), not during a momentary gap in the data.",
+      "oneOf": [
+        {
+          "const": "show",
+          "description": "Designed empty state (dimmed \"—\").",
+          "type": "string"
+        },
+        {
+          "const": "hide",
+          "description": "The widget is not drawn.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "description": "A `*.ovl.json` overlay layout (spec §4.1).",
+  "properties": {
+    "$schema": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "design_aspect": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Aspect"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Default 16:9; used by the `fit` scale mode."
+    },
+    "name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "nodes": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Node"
+      },
+      "type": "array"
+    },
+    "theme": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Theme"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "units": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Units"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Default unit system; widgets can override it with `units`. Default metric."
+    },
+    "version": {
+      "description": "Format version, 1 or higher.",
+      "format": "uint32",
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version"
+  ],
+  "title": "ActionLay overlay layout",
+  "type": "object"
+}

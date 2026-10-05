@@ -107,6 +107,37 @@ jobs:
         if: runner.os != 'Windows'
         run: echo "ACTIONLAY_SAMPLES=$GITHUB_WORKSPACE/samples/synthetic" >> "$GITHUB_ENV"
 
+      # Public GoPro samples (Apache-2.0) for the telemetry tests. Plain
+      # downloads, so every OS gets them; fetched only when the pinned list
+      # in the script changes.
+      - name: Cache GoPro samples
+        id: gopro-cache
+        uses: actions/cache@v4
+        with:
+          path: samples/gopro/*.mp4
+          key: gopro-samples-${{ hashFiles('scripts/fetch-gopro-samples.sh') }}
+
+      - name: Fetch GoPro samples
+        if: steps.gopro-cache.outputs.cache-hit != 'true'
+        run: bash ./scripts/fetch-gopro-samples.sh
+
+      - name: Require GoPro samples in tests
+        run: echo "ACTIONLAY_REQUIRE_GOPRO_SAMPLES=1" >> "$GITHUB_ENV"
+
+      - name: Private sample stays out of tests and CI
+        run: |
+          if grep -rn "GX013370" crates scripts .github --exclude=ci.yml; then
+            echo "samples/GX013370.MP4 is private: tests and CI must not use it" >&2
+            exit 1
+          fi
+
+      - name: Telemetry crate stays free of FFmpeg
+        run: |
+          if cargo tree -p actionlay-telemetry -e normal --prefix none | grep -i ffmpeg; then
+            echo "actionlay-telemetry must not depend on FFmpeg" >&2
+            exit 1
+          fi
+
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       # Player tests open the audio device and are timing-sensitive, so they
@@ -116,8 +147,16 @@ jobs:
       # `--exclude actionlay-media` fails while it is the only member).
       - run: cargo test --workspace -- --test-threads=1
 
+      - name: Upload golden image diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-diff-${{ matrix.target }}
+          path: target/golden-diff
+          if-no-files-found: ignore
+
       - name: Build release binaries
-        run: cargo build --release -p actionlay-app -p actionlay-media --bins
+        run: cargo build --release -p actionlay-app -p actionlay-media -p actionlay-telemetry-cli --bins
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4
@@ -128,4 +167,6 @@ jobs:
             target/release/actionlay.exe
             target/release/decode-bench
             target/release/decode-bench.exe
+            target/release/actionlay-telemetry
+            target/release/actionlay-telemetry.exe
           if-no-files-found: error

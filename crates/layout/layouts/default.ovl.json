@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "name": "ActionLay default",
+  "design_aspect": "16:9",
+  "nodes": [
+    {
+      "id": "clock", "type": "frame", "anchor": "top-left", "offset": [24, 24], "size": [300, 112],
+      "children": [
+        { "id": "date", "type": "datetime", "anchor": "top-left", "offset": [20, 14],
+          "format": "%a %d %b %Y", "size": 26, "color": "secondary" },
+        { "id": "time", "type": "datetime", "anchor": "bottom-left", "offset": [20, -12],
+          "format": "%H:%M:%S", "size": 52, "weight": "bold" }
+      ]
+    },
+    {
+      "id": "gps", "type": "frame", "anchor": "top-right", "offset": [-24, 24], "size": [330, 112],
+      "children": [
+        { "id": "gps-lock", "type": "gps_lock_icon", "anchor": "left", "offset": [18, 0], "size": 44 },
+        { "id": "lat", "type": "metric", "metric": "lat", "anchor": "top-right", "offset": [-20, 16],
+          "format": "{value:.5}°", "size": 32, "weight": "medium" },
+        { "id": "lon", "type": "metric", "metric": "lon", "anchor": "bottom-right", "offset": [-20, -16],
+          "format": "{value:.5}°", "size": 32, "weight": "medium" }
+      ]
+    },
+    {
+      "id": "speed", "type": "frame", "anchor": "bottom-left", "offset": [24, -24], "size": [340, 196],
+      "children": [
+        { "id": "speed-icon", "type": "icon", "icon": "speed", "anchor": "top-left", "offset": [20, 18], "size": 34 },
+        { "id": "speed-label", "type": "text", "text": "SPEED", "anchor": "top-left", "offset": [62, 22],
+          "size": 24, "color": "secondary", "weight": "medium" },
+        { "id": "speed-value", "type": "metric", "metric": "speed", "anchor": "bottom-left", "offset": [18, -6],
+          "size": 120 },
+        { "id": "speed-unit", "type": "metric_unit", "metric": "speed", "anchor": "bottom-right", "offset": [-20, -20],
+          "size": 30 }
+      ]
+    },
+    {
+      "id": "stats", "type": "frame", "anchor": "bottom-right", "offset": [-24, -24], "size": [380, 196],
+      "children": [
+        { "id": "alt-icon", "type": "icon", "icon": "altitude", "anchor": "top-left", "offset": [20, 18], "size": 36 },
+        { "id": "alt-value", "type": "metric", "metric": "alt", "anchor": "top-right", "offset": [-76, 14], "size": 44 },
+        { "id": "alt-unit", "type": "metric_unit", "metric": "alt", "anchor": "top-left", "offset": [314, 29], "size": 26 },
+        { "id": "grad-icon", "type": "icon", "icon": "gradient", "anchor": "top-left", "offset": [20, 78], "size": 36 },
+        { "id": "grad-value", "type": "metric", "metric": "gradient", "anchor": "top-right", "offset": [-76, 74],
+          "format": "{value:+.1}", "size": 44 },
+        { "id": "grad-unit", "type": "metric_unit", "metric": "gradient", "anchor": "top-left", "offset": [314, 89], "size": 26 },
+        { "id": "dist-icon", "type": "icon", "icon": "distance", "anchor": "top-left", "offset": [20, 138], "size": 36 },
+        { "id": "dist-value", "type": "metric", "metric": "odo", "anchor": "top-right", "offset": [-76, 134],
+          "format": "{value:.2}", "size": 44 },
+        { "id": "dist-unit", "type": "metric_unit", "metric": "odo", "anchor": "top-left", "offset": [314, 149], "size": 26 }
+      ]
+    }
+  ]
+}
