@@ -9,22 +9,27 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::color::{Color, ColorRef, Role};
+use crate::model::Extra;
 
 // Groups with every field unset are not serialized either, so resetting the last
 // field of a group leaves no empty object behind.
 fn outline_unset(o: &Option<OutlineOpt>) -> bool {
     o.as_ref()
-        .is_none_or(|o| o.color.is_none() && o.width.is_none())
+        .is_none_or(|o| o.color.is_none() && o.width.is_none() && o.extra.is_empty())
 }
 
 fn shadow_unset(o: &Option<ShadowOpt>) -> bool {
     o.as_ref()
-        .is_none_or(|o| o.color.is_none() && o.offset.is_none())
+        .is_none_or(|o| o.color.is_none() && o.offset.is_none() && o.extra.is_empty())
 }
 
 fn palette_unset(o: &Option<Palette>) -> bool {
     o.as_ref().is_none_or(|p| {
-        p.primary.is_none() && p.secondary.is_none() && p.accent.is_none() && p.panel.is_none()
+        p.primary.is_none()
+            && p.secondary.is_none()
+            && p.accent.is_none()
+            && p.panel.is_none()
+            && p.extra.is_empty()
     })
 }
 
@@ -78,6 +83,9 @@ pub struct OutlineOpt {
     pub color: Option<ColorRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub width: Option<f32>,
+    /// Keys this version does not know, preserved on save (spec §6.4).
+    #[serde(flatten)]
+    pub extra: Extra,
 }
 
 /// Hard drop shadow. `offset` in layout units.
@@ -87,6 +95,9 @@ pub struct ShadowOpt {
     pub color: Option<ColorRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub offset: Option<[f32; 2]>,
+    /// Keys this version does not know, preserved on save (spec §6.4).
+    #[serde(flatten)]
+    pub extra: Extra,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -103,6 +114,9 @@ pub struct Palette {
     /// Background of frames.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub panel: Option<Color>,
+    /// Keys this version does not know, preserved on save (spec §6.4).
+    #[serde(flatten)]
+    pub extra: Extra,
 }
 
 /// Layout header theme (spec §4.1, §4.3.2).
@@ -119,6 +133,9 @@ pub struct Theme {
     /// Alpha multiplier of stale values and empty states (0..=1).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dim_opacity: Option<f32>,
+    /// Keys this version does not know, preserved on save (spec §6.4).
+    #[serde(flatten)]
+    pub extra: Extra,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -369,6 +386,7 @@ mod tests {
             outline: Some(OutlineOpt {
                 color: None,
                 width: Some(4.0),
+                ..Default::default()
             }),
             ..Default::default()
         }
@@ -385,10 +403,12 @@ mod tests {
             outline: Some(OutlineOpt {
                 color: None,
                 width: Some(0.0),
+                ..Default::default()
             }),
             shadow: Some(ShadowOpt {
                 color: Some(ColorRef::Role(Role::Accent)),
                 offset: None,
+                ..Default::default()
             }),
             ..Default::default()
         };
@@ -446,6 +466,7 @@ mod tests {
             outline: Some(OutlineOpt {
                 color: None,
                 width: Some(4.0),
+                ..Default::default()
             }),
             palette: Some(Palette {
                 accent: Some(GREEN),
@@ -454,6 +475,7 @@ mod tests {
             shadow: Some(ShadowOpt {
                 color: None,
                 offset: Some([1.0, 1.0]),
+                ..Default::default()
             }),
             ..Default::default()
         };
@@ -493,6 +515,7 @@ mod tests {
             shadow: Some(ShadowOpt {
                 color: Some(ColorRef::Color(GREEN)),
                 offset: None,
+                ..Default::default()
             }),
             ..Default::default()
         }
@@ -517,6 +540,7 @@ mod tests {
             outline: Some(OutlineOpt {
                 color: Some(ColorRef::Role(Role::Accent)),
                 width: None,
+                ..Default::default()
             }),
             ..Default::default()
         }
@@ -550,12 +574,15 @@ mod tests {
             outline: Some(OutlineOpt {
                 color: Some(ColorRef::Role(Role::Accent)),
                 width: Some(1.5),
+                ..Default::default()
             }),
             shadow: Some(ShadowOpt {
                 color: Some(ColorRef::Color(GREEN)),
                 offset: Some([1.0, 3.0]),
+                ..Default::default()
             }),
             dim_opacity: Some(0.25),
+            ..Default::default()
         };
         let json = serde_json::to_string(&theme).unwrap();
         assert!(json.contains("\"#ff0000\"") && json.contains("\"accent\""));
@@ -569,10 +596,12 @@ mod tests {
             outline: Some(OutlineOpt {
                 color: None,
                 width: Some(0.0),
+                ..Default::default()
             }),
             shadow: Some(ShadowOpt {
                 color: Some(ColorRef::Role(Role::Panel)),
                 offset: None,
+                ..Default::default()
             }),
         };
         let json = serde_json::to_string(&style).unwrap();
