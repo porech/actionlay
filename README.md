@@ -8,10 +8,11 @@ top: speed, altitude, maps, heart rate and more. You can also design the
 dashboard visually and export the result. It is free, open source, and ships
 as a single executable for Windows, macOS and Linux.
 
-> **Status: early prototype (milestone M1).** Today ActionLay is a fast,
-> hardware-accelerated video player for GoPro footage, and it reads the
-> telemetry GoPro cameras record. The overlay, the layout editor and the
-> export are being built next; see the [roadmap](#roadmap). Expect rough
+> **Status: early prototype (milestones M1 and M2 done).** ActionLay plays
+> GoPro footage with hardware decoding and draws a live telemetry overlay
+> (speed, altitude, gradient, distance, coordinates, date and time, GPS
+> status) on top of it. The other dashboard widgets, the layout editor and
+> the export are being built next; see the [roadmap](#roadmap). Expect rough
 > edges.
 
 ## What works today
@@ -33,13 +34,22 @@ as a single executable for Windows, macOS and Linux.
   The tool ships in the same download as `actionlay`; run it from a terminal,
   or from source with `cargo run -p actionlay-telemetry-cli -- dump VIDEO`.
 
+- **Live telemetry overlay**: open a GoPro video and a default dashboard
+  appears over it, following the video as you play, pause and seek. Press
+  `O` to show or hide it. Where the video has no GPS (or the signal is lost),
+  values dim and then show `—` instead of stale numbers.
+- **Your own layout**: the dashboard is a JSON file. Drag a `.ovl.json` file
+  onto the window to use it; ActionLay remembers the last one. The default
+  layout is in `crates/layout/layouts/default.ovl.json`, and a JSON Schema for
+  editing it is in `crates/layout/schema`. The visual editor comes in M4.
+
 ## Roadmap
 
 | Milestone | What you get |
 |---|---|
 | **M0** ✅ | Video player with hardware decoding and synced audio |
 | **M1** ✅ | Telemetry from GoPro files (GPS, speed, altitude, accelerometer, …) |
-| M2 | Dashboard overlay drawn live on the video |
+| **M2** ✅ | Dashboard overlay drawn live on the video |
 | M3 | All dashboard widgets: gauges, charts, compasses, moving and journey maps, plus a G-meter. Every widget is deeply customisable, with good defaults and a polished look when data is missing. Layouts from gopro-dashboard-overlay can be imported |
 | M4 | Visual layout editor: add, move, resize and style widgets, with anchors that adapt to any resolution or aspect ratio. It warns you when a widget can't work with the data in your video, and layouts can be shared as files |
 | M5 | Export: the final video, or a transparent overlay-only track (ProRes 4444 / PNG) for your video editor |
@@ -76,16 +86,18 @@ Open a video by passing it on the command line:
 actionlay GX010123.MP4
 ```
 
-or drag the file into the window.
+or drag the file into the window. To change the dashboard, drag a
+`.ovl.json` layout file into the window instead.
 
 | Key | Action |
 |---|---|
 | Space | Play / pause |
 | → / ← | Next / previous frame |
+| O | Show / hide the telemetry overlay |
 
 The bar at the bottom also has the seek slider, the playback speed and some
-playback statistics: the decoder in use, the dropped frames and the
-audio/video offset.
+playback statistics: the decoder in use, the dropped frames, the
+audio/video offset and the time it takes to draw the overlay.
 
 ## Building from source
 
