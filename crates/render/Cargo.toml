@@ -1,0 +1,19 @@
+[package]
+name = "actionlay-render"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+actionlay-layout = { path = "../layout" }
+actionlay-telemetry = { path = "../telemetry" }
+tiny-skia.workspace = true
+cosmic-text.workspace = true
+resvg.workspace = true
+chrono = { workspace = true, features = ["clock"] }
+log.workspace = true
+
+[dev-dependencies]
+actionlay-telemetry = { path = "../telemetry", features = ["test-util"] }
+serde_json.workspace = true
