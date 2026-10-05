@@ -147,6 +147,14 @@ jobs:
       # `--exclude actionlay-media` fails while it is the only member).
       - run: cargo test --workspace -- --test-threads=1
 
+      - name: Upload golden image diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-diff-${{ matrix.target }}
+          path: target/golden-diff
+          if-no-files-found: ignore
+
       - name: Build release binaries
         run: cargo build --release -p actionlay-app -p actionlay-media -p actionlay-telemetry-cli --bins
 
