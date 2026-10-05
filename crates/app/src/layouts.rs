@@ -32,10 +32,7 @@ pub fn load(path: &Path) -> Result<(Layout, Option<String>), String> {
     for w in &warnings {
         log::warn!("{}: {w}", path.display());
     }
-    let name = path.file_name().map_or_else(
-        || path.display().to_string(),
-        |n| n.to_string_lossy().into_owned(),
-    );
+    let name = path.display();
     let notice = match warnings.as_slice() {
         [] => None,
         [w] => Some(format!("{name}: 1 warning: {}: {}", w.path, w.message)),
@@ -61,6 +58,9 @@ fn one_line(s: &str) -> String {
 pub struct Initial {
     pub layout: Layout,
     pub notice: Option<String>,
+    /// The last layout no longer loads: the default is used and the preference should
+    /// be forgotten (so the notice does not come back at every launch).
+    pub fallback: bool,
 }
 
 /// The last layout used if it still loads, else the bundled default.
@@ -69,15 +69,21 @@ pub fn initial(prefs: &Prefs) -> Initial {
         return Initial {
             layout: default_layout(),
             notice: None,
+            fallback: false,
         };
     };
     match load(path) {
-        Ok((layout, notice)) => Initial { layout, notice },
+        Ok((layout, notice)) => Initial {
+            layout,
+            notice,
+            fallback: false,
+        },
         Err(e) => {
             log::warn!("{e}");
             Initial {
                 layout: default_layout(),
                 notice: Some(format!("{e} — using the default layout")),
+                fallback: true,
             }
         }
     }
@@ -136,6 +142,7 @@ mod tests {
         let i = initial(&Prefs::default());
         assert_eq!(i.layout, default_layout());
         assert!(i.notice.is_none());
+        assert!(!i.fallback);
     }
 
     #[test]
@@ -149,6 +156,7 @@ mod tests {
         std::fs::remove_file(&path).ok();
         assert_eq!(i.layout.name.as_deref(), Some("mine"));
         assert!(i.notice.is_none(), "{:?}", i.notice);
+        assert!(!i.fallback);
     }
 
     #[test]
@@ -162,6 +170,7 @@ mod tests {
         });
         std::fs::remove_file(&path).ok();
         assert_eq!(i.layout, default_layout());
+        assert!(i.fallback);
         let notice = i.notice.unwrap();
         assert!(notice.contains(&path.display().to_string()), "{notice}");
         assert!(notice.contains("default layout"), "{notice}");
@@ -171,6 +180,7 @@ mod tests {
             last_layout: Some(path.clone()),
         });
         assert_eq!(gone.layout, default_layout());
+        assert!(gone.fallback);
         let notice = gone.notice.unwrap();
         // LayoutError::Io carries no path: the notice must name the file.
         assert!(notice.contains(&path.display().to_string()), "{notice}");
@@ -197,7 +207,8 @@ mod tests {
         assert_eq!(layout.nodes.len(), 2);
         let notice = notice.unwrap();
         assert!(notice.contains("2 warnings"), "{notice}");
-        assert!(notice.contains("-warn.ovl.json"), "{notice}");
+        // the whole path, not only the file name
+        assert!(notice.contains(&path.display().to_string()), "{notice}");
     }
 
     fn with_aspect(aspect: &str) -> Layout {

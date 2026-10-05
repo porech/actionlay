@@ -1,6 +1,6 @@
 //! Reads a video's GPMF track and builds its telemetry off the UI thread (spec §3).
 use std::path::{Path, PathBuf};
-use std::sync::mpsc;
+use std::sync::{Mutex, PoisonError, mpsc};
 
 use actionlay_media::gpmf::{GpmfPacket, read_gpmf_packets};
 use actionlay_telemetry::{RawPacket, Telemetry, TelemetryOptions};
@@ -62,12 +62,19 @@ pub fn load(path: &Path, duration: f64) -> Loaded {
     }
 }
 
+/// Serializes loads: `read_gpmf_packets` lowers and restores FFmpeg's process-wide log
+/// level, so two overlapping loads could restore it in the wrong order.
+static LOADING: Mutex<()> = Mutex::new(());
+
 /// Loads the telemetry on a background thread; the receiver gets exactly one `Loaded`.
+/// Loads run one at a time: a load started while another runs waits for it (off the UI
+/// thread); the result of a load whose receiver was dropped is discarded.
 pub fn spawn(path: PathBuf, duration: f64) -> mpsc::Receiver<Loaded> {
     let (tx, rx) = mpsc::channel();
     std::thread::Builder::new()
         .name("telemetry".into())
         .spawn(move || {
+            let _one_at_a_time = LOADING.lock().unwrap_or_else(PoisonError::into_inner);
             // The receiver may be gone (another video was opened): nothing to do.
             let _ = tx.send(load(&path, duration));
         })
