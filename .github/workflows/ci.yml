@@ -118,9 +118,13 @@ jobs:
           path: samples/gopro/*.mp4
           key: gopro-samples-${{ hashFiles('scripts/fetch-gopro-samples.sh') }}
 
-      - name: Fetch GoPro samples
-        if: steps.gopro-cache.outputs.cache-hit != 'true'
-        shell: ${{ matrix.os == 'windows-2022' && 'msys2 {0}' || 'bash' }}
+      - name: Fetch GoPro samples (macOS/Linux)
+        if: runner.os != 'Windows' && steps.gopro-cache.outputs.cache-hit != 'true'
+        run: make gopro-samples
+
+      - name: Fetch GoPro samples (Windows)
+        if: runner.os == 'Windows' && steps.gopro-cache.outputs.cache-hit != 'true'
+        shell: msys2 {0}
         run: make gopro-samples
 
       - name: Require GoPro samples in tests
@@ -140,19 +144,34 @@ jobs:
             exit 1
           fi
 
-      - name: Check formatting
-        shell: ${{ matrix.os == 'windows-2022' && 'msys2 {0}' || 'bash' }}
+      - name: Check formatting (macOS/Linux)
+        if: runner.os != 'Windows'
         run: make fmt-check
-      - name: Run Clippy
-        shell: ${{ matrix.os == 'windows-2022' && 'msys2 {0}' || 'bash' }}
+
+      - name: Check formatting (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make fmt-check
+      - name: Run Clippy (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: make clippy
+
+      - name: Run Clippy (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
         run: make clippy
       # Player tests open the audio device and are timing-sensitive, so they
       # must not run concurrently. Every other test is fast; running the whole
       # workspace single-threaded keeps each test running exactly once (a
       # per-target split cannot exclude only tests/player.rs, and
       # `--exclude actionlay-media` fails while it is the only member).
-      - name: Run workspace tests
-        shell: ${{ matrix.os == 'windows-2022' && 'msys2 {0}' || 'bash' }}
+      - name: Run workspace tests (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: make test
+
+      - name: Run workspace tests (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
         run: make test
 
       - name: Upload golden image diffs
@@ -163,8 +182,13 @@ jobs:
           path: target/golden-diff
           if-no-files-found: ignore
 
-      - name: Build release binaries
-        shell: ${{ matrix.os == 'windows-2022' && 'msys2 {0}' || 'bash' }}
+      - name: Build release binaries (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: make build
+
+      - name: Build release binaries (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
         run: make build
 
       - name: Upload binaries
