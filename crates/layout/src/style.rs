@@ -1,10 +1,32 @@
 //! Theme and style defaults (spec §4.3.2). Every optional field means "inherit":
 //! widget-type default → layout theme → value set on the widget. Unset values are
 //! not serialized, so "Reset to default" is removing the key.
+//!
+//! The model stores whatever is set, including a value equal to the inherited one.
+//! The editor (milestone M4) is responsible for storing nothing when the user picks
+//! a value equal to the inherited one.
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::color::{Color, ColorRef, Role};
+
+// Groups with every field unset are not serialized either, so resetting the last
+// field of a group leaves no empty object behind.
+fn outline_unset(o: &Option<OutlineOpt>) -> bool {
+    o.as_ref()
+        .is_none_or(|o| o.color.is_none() && o.width.is_none())
+}
+
+fn shadow_unset(o: &Option<ShadowOpt>) -> bool {
+    o.as_ref()
+        .is_none_or(|o| o.color.is_none() && o.offset.is_none())
+}
+
+fn palette_unset(o: &Option<Palette>) -> bool {
+    o.as_ref().is_none_or(|p| {
+        p.primary.is_none() && p.secondary.is_none() && p.accent.is_none() && p.panel.is_none()
+    })
+}
 
 /// The look ActionLay ships with. Changing these restyles every layout that did not override them.
 pub mod defaults {
@@ -12,11 +34,11 @@ pub mod defaults {
 
     pub const FONT: &str = "Roboto";
     pub const PRIMARY: Color = Color::rgba(0xff, 0xff, 0xff, 0xff);
-    pub const SECONDARY: Color = Color::rgba(0xff, 0xff, 0xff, 0xb3);
+    pub const SECONDARY: Color = Color::rgba(0xff, 0xff, 0xff, 0xcc);
     pub const ACCENT: Color = Color::rgba(0xff, 0xb3, 0x00, 0xff);
-    pub const PANEL: Color = Color::rgba(0x0b, 0x0f, 0x14, 0x66);
-    pub const OUTLINE_COLOR: Color = Color::rgba(0x00, 0x00, 0x00, 0xa6);
-    pub const OUTLINE_WIDTH: f32 = 2.0;
+    pub const PANEL: Color = Color::rgba(0x0b, 0x0f, 0x14, 0x8c);
+    pub const OUTLINE_COLOR: Color = Color::rgba(0x00, 0x00, 0x00, 0xd9);
+    pub const OUTLINE_WIDTH: f32 = 3.0;
     pub const SHADOW_COLOR: Color = Color::rgba(0x00, 0x00, 0x00, 0x59);
     pub const SHADOW_OFFSET: [f32; 2] = [0.0, 2.0];
     pub const DIM_OPACITY: f32 = 0.45;
@@ -88,11 +110,11 @@ pub struct Palette {
 pub struct Theme {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub font: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "palette_unset")]
     pub palette: Option<Palette>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "outline_unset")]
     pub outline: Option<OutlineOpt>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "shadow_unset")]
     pub shadow: Option<ShadowOpt>,
     /// Alpha multiplier of stale values and empty states (0..=1).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -208,9 +230,9 @@ pub struct TextStyleOpt {
     pub weight: Option<FontWeight>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub font: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "outline_unset")]
     pub outline: Option<OutlineOpt>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "shadow_unset")]
     pub shadow: Option<ShadowOpt>,
 }
 
@@ -299,7 +321,7 @@ mod tests {
             s.outline,
             OutlineStyle {
                 color: defaults::OUTLINE_COLOR,
-                width: 2.0
+                width: defaults::OUTLINE_WIDTH
             }
         );
         let u = TextStyleOpt::default().resolve(TextKind::MetricUnit, &ResolvedTheme::default());
@@ -416,5 +438,145 @@ mod tests {
                 width: 3.0
             }
         );
+    }
+
+    #[test]
+    fn empty_groups_are_not_serialized() {
+        let mut t = Theme {
+            outline: Some(OutlineOpt {
+                color: None,
+                width: Some(4.0),
+            }),
+            palette: Some(Palette {
+                accent: Some(GREEN),
+                ..Default::default()
+            }),
+            shadow: Some(ShadowOpt {
+                color: None,
+                offset: Some([1.0, 1.0]),
+            }),
+            ..Default::default()
+        };
+        assert!(serde_json::to_value(&t).unwrap().get("outline").is_some());
+        t.outline.as_mut().unwrap().width = None;
+        t.palette.as_mut().unwrap().accent = None;
+        t.shadow.as_mut().unwrap().offset = None;
+        assert_eq!(serde_json::to_value(&t).unwrap(), serde_json::json!({}));
+        let own = TextStyleOpt {
+            outline: Some(OutlineOpt::default()),
+            ..Default::default()
+        };
+        assert_eq!(serde_json::to_value(&own).unwrap(), serde_json::json!({}));
+    }
+
+    #[test]
+    fn font_layers_theme_then_widget() {
+        let theme = Theme {
+            font: Some("Inter".into()),
+            ..Default::default()
+        }
+        .resolve();
+        assert_eq!(
+            TextStyleOpt::default().resolve(TextKind::Text, &theme).font,
+            "Inter"
+        );
+        let own = TextStyleOpt {
+            font: Some("Mono".into()),
+            ..Default::default()
+        };
+        assert_eq!(own.resolve(TextKind::Text, &theme).font, "Mono");
+    }
+
+    #[test]
+    fn shadow_colour_from_theme_keeps_type_default_offset() {
+        let theme = Theme {
+            shadow: Some(ShadowOpt {
+                color: Some(ColorRef::Color(GREEN)),
+                offset: None,
+            }),
+            ..Default::default()
+        }
+        .resolve();
+        let s = TextStyleOpt::default().resolve(TextKind::Metric, &theme);
+        assert_eq!(
+            s.shadow,
+            ShadowStyle {
+                color: GREEN,
+                offset: defaults::SHADOW_OFFSET
+            }
+        );
+    }
+
+    #[test]
+    fn theme_outline_role_follows_its_palette() {
+        let theme = Theme {
+            palette: Some(Palette {
+                accent: Some(GREEN),
+                ..Default::default()
+            }),
+            outline: Some(OutlineOpt {
+                color: Some(ColorRef::Role(Role::Accent)),
+                width: None,
+            }),
+            ..Default::default()
+        }
+        .resolve();
+        assert_eq!(theme.outline.color, GREEN);
+    }
+
+    #[test]
+    fn text_and_datetime_type_defaults() {
+        let t = TextStyleOpt::default().resolve(TextKind::Text, &ResolvedTheme::default());
+        assert_eq!(
+            (t.size, t.weight, t.color),
+            (32.0, FontWeight::Regular, defaults::PRIMARY)
+        );
+        let d = TextStyleOpt::default().resolve(TextKind::Datetime, &ResolvedTheme::default());
+        assert_eq!(
+            (d.size, d.weight, d.color),
+            (32.0, FontWeight::Medium, defaults::PRIMARY)
+        );
+    }
+
+    #[test]
+    fn populated_theme_and_style_round_trip() {
+        let theme = Theme {
+            font: Some("Inter".into()),
+            palette: Some(Palette {
+                primary: Some(RED),
+                panel: Some(Color::rgba(1, 2, 3, 4)),
+                ..Default::default()
+            }),
+            outline: Some(OutlineOpt {
+                color: Some(ColorRef::Role(Role::Accent)),
+                width: Some(1.5),
+            }),
+            shadow: Some(ShadowOpt {
+                color: Some(ColorRef::Color(GREEN)),
+                offset: Some([1.0, 3.0]),
+            }),
+            dim_opacity: Some(0.25),
+        };
+        let json = serde_json::to_string(&theme).unwrap();
+        assert!(json.contains("\"#ff0000\"") && json.contains("\"accent\""));
+        assert_eq!(serde_json::from_str::<Theme>(&json).unwrap(), theme);
+
+        let style = TextStyleOpt {
+            size: Some(50.0),
+            color: Some(ColorRef::Color(GREEN)),
+            weight: Some(FontWeight::Medium),
+            font: Some("Mono".into()),
+            outline: Some(OutlineOpt {
+                color: None,
+                width: Some(0.0),
+            }),
+            shadow: Some(ShadowOpt {
+                color: Some(ColorRef::Role(Role::Panel)),
+                offset: None,
+            }),
+        };
+        let json = serde_json::to_string(&style).unwrap();
+        assert!(json.contains("\"weight\":\"medium\""));
+        assert_eq!(serde_json::from_str::<TextStyleOpt>(&json).unwrap(), style);
     }
 }
