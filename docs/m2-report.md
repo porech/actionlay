@@ -7,7 +7,7 @@ Gate status: **partial**. All automatic measurements are done. The visual and be
 ## Automatic checks (measured)
 - `cargo fmt --all --check`: ok (exit 0).
 - `cargo clippy --workspace --all-targets -- -D warnings`: clean (`Finished`, no warnings).
-- `cargo test --workspace -- --test-threads=1`: all pass, 0 failed (app 46, layout 51 + schema 3, media 23 + audio_decode 2 + ffmpeg_link 2 + gpmf 6 + player 8 + probe 4 + video_decode 5, render 15 + golden 7 + render 19, telemetry 80 + contract_additions 2 + gopro_files 7 + reference 5, telemetry CLI 12).
+- `cargo test --workspace -- --test-threads=1`: all pass, 0 failed (counts re-measured after the final fix wave, f880708) (app 48, layout 55 + schema 3, media 23 + audio_decode 2 + ffmpeg_link 2 + gpmf 6 + player 8 + probe 4 + video_decode 5, render 15 + golden 7 + render 19, telemetry 80 + contract_additions 2 + gopro_files 7 + reference 5, telemetry CLI 12).
 
 ## Render time (default layout, release, render-bench)
 Run 1 of 2 (raw output of both runs is in the task report):
@@ -52,7 +52,7 @@ Launch: `source scripts/env.sh && cargo run --release -p actionlay-app -- sample
 - Date/time uses the time zone of the machine running ActionLay, not the zone where the video was shot.
 - Pace is shown as a decimal number (e.g. 5.5), not `m:ss`.
 - The scale mode is chosen automatically (no project setting yet): `height` unless, at the `height` scale, a top-level widget of known size (frame, sized group, sized icon) would leave the video frame horizontally or overlap another one where it did not at the design aspect; then `fit`. With the default layout, 16:9 and 4:3 footage use `height` and 9:16 footage uses `fit`. A layout with no sized top-level widget uses `fit` below 0.7 × its design aspect.
-- Task 12 minors (may change if the final fix wave addresses them): the overlay can be stale for 1–2 frames after re-enabling it with `O`; telemetry loads that were cancelled (e.g. opening another video quickly) still run to completion.
+- Task 12 minors (not addressed by the final fix wave): the overlay can be stale for 1–2 frames after re-enabling it with `O`; telemetry loads that were cancelled (e.g. opening another video quickly) still run to completion.
 - Only the M2 widget set exists: group, frame, text, metric, metric_unit, datetime, icon, gps_lock_icon. No maps, gauges or charts yet.
 
 ## Notes for M3
