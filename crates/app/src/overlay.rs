@@ -8,6 +8,7 @@
 //! frames finish in request order, so a frame never replaces a newer one; a frame
 //! rendered for a replaced layout or telemetry is discarded. At most one frame waits
 //! for the UI, one is being rendered and [`MAX_SPARE`] are kept for reuse.
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -176,7 +177,14 @@ struct Job {
     telemetry: Arc<Telemetry>,
     scale_mode: ScaleMode,
     generation: u64,
+    #[cfg(test)]
+    hook: Option<RenderHook>,
 }
+
+/// Test-only code run on the render thread inside each render (to make one panic or
+/// block).
+#[cfg(test)]
+type RenderHook = Arc<dyn Fn(&OverlayRequest) + Send + Sync>;
 
 struct State {
     layout: Arc<Layout>,
@@ -190,7 +198,11 @@ struct State {
     /// Size of the last job: only pixmaps of this size are kept.
     size: Option<(u32, u32)>,
     allocated: usize,
+    /// Renders that panicked (the thread survives them).
+    failures: u64,
     quit: bool,
+    #[cfg(test)]
+    hook: Option<RenderHook>,
 }
 
 impl State {
@@ -205,7 +217,10 @@ impl State {
             spare: Vec::new(),
             size: None,
             allocated: 0,
+            failures: 0,
             quit: false,
+            #[cfg(test)]
+            hook: None,
         }
     }
 
@@ -264,21 +279,31 @@ impl State {
             telemetry,
             scale_mode: self.scale_mode,
             generation: self.generation,
+            #[cfg(test)]
+            hook: self.hook.clone(),
         })
     }
 
     /// Publishes a finished frame; false (and the pixmap recycled) when the scene
-    /// changed while it rendered. A frame the UI did not take yet is replaced: frames
-    /// finish in request order, so the new one is never older.
-    fn deliver(&mut self, frame: OverlayFrame, generation: u64) -> bool {
+    /// changed while it rendered: its request is then rendered again with the new
+    /// scene, unless a newer one is pending. A frame the UI did not take yet is
+    /// replaced: frames finish in request order, so the new one is never older.
+    fn deliver(&mut self, request: OverlayRequest, frame: OverlayFrame, generation: u64) -> bool {
         if generation != self.generation {
             self.recycle(frame.pixmap);
+            self.request.get_or_insert(request);
             return false;
         }
         if let Some(old) = self.done.replace(frame) {
             self.recycle(old.pixmap);
         }
         true
+    }
+
+    /// A render panicked: count it and keep its pixmap (cleared by the next render).
+    fn failed(&mut self, pixmap: Pixmap) {
+        self.failures += 1;
+        self.recycle(pixmap);
     }
 }
 
@@ -350,6 +375,11 @@ impl OverlayWorker {
         self.shared.lock().recycle(pixmap);
     }
 
+    /// Renders that panicked so far (logged; the UI shows a notice when it grows).
+    pub fn failures(&self) -> u64 {
+        self.shared.lock().failures
+    }
+
     /// Pixmaps created so far (tests check that frames reuse them).
     #[cfg(test)]
     pub fn pixmaps_allocated(&self) -> usize {
@@ -360,10 +390,20 @@ impl OverlayWorker {
 impl Drop for OverlayWorker {
     fn drop(&mut self) {
         self.with_state(|st| st.quit = true);
-        if let Some(t) = self.thread.take() {
-            let _ = t.join();
+        if let Some(t) = self.thread.take()
+            && let Err(e) = t.join()
+        {
+            log::error!("overlay thread died: {}", panic_message(e.as_ref()));
         }
     }
+}
+
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> &str {
+    payload
+        .downcast_ref::<&str>()
+        .copied()
+        .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
+        .unwrap_or("unknown panic")
 }
 
 fn run(shared: &Shared, notify: &dyn Fn()) {
@@ -383,12 +423,35 @@ fn run(shared: &Shared, notify: &dyn Fn()) {
             }
         };
         let start = Instant::now();
-        renderer.set_scale_mode(job.scale_mode);
-        let snapshot = job.telemetry.sample(job.request.t);
-        renderer.render_into(&job.layout, &snapshot, &mut job.pixmap);
+        let request = job.request;
+        // A panic in one render (a renderer or telemetry bug) must not stop the overlay
+        // for the rest of the session: log it, count it and serve the next request.
+        let rendered = catch_unwind(AssertUnwindSafe(|| {
+            #[cfg(test)]
+            if let Some(hook) = &job.hook {
+                hook(&request);
+            }
+            renderer.set_scale_mode(job.scale_mode);
+            let snapshot = job.telemetry.sample(request.t);
+            renderer.render_into(&job.layout, &snapshot, &mut job.pixmap);
+        }));
+        if let Err(e) = rendered {
+            log::error!(
+                "overlay render panicked at t={} ({}x{}): {}",
+                request.t,
+                request.width,
+                request.height,
+                panic_message(e.as_ref())
+            );
+            // its caches may be half-updated
+            renderer = Renderer::new();
+            renderer.set_zone(Zone::System);
+            shared.lock().failed(job.pixmap);
+            continue;
+        }
         let frame = OverlayFrame {
             pixmap: job.pixmap,
-            t: job.request.t,
+            t: request.t,
             render_ms: start.elapsed().as_secs_f32() * 1000.0,
         };
         let delivered = {
@@ -396,7 +459,7 @@ fn run(shared: &Shared, notify: &dyn Fn()) {
             if st.quit {
                 return;
             }
-            st.deliver(frame, job.generation)
+            st.deliver(request, frame, job.generation)
         };
         if delivered {
             notify();
@@ -603,6 +666,12 @@ mod tests {
         }
     }
 
+    /// What the render thread does with a finished job.
+    fn finish(st: &mut State, job: Job) -> bool {
+        let (request, generation) = (job.request, job.generation);
+        st.deliver(request, frame(job), generation)
+    }
+
     #[test]
     fn state_waits_for_telemetry_and_takes_only_the_latest_request() {
         let mut st = state();
@@ -653,11 +722,9 @@ mod tests {
         st.request = Some(req(2.0, 8));
         // a newer request is pending: the in-flight frame is still delivered,
         // it is newer than what the UI shows
-        let gen_a = a.generation;
-        assert!(st.deliver(frame(a), gen_a));
+        assert!(finish(&mut st, a));
         let b = st.next_job().unwrap();
-        let gen_b = b.generation;
-        assert!(st.deliver(frame(b), gen_b));
+        assert!(finish(&mut st, b));
         assert_eq!(st.done.as_ref().unwrap().t, 2.0);
         assert_eq!(
             st.spare.len(),
@@ -672,12 +739,52 @@ mod tests {
         st.telemetry = Some(Arc::new(Telemetry::empty(10.0)));
         st.request = Some(req(1.0, 8));
         let job = st.next_job().unwrap();
-        let generation = job.generation;
         // a new video opens while the frame renders
         st.set_telemetry(Some(Arc::new(Telemetry::empty(20.0))), ScaleMode::Fit);
-        assert!(!st.deliver(frame(job), generation));
+        assert!(!finish(&mut st, job));
         assert!(st.done.is_none());
         assert_eq!(st.spare.len(), 1, "its pixmap is recycled");
+    }
+
+    #[test]
+    fn a_discarded_frame_is_rendered_again_with_the_new_scene() {
+        let mut st = state();
+        st.telemetry = Some(Arc::new(Telemetry::empty(10.0)));
+        st.request = Some(req(1.0, 8));
+        let job = st.next_job().unwrap();
+        st.set_telemetry(Some(Arc::new(Telemetry::empty(20.0))), ScaleMode::Fit);
+        assert!(!finish(&mut st, job));
+        // nothing newer was requested: the same position is rendered again
+        let again = st.next_job().expect("request re-queued");
+        assert_eq!(again.request, req(1.0, 8));
+        assert_eq!(
+            (again.telemetry.duration(), again.scale_mode),
+            (20.0, ScaleMode::Fit)
+        );
+        assert!(finish(&mut st, again));
+        assert_eq!(st.done.as_ref().unwrap().t, 1.0);
+
+        // a newer request pending wins over the discarded one
+        st.request = Some(req(2.0, 8));
+        let job = st.next_job().unwrap();
+        st.request = Some(req(3.0, 8));
+        st.set_layout(
+            Arc::new(actionlay_layout::default_layout()),
+            ScaleMode::Height,
+        );
+        assert!(!finish(&mut st, job));
+        assert_eq!(st.request, Some(req(3.0, 8)));
+    }
+
+    #[test]
+    fn a_failed_render_is_counted_and_its_pixmap_kept() {
+        let mut st = state();
+        st.telemetry = Some(Arc::new(Telemetry::empty(10.0)));
+        st.request = Some(req(1.0, 8));
+        let job = st.next_job().unwrap();
+        st.failed(job.pixmap);
+        assert_eq!((st.failures, st.spare.len()), (1, 1));
+        assert!(st.done.is_none());
     }
 
     #[test]
@@ -686,8 +793,7 @@ mod tests {
         st.set_telemetry(Some(Arc::new(Telemetry::empty(10.0))), ScaleMode::Height);
         st.request = Some(req(1.0, 8));
         let first = st.next_job().unwrap();
-        let generation = first.generation;
-        assert!(st.deliver(frame(first), generation));
+        assert!(finish(&mut st, first));
         let mut other = actionlay_layout::default_layout();
         other.name = Some("other".into());
         st.set_layout(Arc::new(other), ScaleMode::Fit);
@@ -714,6 +820,14 @@ mod tests {
         w.set_telemetry(Some(Arc::new(Telemetry::empty(10.0))), ScaleMode::Height);
     }
 
+    fn wait_until(mut done: impl FnMut() -> bool, what: &str) {
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while !done() {
+            assert!(Instant::now() < deadline, "{what}");
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+
     fn wait_frame(w: &OverlayWorker) -> OverlayFrame {
         let deadline = Instant::now() + Duration::from_secs(30);
         loop {
@@ -733,15 +847,11 @@ mod tests {
             width: 64,
             height: 36,
         });
-        std::thread::sleep(Duration::from_millis(200));
-        assert!(
-            w.take_frame().is_none(),
-            "no telemetry yet: nothing rendered"
-        );
         with_telemetry(&w);
         let f = wait_frame(&w);
         assert_eq!((f.pixmap.width(), f.pixmap.height(), f.t), (64, 36, 1.0));
-        assert!(notified.load(Ordering::SeqCst) >= 1);
+        // `notify` runs right after the frame is published
+        wait_until(|| notified.load(Ordering::SeqCst) >= 1, "notify not called");
     }
 
     #[test]
@@ -789,38 +899,73 @@ mod tests {
         );
     }
 
+    fn set_hook(w: &OverlayWorker, hook: impl Fn(&OverlayRequest) + Send + Sync + 'static) {
+        w.shared.lock().hook = Some(Arc::new(hook));
+    }
+
+    fn small(t: f64) -> OverlayRequest {
+        OverlayRequest {
+            t,
+            width: 32,
+            height: 18,
+        }
+    }
+
     #[test]
-    fn dropping_the_worker_stops_its_thread_promptly() {
+    fn a_panicking_render_is_counted_and_later_requests_still_render() {
+        let (w, _) = worker();
+        with_telemetry(&w);
+        set_hook(&w, |r| assert!(r.t != 2.0, "injected render failure"));
+        w.request(small(2.0));
+        wait_until(|| w.failures() == 1, "failure not counted");
+        assert!(w.take_frame().is_none(), "nothing published for t=2");
+        w.request(small(3.0));
+        let f = wait_frame(&w);
+        assert_eq!((f.t, w.failures()), (3.0, 1));
+    }
+
+    #[test]
+    fn dropping_an_idle_worker_stops_its_thread() {
         let alive = Arc::new(());
         let token = alive.clone();
         let w = OverlayWorker::spawn(Arc::new(actionlay_layout::default_layout()), move || {
             let _ = &token;
         });
         with_telemetry(&w);
-        // a render is likely in flight when the worker is dropped
-        w.request(OverlayRequest {
-            t: 1.0,
-            width: 640,
-            height: 360,
-        });
-        let start = Instant::now();
+        w.request(small(1.0));
+        wait_frame(&w); // the thread is up and back waiting on its condition variable
         drop(w);
         // the thread owned `notify`: it is gone only once the thread has exited
         assert_eq!(Arc::strong_count(&alive), 1);
-        assert!(
-            start.elapsed() < Duration::from_secs(10),
-            "{:?}",
-            start.elapsed()
-        );
+    }
 
-        // idle worker (waiting on its condition variable) too
-        let (idle, _) = worker();
-        let start = Instant::now();
-        drop(idle);
-        assert!(
-            start.elapsed() < Duration::from_secs(2),
-            "{:?}",
-            start.elapsed()
+    #[test]
+    fn dropping_the_worker_during_a_render_stops_it_without_publishing() {
+        let (w, notified) = worker();
+        with_telemetry(&w);
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+        let release_rx = Mutex::new(release_rx);
+        set_hook(&w, move |_| {
+            started_tx.send(()).unwrap();
+            let _ = release_rx.lock().unwrap().recv();
+        });
+        w.request(small(1.0));
+        started_rx.recv().unwrap(); // a render is in flight
+        // release it only once `drop` has asked the thread to quit
+        let shared = w.shared.clone();
+        let releaser = std::thread::spawn(move || {
+            while !shared.lock().quit {
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            release_tx.send(()).unwrap();
+        });
+        drop(w); // returns only once the thread has exited
+        releaser.join().unwrap();
+        assert_eq!(
+            notified.load(Ordering::SeqCst),
+            0,
+            "frame published after quit"
         );
     }
 }
