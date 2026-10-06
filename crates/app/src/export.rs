@@ -87,11 +87,13 @@ pub struct Progress {
     pub error: Option<String>,
 }
 pub struct Job {
+    pub started: Instant,
     pub cancel: Arc<AtomicBool>,
     pub progress: Arc<Mutex<Progress>>,
 }
 impl Job {
     pub fn spawn(request: Request, wake: impl Fn() + Send + 'static) -> Self {
+        let started = Instant::now();
         let cancel = Arc::new(AtomicBool::new(false));
         let progress = Arc::new(Mutex::new(Progress::default()));
         let c = cancel.clone();
@@ -106,6 +108,7 @@ impl Job {
             .unwrap_or_else(|_| Err(anyhow::anyhow!("export worker failed")));
             let mut state = p.lock().unwrap();
             state.done = true;
+            state.elapsed = started.elapsed().as_secs_f64();
             if let Err(e) = result {
                 state.error = Some(format!("{e:#}"));
                 state.status = "Export failed".into();
@@ -113,7 +116,11 @@ impl Job {
             drop(state);
             wake();
         });
-        Self { cancel, progress }
+        Self {
+            started,
+            cancel,
+            progress,
+        }
     }
 }
 impl Drop for Job {
@@ -156,6 +163,17 @@ pub fn validate(request: &Request, duration: f64) -> Result<f64> {
     Ok(end)
 }
 
+fn route_data_required(nodes: &[actionlay_layout::model::Node]) -> bool {
+    use actionlay_layout::model::{MapRoute, Node, Widget};
+    nodes.iter().any(|node| match node {
+        Node::Known(widget) if widget.common().visible != Some(false) => {
+            matches!(widget, Widget::Map(map) if map.needs_full_track() || map.route_mode.unwrap_or_default() != MapRoute::None)
+                || route_data_required(widget.children())
+        }
+        _ => false,
+    })
+}
+
 pub fn run(
     request: Request,
     cancel: Arc<AtomicBool>,
@@ -175,8 +193,27 @@ pub fn run(
         status: "Reading telemetry…".into(),
         ..Default::default()
     });
-    let packets =
-        actionlay_media::gpmf::read_gpmf_packets_with_cancel(&request.source, cancel.clone())?;
+    let route_required = route_data_required(&request.layout.nodes);
+    let packets = if route_required {
+        actionlay_media::gpmf::read_gpmf_packets_complete(&request.source, &cancel).map_err(
+            |error| {
+                log::warn!("complete export route metadata: {error}");
+                anyhow::anyhow!("Route data could not be fully loaded. Export was not started.")
+            },
+        )?
+    } else {
+        actionlay_media::gpmf::read_gpmf_packets_with_cancel(&request.source, cancel.clone())?
+    };
+    if cancel.load(Ordering::Relaxed) {
+        notify(Progress {
+            done: true,
+            cancelled: true,
+            elapsed: started.elapsed().as_secs_f64(),
+            status: "Export cancelled".into(),
+            ..Default::default()
+        });
+        return Ok(());
+    }
     let raw: Vec<_> = packets
         .into_iter()
         .map(|p| RawPacket {
@@ -197,12 +234,17 @@ pub fn run(
         ) {
             Ok(telemetry) => telemetry,
             Err(error) => {
+                if route_required {
+                    log::warn!("complete export route decoding: {error}");
+                    bail!("Route data could not be fully loaded. Export was not started.");
+                }
                 log::warn!("export telemetry unavailable: {error}");
                 Telemetry::empty(info.duration)
             }
         }
     };
     let telemetry = Arc::new(telemetry);
+    let rendering_started = Instant::now();
     let parent = request
         .output
         .parent()
@@ -334,7 +376,10 @@ pub fn run(
                         fraction: fraction as f32,
                         frames,
                         elapsed,
-                        remaining: Some(elapsed * (1.0 - fraction) / fraction.max(0.001)),
+                        remaining: Some(
+                            rendering_started.elapsed().as_secs_f64() * (1.0 - fraction)
+                                / fraction.max(0.001),
+                        ),
                         status: format!("Exporting · {backend}"),
                         ..Default::default()
                     });
@@ -454,6 +499,75 @@ mod tests {
             maps: actionlay_maps::TileStore::offline(),
         }
     }
+    #[test]
+    fn first_export_frame_uses_the_complete_route_even_if_preview_has_only_one_packet() {
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/gopro/hero5.mp4");
+        if !source.exists() {
+            assert!(std::env::var_os("ACTIONLAY_REQUIRE_GOPRO_SAMPLES").is_none());
+            return;
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let output = dir.path().join("route-frames");
+        let mut req = request(output.clone());
+        req.source = source.clone();
+        req.start = 0.2;
+        req.end = Some(0.3);
+        req.settings.mode = Mode::Transparent;
+        req.settings.format = Format::Png;
+        req.layout = Arc::new(Layout::from_json(r#"{"version":1,"nodes":[{"type":"map","mode":"circuit","zoom_mode":"route","route_coverage":0.8,"route_mode":"full","size":[400,300],"show_marker":false}]}"#).unwrap().layout);
+        let layout = req.layout.clone();
+        let settings = req.settings.clone();
+        let info = actionlay_media::probe::probe(&source).unwrap();
+        let packets = crate::telemetry_load::to_raw(
+            actionlay_media::gpmf::read_gpmf_packets(&source).unwrap(),
+        );
+        let preview = Telemetry::from_gpmf_packets_progressive(&packets[..1]).unwrap();
+        assert!(!preview.is_complete());
+        let complete = Telemetry::from_gpmf_packets_with(
+            &packets,
+            &TelemetryOptions {
+                video_duration: Some(info.duration),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(complete.is_complete());
+        run(req, Arc::new(AtomicBool::new(false)), |_| {}).unwrap();
+        let manifest: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(output.join("sequence.json")).unwrap()).unwrap();
+        let first_t = manifest["source_start"].as_f64().unwrap();
+        let mut renderer = Renderer::new();
+        let mut pixels = Pixmap::new(info.video.width, info.video.height).unwrap();
+        renderer.render_telemetry_into(&layout, &complete, first_t, &mut pixels);
+        let expected = composite(pixels.data(), None, &settings);
+        let actual = image::open(output.join("frame-000000.png"))
+            .unwrap()
+            .to_rgba8();
+        assert_eq!(actual.as_raw(), &expected);
+        renderer.render_telemetry_into(&layout, &preview, first_t, &mut pixels);
+        assert_ne!(
+            actual.as_raw(),
+            &composite(pixels.data(), None, &settings),
+            "a partial preview track cannot determine export zoom"
+        );
+    }
+
+    #[test]
+    fn relative_zoom_loads_the_whole_route_without_drawing_it() {
+        let layout = Layout::from_json(
+            r#"{"version":1,"nodes":[{"type":"map","zoom_mode":"route","route_mode":"none"}]}"#,
+        )
+        .unwrap()
+        .layout;
+        assert!(route_data_required(&layout.nodes));
+        let layout = Layout::from_json(
+            r#"{"version":1,"nodes":[{"type":"map","zoom_mode":"fixed","route_mode":"none"}]}"#,
+        )
+        .unwrap()
+        .layout;
+        assert!(!route_data_required(&layout.nodes));
+    }
+
     #[test]
     fn ranges_and_existing_destinations_are_rejected() {
         let dir = tempfile::tempdir().unwrap();

@@ -101,6 +101,17 @@ fn truncated_faststart_file_returns_partial_packets() {
     // usually ends in EOF rather than in a read error.
     let n = read_gpmf_packets(&cut).unwrap().len();
     assert!(n > 0 && n < full, "{n} packets of {full}");
+    let cancelled = std::sync::atomic::AtomicBool::new(false);
+    assert_eq!(
+        actionlay_media::gpmf::read_gpmf_packets_complete(&fast, &cancelled)
+            .unwrap()
+            .len(),
+        full
+    );
+    assert!(
+        actionlay_media::gpmf::read_gpmf_packets_complete(&cut, &cancelled).is_err(),
+        "route exports must refuse partial metadata"
+    );
 }
 
 #[test]

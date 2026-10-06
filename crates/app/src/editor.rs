@@ -504,50 +504,76 @@ impl Editor {
         let mut action = None;
         egui::Panel::top("editor-toolbar").show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.strong("Edit layout");
-                ui.label(format!(
-                    "{}{}",
-                    self.draft.name.as_deref().unwrap_or("Untitled"),
-                    if self.dirty() { " *" } else { "" }
+                ui.strong(crate::i18n::ui_text(ui, "Edit layout"));
+                ui.label(crate::i18n::ui_text(
+                    ui,
+                    format!(
+                        "{}{}",
+                        self.draft.name.as_deref().unwrap_or("Untitled"),
+                        if self.dirty() { " *" } else { "" }
+                    ),
                 ));
-                if ui.button("New layout…").clicked() {
+                if ui.button(crate::i18n::ui_text(ui, "New layout…")).clicked() {
                     action = Some(Action::New);
                 }
-                if ui.button("Save").clicked() {
+                if ui.button(crate::i18n::ui_text(ui, "Save")).clicked() {
                     action = Some(Action::Save);
                 }
-                if ui.button("Save as…").clicked() {
+                if ui.button(crate::i18n::ui_text(ui, "Save as…")).clicked() {
                     action = Some(Action::SaveAs);
                 }
-                if ui.button("Export package…").clicked() {
+                if ui
+                    .button(crate::i18n::ui_text(ui, "Export package…"))
+                    .clicked()
+                {
                     action = Some(Action::Export);
                 }
-                ui.checkbox(&mut self.include_fonts, "Include fonts");
-                if ui.button("Exit editor").clicked() {
+                ui.checkbox(
+                    &mut self.include_fonts,
+                    crate::i18n::ui_text(ui, "Include fonts"),
+                );
+                if ui.button(crate::i18n::ui_text(ui, "Exit editor")).clicked() {
                     action = Some(Action::Exit);
                 }
                 if ui
-                    .add_enabled(!self.undo.is_empty(), egui::Button::new("Undo"))
+                    .add_enabled(
+                        !self.undo.is_empty(),
+                        egui::Button::new(crate::i18n::text("Undo")),
+                    )
                     .clicked()
                 {
                     self.undo();
                 }
                 if ui
-                    .add_enabled(!self.redo.is_empty(), egui::Button::new("Redo"))
+                    .add_enabled(
+                        !self.redo.is_empty(),
+                        egui::Button::new(crate::i18n::text("Redo")),
+                    )
                     .clicked()
                 {
                     self.redo();
                 }
             });
             ui.horizontal_wrapped(|ui| {
-                ui.label("Background");
+                ui.label(crate::i18n::ui_text(ui, "Background"));
                 ui.add_enabled_ui(video_size.is_some(), |ui| {
-                    ui.selectable_value(&mut self.video_background, true, "Open video");
+                    ui.selectable_value(
+                        &mut self.video_background,
+                        true,
+                        crate::i18n::ui_text(ui, "Open video"),
+                    );
                 });
-                ui.selectable_value(&mut self.video_background, false, "Static image");
+                ui.selectable_value(
+                    &mut self.video_background,
+                    false,
+                    crate::i18n::text("Static image"),
+                );
                 if !self.video_background {
                     egui::ComboBox::from_id_salt("preview-aspect")
-                        .selected_text(format!("{} × {}", self.dimensions[0], self.dimensions[1]))
+                        .selected_text(crate::i18n::ui_text(
+                            ui,
+                            format!("{} × {}", self.dimensions[0], self.dimensions[1]),
+                        ))
                         .show_ui(ui, |ui| {
                             for (name, size) in [
                                 ("16:9 · Full HD", [1920, 1080]),
@@ -556,15 +582,22 @@ impl Editor {
                                 ("9:16", [1080, 1920]),
                                 ("1:1", [1080, 1080]),
                             ] {
-                                ui.selectable_value(&mut self.dimensions, size, name);
+                                ui.selectable_value(
+                                    &mut self.dimensions,
+                                    size,
+                                    crate::i18n::ui_text(ui, name),
+                                );
                             }
                         });
                     for n in &mut self.dimensions {
                         ui.add(egui::DragValue::new(n).range(64..=16384));
                     }
                 }
-                ui.checkbox(&mut self.snap, "Snap to guides");
-                ui.checkbox(&mut self.automatic_anchor, "Update anchor on drop");
+                ui.checkbox(&mut self.snap, crate::i18n::ui_text(ui, "Snap to guides"));
+                ui.checkbox(
+                    &mut self.automatic_anchor,
+                    crate::i18n::ui_text(ui, "Update anchor on drop"),
+                );
             });
         });
         if ui.is_enabled() && !ctx.egui_wants_keyboard_input() {
@@ -611,18 +644,24 @@ impl Editor {
             .resizable(true)
             .show(ui, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    ui.heading("Widgets");
-                    ui.small("Drag onto the preview, or click to add.");
+                    ui.heading(crate::i18n::ui_text(ui, "Widgets"));
+                    ui.small(crate::i18n::ui_text(
+                        ui,
+                        "Drag onto the preview, or click to add.",
+                    ));
                     for kind in Widget::TYPES {
                         ui.horizontal(|ui| {
                             ui.dnd_drag_source(
                                 egui::Id::new(("palette", kind)),
                                 kind.to_owned(),
                                 |ui| {
-                                    ui.label(kind.replace('_', " "));
+                                    ui.label(crate::i18n::ui_text(
+                                        ui,
+                                        crate::i18n::widget_label(kind),
+                                    ));
                                 },
                             );
-                            if ui.small_button("+").clicked() {
+                            if ui.small_button(crate::i18n::ui_text(ui, "+")).clicked() {
                                 let size = if self.video_background {
                                     video_size.unwrap_or(self.dimensions)
                                 } else {
@@ -648,8 +687,11 @@ impl Editor {
                         });
                     }
                     ui.separator();
-                    ui.heading("Layers");
-                    ui.small("Ctrl/⌘ or Shift-click to select several widgets.");
+                    ui.heading(crate::i18n::ui_text(ui, "Layers"));
+                    ui.small(crate::i18n::ui_text(
+                        ui,
+                        "Ctrl/⌘ or Shift-click to select several widgets.",
+                    ));
                     layer_tree(
                         ui,
                         &self.draft.nodes,
@@ -659,16 +701,16 @@ impl Editor {
                         warnings_telemetry,
                     );
                     ui.horizontal_wrapped(|ui| {
-                        if ui.button("Duplicate").clicked() {
+                        if ui.button(crate::i18n::ui_text(ui, "Duplicate")).clicked() {
                             self.duplicate();
                         }
-                        if ui.button("Delete").clicked() {
+                        if ui.button(crate::i18n::ui_text(ui, "Delete")).clicked() {
                             self.delete();
                         }
                         if ui
                             .add_enabled(
                                 self.selected_paths().len() == 1,
-                                egui::Button::new("Forward"),
+                                egui::Button::new(crate::i18n::text("Forward")),
                             )
                             .clicked()
                         {
@@ -677,7 +719,7 @@ impl Editor {
                         if ui
                             .add_enabled(
                                 self.selected_paths().len() == 1,
-                                egui::Button::new("Backward"),
+                                egui::Button::new(crate::i18n::text("Backward")),
                             )
                             .clicked()
                         {
@@ -685,18 +727,18 @@ impl Editor {
                         }
                     });
                     ui.horizontal_wrapped(|ui| {
-                        if ui.button("Group").clicked() {
+                        if ui.button(crate::i18n::ui_text(ui, "Group")).clicked() {
                             self.error = self.group_selection().err();
                         }
-                        if ui.button("Ungroup").clicked() {
+                        if ui.button(crate::i18n::ui_text(ui, "Ungroup")).clicked() {
                             self.error = self.ungroup().err();
                         }
                     });
                     let mut destination = None;
                     egui::ComboBox::from_id_salt("move-to-group")
-                        .selected_text("Move selection to…")
+                        .selected_text(crate::i18n::ui_text(ui, "Move selection to…"))
                         .show_ui(ui, |ui| {
-                            if ui.button("Layout root").clicked() {
+                            if ui.button(crate::i18n::ui_text(ui, "Layout root")).clicked() {
                                 destination = Some(Vec::new());
                                 ui.close();
                             }
@@ -709,10 +751,13 @@ impl Editor {
                                         .iter()
                                         .any(|path| hit.path.starts_with(path))
                                     && ui
-                                        .button(format!(
-                                            "{} ({:?})",
-                                            widget.common().name.as_deref().unwrap_or("Group"),
-                                            hit.path
+                                        .button(crate::i18n::ui_text(
+                                            ui,
+                                            format!(
+                                                "{} ({:?})",
+                                                widget.common().name.as_deref().unwrap_or("Group"),
+                                                hit.path
+                                            ),
                                         ))
                                         .clicked()
                                 {
@@ -731,16 +776,21 @@ impl Editor {
             .resizable(true)
             .show(ui, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    ui.heading("Properties");
+                    ui.heading(crate::i18n::ui_text(ui, "Properties"));
                     self.properties(ui, warnings_telemetry);
                 });
             });
         egui::CentralPanel::default().show(ui, |ui| {
             if !self.video_background {
                 ui.horizontal(|ui| {
-                    if ui.button("Load background image…").clicked()
+                    if ui
+                        .button(crate::i18n::text("Load background image…"))
+                        .clicked()
                         && let Some(path) = rfd::FileDialog::new()
-                            .add_filter("Images", &["png", "jpg", "jpeg", "webp", "bmp"])
+                            .add_filter(
+                                crate::i18n::native_text("Images"),
+                                &["png", "jpg", "jpeg", "webp", "bmp"],
+                            )
                             .pick_file()
                     {
                         match load_background(&ctx, &path) {
@@ -748,14 +798,19 @@ impl Editor {
                             Err(e) => self.error = Some(e),
                         }
                     }
-                    if self.background.is_some() && ui.button("Clear image").clicked() {
+                    if self.background.is_some()
+                        && ui.button(crate::i18n::text("Clear image")).clicked()
+                    {
                         self.background = None;
                     }
-                    ui.small("Demonstration data · map downloads disabled");
+                    ui.small(crate::i18n::ui_text(
+                        ui,
+                        "Demonstration data · map downloads disabled",
+                    ));
                 });
             }
             for error in [&self.error, &self.property_error].into_iter().flatten() {
-                ui.colored_label(egui::Color32::LIGHT_RED, error);
+                ui.colored_label(egui::Color32::LIGHT_RED, crate::i18n::ui_text(ui, error));
             }
             let size = if self.video_background {
                 video_size.unwrap_or(self.dimensions)
@@ -764,7 +819,10 @@ impl Editor {
             };
             let canvas = fit_rect(ui.available_rect_before_wrap(), size[0], size[1]);
             if canvas.width() < 8.0 || canvas.height() < 8.0 {
-                ui.label("Enlarge the window or narrow the side panels to show the preview.");
+                ui.label(crate::i18n::ui_text(
+                    ui,
+                    "Enlarge the window or narrow the side panels to show the preview.",
+                ));
                 return;
             }
             let response = ui.allocate_rect(canvas, egui::Sense::click_and_drag());
@@ -873,7 +931,7 @@ impl Editor {
                             egui::Id::new(("data-warning", &hit.path)),
                             egui::Sense::hover(),
                         )
-                        .on_hover_text(warnings.join("\n"));
+                        .on_hover_text(crate::i18n::ui_text(ui, warnings.join("\n")));
                     }
                 }
             }
@@ -938,7 +996,7 @@ impl Editor {
                 ui.painter().text(
                     canvas.left_top() + egui::vec2(8.0, 8.0),
                     egui::Align2::LEFT_TOP,
-                    "Selected widget extends outside the frame",
+                    crate::i18n::text("Selected widget extends outside the frame"),
                     egui::FontId::proportional(13.0),
                     egui::Color32::YELLOW,
                 );
@@ -1082,10 +1140,12 @@ impl Editor {
 
     fn properties(&mut self, ui: &mut egui::Ui, telemetry: Option<&Telemetry>) {
         let before = self.draft.clone();
-        if ui.button("Attach font or image…").clicked()
+        if ui
+            .button(crate::i18n::text("Attach font or image…"))
+            .clicked()
             && let Some(path) = rfd::FileDialog::new()
                 .add_filter(
-                    "Layout assets",
+                    crate::i18n::native_text("Layout assets"),
                     &["ttf", "otf", "ttc", "png", "jpg", "jpeg", "webp", "svg"],
                 )
                 .pick_file()
@@ -1109,7 +1169,7 @@ impl Editor {
             })();
             self.error = result.err();
         }
-        ui.small("Custom fonts are scoped to this layout. Set a font family in its theme or widget properties.");
+        ui.small(crate::i18n::ui_text(ui, "Custom fonts are scoped to this layout. Set a font family in its theme or widget properties."));
         let font_key = actionlay_render::fonts::configuration_key(&self.draft);
         if self.font_key.as_ref() != Some(&font_key) {
             self.font_warnings = actionlay_render::fonts::warnings(&self.draft);
@@ -1118,10 +1178,10 @@ impl Editor {
         }
         let mut font = None;
         egui::ComboBox::from_id_salt("editor-font-family")
-            .selected_text("Choose font family…")
+            .selected_text(crate::i18n::ui_text(ui, "Choose font family…"))
             .show_ui(ui, |ui| {
                 for family in &self.font_families {
-                    if ui.button(family).clicked() {
+                    if ui.button(crate::i18n::ui_text(ui, family)).clicked() {
                         font = Some(family.clone());
                         ui.close();
                     }
@@ -1147,20 +1207,26 @@ impl Editor {
             }
         }
         for warning in &self.font_warnings {
-            ui.colored_label(egui::Color32::YELLOW, warning);
+            ui.colored_label(egui::Color32::YELLOW, crate::i18n::ui_text(ui, warning));
         }
         if let Some(path) = self.selection.clone()
             && let Some(node) = node_at(&self.draft.nodes, &path)
         {
             if self.selected_paths().len() > 1 {
-                ui.small(format!(
-                    "{} widgets selected; properties apply to this widget",
-                    self.selected_paths().len()
+                ui.small(crate::i18n::ui_text(
+                    ui,
+                    format!(
+                        "{} widgets selected; properties apply to this widget",
+                        self.selected_paths().len()
+                    ),
                 ));
             }
-            ui.strong(node.type_name().replace('_', " "));
+            ui.strong(crate::i18n::ui_text(
+                ui,
+                crate::i18n::widget_label(node.type_name()),
+            ));
             for warning in metric_warnings(node, telemetry) {
-                ui.colored_label(egui::Color32::YELLOW, warning);
+                ui.colored_label(egui::Color32::YELLOW, crate::i18n::ui_text(ui, warning));
             }
             let mut value = self
                 .properties_buffer
@@ -1179,7 +1245,10 @@ impl Editor {
                 .and_then(|r| self.schema.pointer(&r[1..]))
                 .cloned();
             if let Some(schema) = node_schema {
-                if ui.button("Reset widget parameters").clicked() {
+                if ui
+                    .button(crate::i18n::ui_text(ui, "Reset widget parameters"))
+                    .clicked()
+                {
                     let template = template(node.type_name());
                     let mut fresh = serde_json::to_value(template).unwrap();
                     for key in [
@@ -1231,18 +1300,24 @@ impl Editor {
                     }
                 }
             } else {
-                ui.weak("This widget is preserved but is not supported by this version.");
+                ui.weak(crate::i18n::ui_text(
+                    ui,
+                    "This widget is preserved but is not supported by this version.",
+                ));
             }
         } else {
-            ui.label("Layout name");
+            ui.label(crate::i18n::ui_text(ui, "Layout name"));
             let name = self.draft.name.get_or_insert_default();
             ui.text_edit_singleline(name);
-            ui.small("Select a widget in the preview or in Layers to edit it.");
-            ui.label("Design proportions");
+            ui.small(crate::i18n::ui_text(
+                ui,
+                "Select a widget in the preview or in Layers to edit it.",
+            ));
+            ui.label(crate::i18n::ui_text(ui, "Design proportions"));
             let aspect = self.draft.design_aspect.get_or_insert(Aspect::WIDESCREEN);
             ui.horizontal(|ui| {
                 ui.add(egui::DragValue::new(&mut aspect.w).range(1.0..=16384.0));
-                ui.label(":");
+                ui.label(crate::i18n::ui_text(ui, ":"));
                 ui.add(egui::DragValue::new(&mut aspect.h).range(1.0..=16384.0));
             });
             let mut value = serde_json::to_value(&self.draft).unwrap();
@@ -1445,13 +1520,18 @@ fn layer_tree(
             _ => node.type_name(),
         };
         let warnings = metric_warnings(node, telemetry);
+        let name = if name == node.type_name() {
+            crate::i18n::widget_label(name)
+        } else {
+            name.to_owned()
+        };
         let label = format!("{}{}", if warnings.is_empty() { "" } else { "⚠ " }, name);
         if ui
             .selectable_label(
                 selected.as_ref() == Some(path) || additional.contains(path),
-                label,
+                crate::i18n::user_text(ui, label),
             )
-            .on_hover_text(warnings.join("\n"))
+            .on_hover_text(crate::i18n::ui_text(ui, warnings.join("\n")))
             .clicked()
         {
             let additive = ui.input(|i| i.modifiers.command || i.modifiers.shift);
@@ -1665,20 +1745,28 @@ fn map_properties(ui: &mut egui::Ui, value: &mut Value) {
         ] {
             let mut selected=value[key].as_str().unwrap_or(default).to_owned();
             let old=selected.clone();
-            egui::ComboBox::from_id_salt(key).selected_text(options.iter().find(|o|o.0==selected).map_or(selected.as_str(),|o|o.1))
-                .show_ui(ui,|ui| { for &(id,text) in options { ui.selectable_value(&mut selected,id.to_owned(),text); } });
-            ui.small(label);
+            egui::ComboBox::from_id_salt(key).selected_text(crate::i18n::ui_text(ui, options.iter().find(|o|o.0==selected).map_or(selected.as_str(),|o|o.1)))
+                .show_ui(ui,|ui| { for &(id,text) in options { ui.selectable_value(&mut selected,id.to_owned(),crate::i18n::ui_text(ui, text)); } });
+            ui.small(crate::i18n::ui_text(ui, label));
             if selected != old { value[key]=json!(selected); }
-            if value.get(key).is_some() && ui.small_button(format!("Reset {label}")).clicked() { value.as_object_mut().unwrap().remove(key); }
+            if value.get(key).is_some() && ui.small_button(crate::i18n::ui_text(ui, format!("Reset {label}"))).clicked() { value.as_object_mut().unwrap().remove(key); }
+        }
+        let mut zoom_mode = value["zoom_mode"].as_str().unwrap_or("fixed").to_owned();
+        let before = zoom_mode.clone();
+        ui.label(crate::i18n::text("Zoom mode"));
+        egui::ComboBox::from_id_salt("map-zoom-mode").selected_text(crate::i18n::text(if zoom_mode == "route" { "Fit entire route" } else { "Fixed zoom" })).show_ui(ui, |ui| {
+            ui.selectable_value(&mut zoom_mode, "fixed".to_owned(), crate::i18n::text("Fixed zoom"));
+            ui.selectable_value(&mut zoom_mode, "route".to_owned(), crate::i18n::text("Fit entire route"));
+        });
+        if zoom_mode != before { value["zoom_mode"] = json!(zoom_mode); }
+        if zoom_mode == "route" {
+            let mut coverage = value["route_coverage"].as_f64().unwrap_or(0.8);
+            if ui.add(egui::Slider::new(&mut coverage, 0.1..=1.0).text(crate::i18n::text("Route size")).custom_formatter(|n, _| format!("{:.0}%", n * 100.0))).changed() { value["route_coverage"] = json!(coverage); }
+            ui.small(crate::i18n::ui_text(ui, "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading."));
         }
         let mut split=value["split_route"].as_bool().unwrap_or(true);
-        if ui.checkbox(&mut split,"Different color for the upcoming route").changed() { value["split_route"]=json!(split); }
-        match value["route_mode"].as_str().unwrap_or("none") {
-            "past" => { ui.colored_label(egui::Color32::YELLOW, "After seeking, showing the completed route may require loading additional metadata from the video up to the selected time."); }
-            "full" => { ui.colored_label(egui::Color32::YELLOW, "Showing the entire route may require loading additional metadata from the whole video, even without seeking. The route appears as the data loads."); }
-            _ => {}
-        }
-        ui.small("Default: north up, no route. Route colors: dark green completed, yellow upcoming.");
+        if ui.checkbox(&mut split,crate::i18n::ui_text(ui, "Different color for the upcoming route")).changed() { value["split_route"]=json!(split); }
+
     });
 }
 
@@ -1695,23 +1783,84 @@ fn property_object(
     };
     for (key, s) in properties {
         if value["type"] == "map"
-            && matches!(key.as_str(), "orientation" | "route_mode" | "split_route")
+            && matches!(
+                key.as_str(),
+                "orientation" | "route_mode" | "split_route" | "zoom_mode" | "route_coverage"
+            )
         {
             continue;
         }
         if matches!(key.as_str(), "type" | "children" | "id") {
             continue;
         }
+        if key == "units" && value.get("metric").is_none() {
+            let selected = value["units"].as_str().unwrap_or("default").to_owned();
+            let mut chosen = selected.clone();
+            ui.label(crate::i18n::property_label(key));
+            egui::ComboBox::from_id_salt((depth, key))
+                .selected_text(crate::i18n::enum_label(&selected))
+                .show_ui(ui, |ui| {
+                    for id in ["default", "metric", "imperial"] {
+                        ui.selectable_value(
+                            &mut chosen,
+                            id.to_owned(),
+                            crate::i18n::enum_label(id),
+                        );
+                    }
+                });
+            if chosen != selected {
+                value[key] = json!(chosen);
+            }
+            continue;
+        }
+        if key == "units" && s.to_string().contains("string") && value.get("metric").is_some() {
+            let selected = value["units"].as_str().unwrap_or("default").to_owned();
+            let mut chosen = selected.clone();
+            ui.label(crate::i18n::property_label(key));
+            egui::ComboBox::from_id_salt((depth, key))
+                .selected_text(if selected == "default" {
+                    crate::i18n::text("Default")
+                } else {
+                    &selected
+                })
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(
+                        &mut chosen,
+                        "default".to_owned(),
+                        crate::i18n::text("Default"),
+                    );
+                    if let Some(metric) = value["metric"]
+                        .as_str()
+                        .and_then(actionlay_telemetry::metric::Metric::from_id)
+                    {
+                        for unit in actionlay_telemetry::units::units_for(metric.quantity()) {
+                            ui.selectable_value(
+                                &mut chosen,
+                                unit.id().to_owned(),
+                                if actionlay_telemetry::units::symbol(*unit).is_empty() {
+                                    crate::i18n::text("None")
+                                } else {
+                                    actionlay_telemetry::units::symbol(*unit)
+                                },
+                            );
+                        }
+                    }
+                });
+            if chosen != selected {
+                value[key] = json!(chosen);
+            }
+            continue;
+        }
         ui.push_id(key, |ui| {
-            let required = schema["required"]
+            let required = key == "stale_secs" || schema["required"]
                 .as_array()
                 .is_some_and(|a| a.contains(&json!(key)));
             let existing = value.get(key).cloned();
-            let mut enabled = existing.is_some();
+            let mut enabled = existing.is_some() || key == "stale_secs";
             let mut reset = false;
             ui.horizontal(|ui| {
                 if !required {
-                    ui.checkbox(&mut enabled, "");
+                    ui.checkbox(&mut enabled, crate::i18n::ui_text(ui, ""));
                 }
                 let label = if value["type"] == "map" {
                     match key.as_str() {
@@ -1721,24 +1870,26 @@ fn property_object(
                         "marker" => "Position dot color".into(),
                         "marker_radius" => "Position dot radius".into(),
                         "show_marker" => "Show position dot".into(),
-                        _ => key.replace('_', " "),
+                        _ => crate::i18n::property_label(key),
                     }
                 } else {
-                    key.replace('_', " ")
+                    crate::i18n::property_label(key)
                 };
-                ui.label(label)
-                    .on_hover_text(s["description"].as_str().unwrap_or(""));
+                ui.label(crate::i18n::ui_text(ui, label))
+                    .on_hover_text(crate::i18n::ui_text(ui, if key == "stale_secs" { "Retain the last valid value during missing data for this many video seconds. Buffering does not count as missing data." } else { s["description"].as_str().unwrap_or("") }));
                 if !required && existing.is_some() {
-                    reset = ui.small_button("Reset").clicked();
+                    reset = ui.small_button(crate::i18n::ui_text(ui, "Reset")).clicked();
                 }
             });
             if reset || !enabled {
                 value.as_object_mut().unwrap().remove(key);
                 return;
             }
-            let mut edited = existing.unwrap_or_else(|| schema_default(s, root));
+            let was_present = existing.is_some();
+            let mut edited = existing.unwrap_or_else(|| if key == "stale_secs" { json!(3.0) } else { schema_default(s, root) });
+            let before = edited.clone();
             edit_value(ui, &mut edited, s, root, depth);
-            value[key] = edited;
+            if key != "stale_secs" || was_present || edited != before { value[key] = edited; }
         });
     }
 }
@@ -1788,21 +1939,25 @@ fn edit_value(ui: &mut egui::Ui, value: &mut Value, schema: &Value, root: &Value
     let schema = resolved_schema(schema, root);
     if let Some(values) = schema["enum"].as_array() {
         egui::ComboBox::from_id_salt("enum")
-            .selected_text(
+            .selected_text(crate::i18n::ui_text(
+                ui,
                 value
                     .as_str()
-                    .map(str::to_owned)
+                    .map(crate::i18n::enum_label)
                     .unwrap_or_else(|| value.to_string()),
-            )
+            ))
             .show_ui(ui, |ui| {
                 for option in values {
                     ui.selectable_value(
                         value,
                         option.clone(),
-                        option
-                            .as_str()
-                            .map(str::to_owned)
-                            .unwrap_or_else(|| option.to_string()),
+                        crate::i18n::ui_text(
+                            ui,
+                            option
+                                .as_str()
+                                .map(crate::i18n::enum_label)
+                                .unwrap_or_else(|| option.to_string()),
+                        ),
                     );
                 }
             });
@@ -1810,7 +1965,7 @@ fn edit_value(ui: &mut egui::Ui, value: &mut Value, schema: &Value, root: &Value
     }
     match value {
         Value::Bool(v) => {
-            ui.checkbox(v, "Enabled");
+            ui.checkbox(v, crate::i18n::ui_text(ui, "Enabled"));
         }
         Value::Number(v) => {
             let mut n = v.as_f64().unwrap_or(0.0);
@@ -1846,7 +2001,10 @@ fn edit_value(ui: &mut egui::Ui, value: &mut Value, schema: &Value, root: &Value
             ui.indent("object", |ui| {
                 property_object(ui, value, schema, root, depth + 1);
             });
-            if ui.small_button("Reset group").clicked() {
+            if ui
+                .small_button(crate::i18n::ui_text(ui, "Reset group"))
+                .clicked()
+            {
                 *value = json!({});
             }
         }
@@ -1858,7 +2016,9 @@ fn edit_value(ui: &mut egui::Ui, value: &mut Value, schema: &Value, root: &Value
                     edit_value(ui, v, s, root, depth + 1);
                     if !(schema["minItems"].as_u64().is_some()
                         && schema["minItems"] == schema["maxItems"])
-                        && ui.small_button("Remove").clicked()
+                        && ui
+                            .small_button(crate::i18n::ui_text(ui, "Remove"))
+                            .clicked()
                     {
                         remove = Some(i);
                     }
@@ -1868,7 +2028,7 @@ fn edit_value(ui: &mut egui::Ui, value: &mut Value, schema: &Value, root: &Value
                 values.remove(i);
             }
             if !(schema["minItems"].as_u64().is_some() && schema["minItems"] == schema["maxItems"])
-                && ui.small_button("Add").clicked()
+                && ui.small_button(crate::i18n::ui_text(ui, "Add")).clicked()
             {
                 values.push(schema_default(&schema["items"], root));
             }

@@ -122,6 +122,7 @@ impl Snapshot {
 #[derive(Debug, Clone)]
 pub struct Telemetry {
     id: u64,
+    complete: bool,
     imu_acceleration: Option<f64>,
     loaded_ranges: Option<Vec<(f64, f64)>>,
     cumulative_until: Option<f64>,
@@ -604,6 +605,7 @@ impl Telemetry {
             None
         };
         tel.loaded_ranges = Some(ranges);
+        tel.complete = false;
         Ok(tel)
     }
 
@@ -762,6 +764,7 @@ impl Telemetry {
         let availability = availability(&series, timeline);
         Telemetry {
             id: next_id(),
+            complete: true,
             imu_acceleration,
             loaded_ranges: None,
             cumulative_until: None,
@@ -780,6 +783,7 @@ impl Telemetry {
         let series = vec![None; Metric::COUNT];
         Telemetry {
             id: next_id(),
+            complete: true,
             imu_acceleration: None,
             loaded_ranges: None,
             cumulative_until: None,
@@ -795,6 +799,11 @@ impl Telemetry {
 
     /// End of the last GPMF packet (the video duration when the track
     /// spans the whole video), or the duration given to `empty`.
+    /// True only after the full source metadata was read, including after activity merges.
+    pub fn is_complete(&self) -> bool {
+        self.complete
+    }
+
     pub fn duration(&self) -> f64 {
         self.duration
     }
@@ -931,6 +940,11 @@ mod tests {
             packets[7].clone(),
         ])
         .unwrap();
+        assert!(!tel.is_complete());
+        assert!(
+            !tel.merge_external(&Telemetry::empty(8.0), 8.0)
+                .is_complete()
+        );
         assert!(tel.is_loaded_at(0.1));
         assert!(!tel.is_loaded_at(3.0));
         assert!(tel.is_loaded_at(6.1));
@@ -943,6 +957,7 @@ mod tests {
         ));
         let complete = Telemetry::from_gpmf_packets_progressive(&packets).unwrap();
         let reference = Telemetry::from_gpmf_packets(&packets).unwrap();
+        assert!(reference.is_complete());
         for t in [0.1, 3.0, 6.1] {
             assert_eq!(complete.sample(t), reference.sample(t));
         }

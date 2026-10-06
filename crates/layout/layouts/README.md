@@ -124,7 +124,8 @@ fits the observed values with a margin. Gaps and unread seek ranges break lines;
 gradient charts colour ascent/descent via `positive`/`negative`.
 
 `map` accepts `mode` (`moving`, `journey`, `moving_journey`, `circuit`), `size`,
-`zoom` (0–19), route/marker/background colours, route width, corner radius,
+`zoom` (0–19), `zoom_mode` (`fixed` or `route`), route/marker/background colours,
+route width, corner radius,
 `opacity_tiles` and `label_style`. Circuit mode draws only the route. Map-provider
 configuration lives in the app preferences; identifying requests, visible
 attribution and a seven-day disk cache apply. Downloads cover only visible tiles,
@@ -154,3 +155,17 @@ Generate offline synthetic previews and measure rendering with:
 cargo run --release -p actionlay-render --example preview-m3
 cargo run --release -p actionlay-render --example m3-bench
 ```
+
+Map zoom can fit the complete route independently of whether its line is hidden,
+past-only or full. `zoom_mode: "route"` uses `route_coverage` (0–1, default 0.8)
+to center the route and occupy that fraction of the viewport in its largest
+dimension. Preview uses the fixed `zoom` until metadata loading completes.
+Export reads and validates complete route metadata before the first frame.
+Included maps use full routes and 80% coverage, north up, with completed sections
+in dark green and upcoming sections in yellow.
+
+Layout `units: "default"` (also the omitted default) inherits user Regional
+settings; widget `units: "default"` inherits its layout. Explicit layout systems
+and widget unit IDs take precedence. Per-widget `stale_secs` retains missing
+data for that many video seconds (three in included layouts); waiting for unread
+metadata preserves the previously displayed overlay instead of aging its values.

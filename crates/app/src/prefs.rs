@@ -16,6 +16,12 @@ pub struct Appearance {
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Prefs {
+    /// None follows regional measurement settings, independently of UI language.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub regional_units: Option<actionlay_layout::model::Units>,
+    /// None means follow the system language, including future changes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
     #[serde(default)]
     pub system_integration_enabled: bool,
     #[serde(default)]
@@ -60,6 +66,17 @@ impl Prefs {
             log::warn!("{}: {e}; using default preferences", path.display());
             Prefs::default()
         });
+        // Older versions kept global units among appearance overrides. Move
+        // them to regional preferences so explicit layout units retain priority.
+        if let Some(old_units) = prefs
+            .appearance
+            .as_mut()
+            .and_then(|appearance| appearance.units.take())
+            && prefs.regional_units.is_none()
+            && old_units != actionlay_layout::model::Units::Default
+        {
+            prefs.regional_units = Some(old_units);
+        }
         normalize(&mut prefs.recent_videos);
         normalize(&mut prefs.recent_layouts);
         // Migrate preferences written before the layout chooser existed.
@@ -101,6 +118,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn legacy_global_units_migrate_without_overriding_layout_units() {
+        let path = temp("regional-migration");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &path,
+            r#"{"appearance":{"units":"imperial","panel_opacity":0.5}}"#,
+        )
+        .unwrap();
+        let prefs = Prefs::load(&path);
+        assert_eq!(
+            prefs.regional_units,
+            Some(actionlay_layout::model::Units::Imperial)
+        );
+        assert_eq!(prefs.appearance.as_ref().unwrap().units, None);
+        assert_eq!(prefs.appearance.as_ref().unwrap().panel_opacity, Some(0.5));
+        prefs.save(&path).unwrap();
+        assert_eq!(Prefs::load(&path), prefs);
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
+    #[test]
     fn preset_and_appearance_survive_immediate_save() {
         let path = temp("appearance");
         let prefs = Prefs {
@@ -108,10 +146,11 @@ mod tests {
             dismiss_association_prompt: true,
             audio_device: Some("BlackHole 2ch".into()),
             last_builtin: Some("training".into()),
+            regional_units: Some(actionlay_layout::model::Units::Imperial),
             appearance: Some(Appearance {
                 accent: Some(actionlay_layout::color::Color::rgba(10, 20, 30, 255)),
                 panel_opacity: Some(0.5),
-                units: Some(actionlay_layout::model::Units::Imperial),
+                units: None,
             }),
             ..Default::default()
         };

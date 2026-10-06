@@ -259,7 +259,13 @@ impl State {
     /// Takes the latest request, if telemetry is set, with a pixmap of its size.
     fn next_job(&mut self) -> Option<Job> {
         let telemetry = self.telemetry.clone()?;
-        let request = self.request.take()?;
+        let request = self.request?;
+        // Metadata that has not arrived must not replace the displayed values
+        // with a missing-data fallback. Leave the request pending for an update.
+        if !telemetry.is_loaded_at(request.t) {
+            return None;
+        }
+        self.request = None;
         let size = (request.width, request.height);
         if self.size != Some(size) {
             self.spare.clear(); // other sizes are obsolete
@@ -698,6 +704,61 @@ mod tests {
     fn finish(st: &mut State, job: Job) -> bool {
         let (request, generation) = (job.request, job.generation);
         st.deliver(request, frame(job), generation)
+    }
+
+    #[test]
+    fn buffering_metadata_keeps_the_last_overlay_until_the_requested_time_is_loaded() {
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/gopro/hero5.mp4");
+        if !path.exists() {
+            assert!(
+                std::env::var_os("ACTIONLAY_REQUIRE_GOPRO_SAMPLES").is_none(),
+                "GoPro sample required"
+            );
+            return;
+        }
+        let packets =
+            crate::telemetry_load::to_raw(actionlay_media::gpmf::read_gpmf_packets(&path).unwrap());
+        let mut st = state();
+        st.set_telemetry(
+            Some(Arc::new(
+                Telemetry::from_gpmf_packets_progressive(&packets[..1]).unwrap(),
+            )),
+            ScaleMode::Height,
+        );
+        st.request = Some(req(packets[0].pts + 0.1, 8));
+        let job = st.next_job().unwrap();
+        let shown = job.request.t;
+        assert!(finish(&mut st, job));
+        let awaiting = packets[4].pts + 0.1;
+        st.request = Some(req(awaiting, 8));
+        assert!(st.next_job().is_none());
+        assert_eq!(
+            st.done.as_ref().unwrap().t,
+            shown,
+            "no empty overlay replaces the last valid frame"
+        );
+        assert_eq!(
+            st.allocated, 1,
+            "buffering does not allocate or repeatedly render"
+        );
+        st.set_telemetry(
+            Some(Arc::new(
+                Telemetry::from_gpmf_packets_progressive(&packets[..5]).unwrap(),
+            )),
+            ScaleMode::Height,
+        );
+        let resumed = st.next_job().unwrap();
+        assert_eq!(resumed.request.t, awaiting);
+        assert!(matches!(
+            resumed
+                .telemetry
+                .sample(awaiting)
+                .get(actionlay_telemetry::Metric::Speed),
+            actionlay_telemetry::Value::Present(_)
+        ));
+        assert!(finish(&mut st, resumed));
+        assert_eq!(st.done.as_ref().unwrap().t, awaiting);
     }
 
     #[test]

@@ -207,3 +207,40 @@ fn map_route_modes_split_colors_rotation_and_marker_size() {
             > count(&render(&mut r, &dot(3), &tel, 1.0), (255, 0, 0)) * 4
     );
 }
+
+#[test]
+fn missing_gps_and_units_respect_each_widgets_tolerance() {
+    for node in [
+        r#"{"type":"metric","metric":"speed","stale_secs":3}"#,
+        r#"{"type":"gps_lock_icon","stale_secs":3}"#,
+        r#"{"type":"map","size":[300,220],"stale_secs":3}"#,
+    ] {
+        let l = layout(&format!("[{node}]"));
+        let snapshot = |age| {
+            Snapshot::for_test(
+                10.0,
+                None,
+                GpsLock::Unknown,
+                &[
+                    (Metric::Speed, Value::Stale { value: 12.0, age }),
+                    (Metric::GpsLock, Value::Stale { value: 3.0, age }),
+                    (Metric::Lat, Value::Stale { value: 45.0, age }),
+                    (Metric::Lon, Value::Stale { value: 9.0, age }),
+                ],
+            )
+        };
+        let mut r = Renderer::new();
+        let within = r.render(&l, &snapshot(3.0), 960, 540);
+        let expired = r.render(&l, &snapshot(3.01), 960, 540);
+        assert_ne!(within.data(), expired.data(), "{node}");
+        let immediate = layout(&format!(
+            "[{}]",
+            node.replace("\"stale_secs\":3", "\"stale_secs\":0")
+        ));
+        assert_eq!(
+            expired.data(),
+            r.render(&immediate, &snapshot(0.01), 960, 540).data(),
+            "{node}"
+        );
+    }
+}

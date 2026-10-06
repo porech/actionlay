@@ -15,7 +15,8 @@ pub enum Command {
     AudioSettings,
     MapSettings,
     PrivacySettings,
-    ToggleDiagnosticData,
+    InterfaceSettings,
+    RegionalSettings,
     #[cfg(not(target_os = "macos"))]
     FileAssociations,
     Sources,
@@ -32,7 +33,6 @@ pub struct Menus {
     _menu: muda::Menu,
     close: muda::MenuItem,
     export_video: muda::MenuItem,
-    diagnostics: muda::CheckMenuItem,
     has_video: std::cell::Cell<bool>,
     editor_items: [muda::MenuItem; 4],
     edit: muda::MenuItem,
@@ -56,21 +56,36 @@ impl Menus {
                 code,
             ))
         };
-        let open = MenuItem::with_id("open-video", "Open Video…", true, key(Code::KeyO, false));
+        let open = MenuItem::with_id(
+            "open-video",
+            crate::i18n::native_text("Open Video…"),
+            true,
+            key(Code::KeyO, false),
+        );
         let layout = MenuItem::with_id(
             "select-layout",
-            "Select Layout…",
+            crate::i18n::native_text("Select Layout…"),
             true,
             key(Code::KeyO, true),
         );
-        let close = MenuItem::with_id("close-video", "Close Video", false, key(Code::KeyW, false));
-        let quit = MenuItem::with_id("quit", "Quit ActionLay", true, key(Code::KeyQ, false));
+        let close = MenuItem::with_id(
+            "close-video",
+            crate::i18n::native_text("Close Video"),
+            false,
+            key(Code::KeyW, false),
+        );
+        let quit = MenuItem::with_id(
+            "quit",
+            crate::i18n::native_text("Quit ActionLay"),
+            true,
+            key(Code::KeyQ, false),
+        );
         let app = Submenu::with_items(
-            "ActionLay",
+            crate::i18n::native_text("ActionLay"),
             true,
             &[
                 &PredefinedMenuItem::about(
-                    None,
+                    Some(crate::i18n::native_text("About ActionLay")),
                     Some(AboutMetadata {
                         name: Some("ActionLay".into()),
                         version: Some(env!("CARGO_PKG_VERSION").into()),
@@ -78,17 +93,22 @@ impl Menus {
                     }),
                 ),
                 &PredefinedMenuItem::separator(),
-                &PredefinedMenuItem::hide(None),
-                &PredefinedMenuItem::hide_others(None),
-                &PredefinedMenuItem::show_all(None),
+                &PredefinedMenuItem::hide(Some(crate::i18n::native_text("Hide ActionLay"))),
+                &PredefinedMenuItem::hide_others(Some(crate::i18n::native_text("Hide Others"))),
+                &PredefinedMenuItem::show_all(Some(crate::i18n::native_text("Show All"))),
                 &PredefinedMenuItem::separator(),
                 &quit,
             ],
         )?;
-        let recent = Submenu::new("Recent Videos", true);
-        let export_video = MenuItem::with_id("export-video", "Export Video…", false, None);
+        let recent = Submenu::new(crate::i18n::native_text("Recent Videos"), true);
+        let export_video = MenuItem::with_id(
+            "export-video",
+            crate::i18n::native_text("Export Video…"),
+            false,
+            None,
+        );
         let file = Submenu::with_items(
-            "File",
+            crate::i18n::native_text("File"),
             true,
             &[
                 &open,
@@ -99,37 +119,93 @@ impl Menus {
                 &close,
             ],
         )?;
-        let audio = MenuItem::with_id("audio-settings", "Audio…", true, None);
-        let maps = MenuItem::with_id("map-settings", "Maps…", true, None);
-        let sources = MenuItem::with_id("sources", "Video sources…", true, None);
-        file.append(&sources)?;
-        let privacy = MenuItem::with_id("privacy-settings", "Privacy zones…", true, None);
-        let diagnostics = muda::CheckMenuItem::with_id(
-            "show-diagnostic-data",
-            "Show diagnostic data",
+        let audio = MenuItem::with_id(
+            "audio-settings",
+            crate::i18n::native_text("Audio…"),
             true,
-            false,
+            None,
+        );
+        let maps = MenuItem::with_id(
+            "map-settings",
+            crate::i18n::native_text("Maps…"),
+            true,
+            None,
+        );
+        let sources = MenuItem::with_id(
+            "sources",
+            crate::i18n::native_text("Video sources…"),
+            true,
+            None,
+        );
+        file.append(&sources)?;
+        let privacy = MenuItem::with_id(
+            "privacy-settings",
+            crate::i18n::native_text("Privacy zones…"),
+            true,
+            None,
+        );
+        let interface = MenuItem::with_id(
+            "interface-settings",
+            crate::i18n::native_text("Interface…"),
+            true,
+            None,
+        );
+        let regional = MenuItem::with_id(
+            "regional-settings",
+            crate::i18n::native_text("Regional settings…"),
+            true,
             None,
         );
         let settings = Submenu::with_items(
-            "Settings",
+            crate::i18n::native_text("Settings"),
             true,
             &[
                 &audio,
                 &maps,
                 &privacy,
                 &PredefinedMenuItem::separator(),
-                &diagnostics,
+                &interface,
+                &regional,
             ],
         )?;
-        let new = MenuItem::with_id("new-layout", "New Layout…", true, key(Code::KeyN, false));
-        let edit = MenuItem::with_id("edit-layout", "Edit Layout", true, key(Code::KeyE, false));
-        let save = MenuItem::with_id("save-layout", "Save", false, key(Code::KeyS, false));
-        let save_as = MenuItem::with_id("save-layout-as", "Save As…", false, key(Code::KeyS, true));
-        let export = MenuItem::with_id("export-layout", "Export package…", false, None);
-        let exit = MenuItem::with_id("exit-editor", "Exit Editor", false, None);
+        let new = MenuItem::with_id(
+            "new-layout",
+            crate::i18n::native_text("New Layout…"),
+            true,
+            key(Code::KeyN, false),
+        );
+        let edit = MenuItem::with_id(
+            "edit-layout",
+            crate::i18n::native_text("Edit Layout"),
+            true,
+            key(Code::KeyE, false),
+        );
+        let save = MenuItem::with_id(
+            "save-layout",
+            crate::i18n::native_text("Save"),
+            false,
+            key(Code::KeyS, false),
+        );
+        let save_as = MenuItem::with_id(
+            "save-layout-as",
+            crate::i18n::native_text("Save As…"),
+            false,
+            key(Code::KeyS, true),
+        );
+        let export = MenuItem::with_id(
+            "export-layout",
+            crate::i18n::native_text("Export package…"),
+            false,
+            None,
+        );
+        let exit = MenuItem::with_id(
+            "exit-editor",
+            crate::i18n::native_text("Exit Editor"),
+            false,
+            None,
+        );
         let layouts = Submenu::with_items(
-            "Layout",
+            crate::i18n::native_text("Layout"),
             true,
             &[
                 &new,
@@ -158,7 +234,8 @@ impl Menus {
                 "audio-settings" => Command::AudioSettings,
                 "map-settings" => Command::MapSettings,
                 "privacy-settings" => Command::PrivacySettings,
-                "show-diagnostic-data" => Command::ToggleDiagnosticData,
+                "interface-settings" => Command::InterfaceSettings,
+                "regional-settings" => Command::RegionalSettings,
                 "sources" => Command::Sources,
                 "clear-recent-videos" => Command::ClearRecentVideos,
                 "close-video" => Command::CloseVideo,
@@ -181,7 +258,6 @@ impl Menus {
             _menu: menu,
             close,
             export_video,
-            diagnostics,
             has_video: std::cell::Cell::new(false),
             editor_items: [save, save_as, export, exit],
             edit,
@@ -202,7 +278,6 @@ impl Menus {
             item.set_enabled(editing);
         }
         self.edit.set_enabled(!editing);
-        self.diagnostics.set_checked(prefs.show_diagnostic_data);
         self.export_video.set_enabled(has_video);
         if self.has_video.replace(has_video) != has_video {
             self.close.set_enabled(has_video);
@@ -211,8 +286,11 @@ impl Menus {
             while self.recent.remove_at(0).is_some() {}
             let result = (|| -> muda::Result<()> {
                 if prefs.recent_videos.is_empty() {
-                    self.recent
-                        .append(&muda::MenuItem::new("No Recent Videos", false, None))?;
+                    self.recent.append(&muda::MenuItem::new(
+                        crate::i18n::native_text("No Recent Videos"),
+                        false,
+                        None,
+                    ))?;
                 }
                 for (index, path) in prefs.recent_videos.iter().enumerate() {
                     self.recent.append(&muda::MenuItem::with_id(
@@ -225,7 +303,7 @@ impl Menus {
                 self.recent.append(&muda::PredefinedMenuItem::separator())?;
                 self.recent.append(&muda::MenuItem::with_id(
                     "clear-recent-videos",
-                    "Clear Recent Videos",
+                    crate::i18n::native_text("Clear Recent Videos"),
                     !prefs.recent_videos.is_empty(),
                     None,
                 ))?;
@@ -279,13 +357,19 @@ impl Menus {
         });
         egui::Panel::top("menu").show(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    ui.menu_button("Recent Videos", |ui| {
+                ui.menu_button(crate::i18n::ui_text(ui, "File"), |ui| {
+                    ui.menu_button(crate::i18n::ui_text(ui, "Recent Videos"), |ui| {
                         if prefs.recent_videos.is_empty() {
-                            ui.add_enabled(false, egui::Button::new("No Recent Videos"));
+                            ui.add_enabled(
+                                false,
+                                egui::Button::new(crate::i18n::text("No Recent Videos")),
+                            );
                         }
                         for (index, path) in prefs.recent_videos.iter().enumerate() {
-                            if ui.button(path.to_string_lossy()).clicked() {
+                            if ui
+                                .button(crate::i18n::user_text(ui, path.to_string_lossy()))
+                                .clicked()
+                            {
                                 command = Some(Command::OpenRecentVideo(index));
                                 ui.close();
                             }
@@ -294,7 +378,7 @@ impl Menus {
                         if ui
                             .add_enabled(
                                 !prefs.recent_videos.is_empty(),
-                                egui::Button::new("Clear Recent Videos"),
+                                egui::Button::new(crate::i18n::text("Clear Recent Videos")),
                             )
                             .clicked()
                         {
@@ -314,40 +398,49 @@ impl Menus {
                         ("Export Video…", Command::ExportVideo, has_video),
                         ("Quit    Ctrl+Q", Command::Quit, true),
                     ] {
-                        if ui.add_enabled(enabled, egui::Button::new(label)).clicked() {
+                        if ui
+                            .add_enabled(enabled, egui::Button::new(crate::i18n::text(label)))
+                            .clicked()
+                        {
                             command = Some(action);
                             ui.close();
                         }
                     }
                 });
-                ui.menu_button("Settings", |ui| {
-                    if ui.button("File associations…").clicked() {
+                ui.menu_button(crate::i18n::ui_text(ui, "Settings"), |ui| {
+                    if ui
+                        .button(crate::i18n::ui_text(ui, "File associations…"))
+                        .clicked()
+                    {
                         command = Some(Command::FileAssociations);
                         ui.close();
                     }
-                    let mut diagnostics = prefs.show_diagnostic_data;
-                    if ui
-                        .checkbox(&mut diagnostics, "Show diagnostic data")
-                        .changed()
-                    {
-                        command = Some(Command::ToggleDiagnosticData);
+                    if ui.button(crate::i18n::ui_text(ui, "Interface…")).clicked() {
+                        command = Some(Command::InterfaceSettings);
+                        ui.close();
+                    }
+                    if ui.button(crate::i18n::text("Regional settings…")).clicked() {
+                        command = Some(Command::RegionalSettings);
                         ui.close();
                     }
                     ui.separator();
-                    if ui.button("Privacy zones…").clicked() {
+                    if ui
+                        .button(crate::i18n::ui_text(ui, "Privacy zones…"))
+                        .clicked()
+                    {
                         command = Some(Command::PrivacySettings);
                         ui.close();
                     }
-                    if ui.button("Maps…").clicked() {
+                    if ui.button(crate::i18n::ui_text(ui, "Maps…")).clicked() {
                         command = Some(Command::MapSettings);
                         ui.close();
                     }
-                    if ui.button("Audio…").clicked() {
+                    if ui.button(crate::i18n::ui_text(ui, "Audio…")).clicked() {
                         command = Some(Command::AudioSettings);
                         ui.close();
                     }
                 });
-                ui.menu_button("Layout", |ui| {
+                ui.menu_button(crate::i18n::ui_text(ui, "Layout"), |ui| {
                     for (label, command_to_run, enabled) in [
                         ("New Layout…", Command::NewLayout, true),
                         ("Edit Layout", Command::EditLayout, !editing),
@@ -356,7 +449,10 @@ impl Menus {
                         ("Export package…", Command::ExportLayout, editing),
                         ("Exit Editor", Command::ExitEditor, editing),
                     ] {
-                        if ui.add_enabled(enabled, egui::Button::new(label)).clicked() {
+                        if ui
+                            .add_enabled(enabled, egui::Button::new(crate::i18n::text(label)))
+                            .clicked()
+                        {
                             command = Some(command_to_run);
                             ui.close();
                         }

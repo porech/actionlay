@@ -326,6 +326,14 @@ impl Validator {
                 for v in m.size() {
                     self.positive(&path, "size", v);
                 }
+                if m.route_coverage
+                    .is_some_and(|v| !v.is_finite() || v <= 0.0 || v > 1.0)
+                {
+                    self.error(
+                        &path,
+                        "route_coverage must be greater than zero and at most one",
+                    );
+                }
                 if m.zoom.is_some_and(|v| v > 19) {
                     self.error(&path, "zoom must not exceed 19");
                 }
@@ -468,6 +476,9 @@ impl Validator {
                 self.style(&path, &m.style);
             }
             Widget::MetricUnit(m) => {
+                if let Some(secs) = m.stale_secs {
+                    self.non_negative(&path, "stale_secs", secs);
+                }
                 if m.metric.is_empty() {
                     self.error(&path, "metric must not be empty");
                 }
@@ -490,6 +501,9 @@ impl Validator {
                 }
             }
             Widget::GpsLockIcon(g) => {
+                if let Some(secs) = g.stale_secs {
+                    self.non_negative(&path, "stale_secs", secs);
+                }
                 if let Some(s) = g.size {
                     self.positive(&path, "size", s);
                 }

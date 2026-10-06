@@ -59,7 +59,8 @@
             18,
             0
           ],
-          "size": 44
+          "size": 44,
+          "stale_secs": 3
         },
         {
           "id": "lat",
@@ -70,9 +71,10 @@
             -20,
             16
           ],
-          "format": "{value:.5}\u00b0",
+          "format": "{value:.5}°",
           "size": 32,
-          "weight": "medium"
+          "weight": "medium",
+          "stale_secs": 3
         },
         {
           "id": "lon",
@@ -83,9 +85,10 @@
             -20,
             -16
           ],
-          "format": "{value:.5}\u00b0",
+          "format": "{value:.5}°",
           "size": 32,
-          "weight": "medium"
+          "weight": "medium",
+          "stale_secs": 3
         }
       ],
       "offset_relative": [
@@ -135,7 +138,8 @@
             18,
             -6
           ],
-          "size": 120
+          "size": 120,
+          "stale_secs": 3
         },
         {
           "id": "speed-unit",
@@ -146,7 +150,8 @@
             -20,
             -20
           ],
-          "size": 30
+          "size": 30,
+          "stale_secs": 3
         }
       ],
       "offset_relative": [
@@ -201,7 +206,8 @@
           ],
           "size": 34,
           "format": "{value:.0} bpm",
-          "weight": "medium"
+          "weight": "medium",
+          "stale_secs": 3
         },
         {
           "id": "heart-zones",
@@ -259,7 +265,8 @@
           ],
           "size": 34,
           "format": "{value:.0} W",
-          "weight": "medium"
+          "weight": "medium",
+          "stale_secs": 3
         },
         {
           "id": "power-zones",
@@ -317,7 +324,8 @@
           ],
           "size": 34,
           "format": "{value:.0} rpm",
-          "weight": "medium"
+          "weight": "medium",
+          "stale_secs": 3
         },
         {
           "id": "alt",
@@ -329,7 +337,8 @@
           ],
           "size": 34,
           "format": "{value:.0} {unit}",
-          "weight": "medium"
+          "weight": "medium",
+          "stale_secs": 3
         }
       ]
     },
@@ -349,7 +358,9 @@
       "seconds": 60,
       "value_style": {
         "size": 22
-      }
+      },
+      "stale_secs": 3
     }
-  ]
+  ],
+  "units": "default"
 }

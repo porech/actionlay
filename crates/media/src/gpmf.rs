@@ -68,6 +68,16 @@ pub fn read_gpmf_packets_with_cancel(
     read_gpmf_range(path, 0.0, f64::INFINITY, &cancel)
 }
 
+/// Complete metadata for route exports: refuse read failures or missing packets.
+pub fn read_gpmf_packets_complete(
+    path: &Path,
+    cancelled: &std::sync::atomic::AtomicBool,
+) -> Result<Vec<GpmfPacket>, MediaError> {
+    let mut input = open_metadata(path, cancelled)?;
+    read_range_input_policy(&mut input, 0.0, f64::INFINITY, cancelled, true)
+        .map(|(packets, _)| packets)
+}
+
 /// Reads only the metadata stream in a time range. MP4's sample index lets the
 /// demuxer seek directly to metadata; video/audio streams are discarded.
 /// Includes the metadata packet before `start` for continuous interpolation.
@@ -147,6 +157,16 @@ fn read_range_input(
     end: f64,
     cancelled: &std::sync::atomic::AtomicBool,
 ) -> Result<(Vec<GpmfPacket>, i64), MediaError> {
+    read_range_input_policy(input, start, end, cancelled, false)
+}
+
+fn read_range_input_policy(
+    input: &mut ffmpeg::format::context::Input,
+    start: f64,
+    end: f64,
+    cancelled: &std::sync::atomic::AtomicBool,
+    require_complete: bool,
+) -> Result<(Vec<GpmfPacket>, i64), MediaError> {
     let Some(index) = input.streams().find(is_gpmd).map(|s| s.index()) else {
         return Ok((Vec::new(), 0));
     };
@@ -192,6 +212,9 @@ fn read_range_input(
             Ok(()) => invalid_in_a_row = 0,
             Err(ffmpeg::Error::Eof) => break,
             Err(ffmpeg::Error::InvalidData) => {
+                if require_complete {
+                    return Err(ffmpeg::Error::InvalidData.into());
+                }
                 invalid_in_a_row += 1;
                 if invalid_in_a_row >= MAX_INVALID_IN_A_ROW {
                     log::warn!(
@@ -204,6 +227,9 @@ fn read_range_input(
                 continue;
             }
             Err(e) => {
+                if require_complete {
+                    return Err(e.into());
+                }
                 log::warn!(
                     "gpmd read stopped by error after {} packets, returning them: {e}",
                     packets.len()
@@ -215,6 +241,11 @@ fn read_range_input(
             continue;
         }
         let (Some(ts), Some(data)) = (packet.pts().or(packet.dts()), packet.data()) else {
+            if require_complete {
+                return Err(MediaError::Io(
+                    "metadata packet has no timestamp or data".into(),
+                ));
+            }
             log::warn!("gpmd packet without timestamp or data skipped");
             continue;
         };
@@ -251,6 +282,15 @@ fn read_range_input(
         let pb = (*input.as_ptr()).pb;
         if pb.is_null() { 0 } else { (*pb).bytes_read }
     };
+    if require_complete && !cancelled.load(std::sync::atomic::Ordering::Relaxed) {
+        let expected = input.stream(index).map_or(0, |stream| stream.frames());
+        if expected > 0 && packets.len() != expected as usize {
+            return Err(MediaError::Io(format!(
+                "incomplete metadata: read {} of {expected} packets",
+                packets.len()
+            )));
+        }
+    }
     Ok((packets, bytes))
 }
 

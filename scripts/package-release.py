@@ -18,6 +18,8 @@ def notices(destination):
     shutil.copy2(ROOT / 'assets/icons/LICENSE-CC-BY-SA-4.0.txt', destination / 'Artwork-CC-BY-SA-4.0.txt')
     shutil.copy2(ROOT / 'crates/render/assets/fonts/LICENSE', destination / 'Roboto-LICENSE.txt')
     shutil.copy2(ROOT / 'crates/render/assets/icons/LICENSE', destination / 'Tabler-LICENSE.txt')
+    for license_file in (ROOT / 'assets/fonts/interface').glob('*-OFL.txt'):
+        shutil.copy2(license_file, destination / f'Noto-{license_file.name}')
     sha = os.environ.get('GITHUB_SHA') or subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     version = re.search(r'^version = "([^"]+)"', (ROOT / 'Cargo.toml').read_text(), re.M).group(1)
     (destination / 'SOURCE.txt').write_text(
@@ -32,7 +34,8 @@ def notices(destination):
         'Their source revisions and download locations\n'
         'are in scripts/ffmpeg-version.env, scripts/build-ffmpeg.sh and scripts/build-encoders.sh.\n'
         'The Rust dependency versions are pinned in Cargo.lock. Roboto is Apache-2.0;\n'
-        'Tabler icons are MIT. Their notices are included alongside this file.\n', encoding='utf-8')
+        'Tabler icons are MIT. Noto interface fonts are SIL-OFL-1.1.\n'
+        'Their notices are included alongside this file.\n', encoding='utf-8')
 
 
 def main():

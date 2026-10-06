@@ -16,7 +16,7 @@ use actionlay_layout::model::{
 };
 use actionlay_layout::style::{ResolvedTheme, TextKind, TextStyle, defaults};
 use actionlay_telemetry::units::UnitSystem;
-use actionlay_telemetry::{GpsLock, Snapshot};
+use actionlay_telemetry::{GpsLock, Metric, Snapshot};
 use chrono::FixedOffset;
 use tiny_skia::{FillRule, LineJoin, Path, Pixmap, PixmapPaint, Stroke, Transform};
 
@@ -541,9 +541,7 @@ fn draw_metric_unit(p: &mut Painter, m: &MetricUnitNode, at: Placement, ctx: &Ct
     let Some(r) = value::resolve(&m.metric, m.units.as_deref(), ctx.system) else {
         return;
     };
-    // metric_unit has no `stale_secs` of its own: it always uses the default grace
-    // (3 s), so next to a metric with a custom grace the two may dim at different times
-    let grace = f64::from(defaults::STALE_SECS);
+    let grace = f64::from(m.stale_secs.unwrap_or(defaults::STALE_SECS));
     let shown = value::shown(
         ctx.snap.get(r.metric),
         ctx.snap.is_available(r.metric),
@@ -667,7 +665,23 @@ fn draw_gps_lock(p: &mut Painter, g: &GpsLockIconNode, mut at: Placement, ctx: &
     let locked = ctx
         .theme
         .color(g.color.unwrap_or(ColorRef::Role(defaults::ICON_ROLE)));
-    let (id, color) = match ctx.snap.gps_lock {
+    let lock = match value::shown(
+        ctx.snap.get(Metric::GpsLock),
+        ctx.snap.is_available(Metric::GpsLock),
+        f64::from(g.stale_secs.unwrap_or(defaults::STALE_SECS)),
+        WhenAbsent::Show,
+    ) {
+        value::Shown::Value(fix) => GpsLock::from_fix(fix as u32),
+        value::Shown::Dimmed(fix) => {
+            at.opacity *= ctx.theme.dim_opacity;
+            GpsLock::from_fix(fix as u32)
+        }
+        _ if ctx.snap.get(Metric::GpsLock) == actionlay_telemetry::Value::Absent => {
+            ctx.snap.gps_lock
+        }
+        _ => GpsLock::Unknown,
+    };
+    let (id, color) = match lock {
         GpsLock::Lock3d => (IconId::Gps, locked),
         GpsLock::Lock2d => (IconId::Gps, ctx.theme.primary),
         GpsLock::NoLock | GpsLock::Unknown => {

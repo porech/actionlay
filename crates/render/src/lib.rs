@@ -59,6 +59,8 @@ pub struct RenderStats {
     pub shapes: Duration,
 }
 
+pub mod regional;
+
 /// Draws layouts. Holds the font system, glyph and icon caches and reusable buffers:
 /// keep one per output and reuse it every frame.
 pub struct Renderer {
@@ -196,6 +198,7 @@ impl Renderer {
             .as_ref()
             .map_or_else(ResolvedTheme::default, Theme::resolve);
         let system = match layout.units.unwrap_or_default() {
+            Units::Default => regional::current(),
             Units::Metric => UnitSystem::Metric,
             Units::Imperial => UnitSystem::Imperial,
         };
@@ -292,6 +295,9 @@ fn check_metric(
         return;
     };
     let Some(u) = units else { return };
+    if u == "default" {
+        return;
+    }
     match Unit::from_id(u) {
         None => issues.push(Issue::warning(
             path,

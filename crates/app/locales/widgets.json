@@ -1,0 +1,18 @@
+{
+  "group": "Group",
+  "frame": "Frame",
+  "text": "Text",
+  "metric": "Telemetry value",
+  "metric_unit": "Telemetry value with unit",
+  "datetime": "Date and time",
+  "bar": "Bar",
+  "zone_bar": "Zone bar",
+  "gauge": "Gauge",
+  "chart": "Chart",
+  "gradient_chart": "Gradient chart",
+  "compass": "Compass",
+  "g_meter": "G-meter",
+  "icon": "Icon",
+  "gps_lock_icon": "GPS signal",
+  "map": "Map"
+}

@@ -46,7 +46,7 @@ pub struct Layout {
     /// Default 16:9; used by the `fit` scale mode.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub design_aspect: Option<geom::Aspect>,
-    /// Default unit system; widgets can override it with `units`. Default metric.
+    /// Measurement units
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub units: Option<model::Units>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

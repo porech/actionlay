@@ -7,6 +7,7 @@
 mod editor;
 mod export;
 mod export_ui;
+mod i18n;
 mod integration;
 mod layouts;
 mod menus;
@@ -30,6 +31,8 @@ use overlay::{OverlayKey, OverlayRequest, OverlayWorker, Scheduler};
 use video_view::VideoView;
 
 struct App {
+    interface: i18n::Interface,
+    regional_visible: bool,
     #[cfg(target_os = "macos")]
     _file_open_handler: objc2::rc::Retained<integration::macos::FileOpenHandler>,
     #[cfg(not(target_os = "macos"))]
@@ -152,8 +155,11 @@ impl App {
                     format!("{name}.ovl.json")
                 };
                 let mut dialog = rfd::FileDialog::new()
-                    .add_filter("Portable ActionLay layout", &["actionlay-layout"])
-                    .add_filter("ActionLay layout", &["json"])
+                    .add_filter(
+                        crate::i18n::native_text("Portable ActionLay layout"),
+                        &["actionlay-layout"],
+                    )
+                    .add_filter(crate::i18n::native_text("ActionLay layout"), &["json"])
                     .set_file_name(if editor.draft.loaded_assets.is_empty() {
                         name
                     } else {
@@ -198,8 +204,11 @@ impl App {
             .map(|c| if "/\\:*?\"<>|".contains(c) { '_' } else { c })
             .collect();
         let Some(path) = rfd::FileDialog::new()
-            .set_title("Export layout package")
-            .add_filter("ActionLay layout package", &["actionlay-layout"])
+            .set_title(crate::i18n::native_text("Export layout package"))
+            .add_filter(
+                crate::i18n::native_text("ActionLay layout package"),
+                &["actionlay-layout"],
+            )
             .set_file_name(format!("{name}.actionlay-layout"))
             .save_file()
         else {
@@ -210,7 +219,7 @@ impl App {
             return;
         }
         if editor.include_fonts && !rfd::MessageDialog::new()
-            .set_title("Include custom fonts")
+            .set_title(crate::i18n::native_text("Include custom fonts"))
             .set_description("Only share fonts you are licensed to redistribute. Including fonts embeds their files in the layout package; it does not install them.")
             .set_buttons(rfd::MessageButtons::OkCancel)
             .show().eq(&rfd::MessageDialogResult::Ok) { return; }
@@ -235,8 +244,11 @@ impl App {
 
     fn import_layout_file(&mut self) {
         if let Some(path) = rfd::FileDialog::new()
-            .set_title("Import into layout library")
-            .add_filter("ActionLay layouts", &["actionlay-layout", "json", "xml"])
+            .set_title(crate::i18n::native_text("Import into layout library"))
+            .add_filter(
+                crate::i18n::native_text("ActionLay layouts"),
+                &["actionlay-layout", "json", "xml"],
+            )
             .pick_file()
         {
             if path
@@ -298,19 +310,22 @@ impl App {
             "Save and continue"
         };
         let response = egui::Modal::new(egui::Id::new("unsaved-layout")).show(ctx, |ui| {
-            ui.heading("Save layout changes?");
-            ui.label("Your layout has unsaved changes.");
+            ui.heading(crate::i18n::ui_text(ui, "Save layout changes?"));
+            ui.label(crate::i18n::ui_text(ui, "Your layout has unsaved changes."));
             if let Some(e) = self.editor.as_ref().and_then(|e| e.error.as_deref()) {
-                ui.colored_label(egui::Color32::LIGHT_RED, e);
+                ui.colored_label(egui::Color32::LIGHT_RED, crate::i18n::ui_text(ui, e));
             }
             ui.horizontal(|ui| {
-                if ui.button(save_label).clicked() {
+                if ui.button(crate::i18n::ui_text(ui, save_label)).clicked() {
                     decision = Some(0);
                 }
-                if ui.button("Discard changes").clicked() {
+                if ui
+                    .button(crate::i18n::ui_text(ui, "Discard changes"))
+                    .clicked()
+                {
                     decision = Some(1);
                 }
-                if ui.button("Cancel").clicked() {
+                if ui.button(crate::i18n::ui_text(ui, "Cancel")).clicked() {
                     decision = Some(2);
                 }
             });
@@ -337,20 +352,34 @@ impl App {
         }
         let mut open = true;
         let mut selected = self.prefs.audio_device.clone();
-        egui::Window::new("Audio output")
+        egui::Window::new(crate::i18n::text("Audio output"))
             .open(&mut open)
             .collapsible(false)
             .show(ctx, |ui| {
-                ui.selectable_value(&mut selected, None, "System default");
+                ui.selectable_value(
+                    &mut selected,
+                    None,
+                    crate::i18n::ui_text(ui, "System default"),
+                );
                 for name in &self.audio_devices {
-                    ui.selectable_value(&mut selected, Some(name.clone()), name);
+                    ui.selectable_value(
+                        &mut selected,
+                        Some(name.clone()),
+                        crate::i18n::user_text(ui, name),
+                    );
                 }
                 if let Some(name) = &selected
                     && !self.audio_devices.contains(name)
                 {
-                    ui.colored_label(egui::Color32::YELLOW, format!("Unavailable: {name}"));
+                    ui.colored_label(
+                        egui::Color32::YELLOW,
+                        crate::i18n::ui_text(ui, format!("Unavailable: {name}")),
+                    );
                 }
-                if ui.button("Refresh devices").clicked() {
+                if ui
+                    .button(crate::i18n::ui_text(ui, "Refresh devices"))
+                    .clicked()
+                {
                     match actionlay_media::audio::AudioOutput::devices() {
                         Ok(names) => self.audio_devices = names,
                         Err(e) => self.error = Some(e.to_string()),
@@ -397,7 +426,6 @@ impl App {
         }
     }
     fn appearance_controls(&mut self, ui: &mut egui::Ui) {
-        use actionlay_layout::model::Units;
         let theme = self
             .layout
             .theme
@@ -408,42 +436,39 @@ impl App {
         let mut appearance = self.prefs.appearance.clone().unwrap_or_default();
         let mut changed = false;
         let mut reset = false;
-        ui.collapsing("Appearance · applies to all layouts", |ui| {
-            let mut units = self.layout.units.unwrap_or_default();
-            egui::ComboBox::from_id_salt("layout-units")
-                .selected_text(match units {
-                    Units::Metric => "Metric",
-                    Units::Imperial => "Imperial",
-                })
-                .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut units, Units::Metric, "Metric");
-                    ui.selectable_value(&mut units, Units::Imperial, "Imperial");
+        ui.collapsing(
+            crate::i18n::ui_text(ui, "Appearance · applies to all layouts"),
+            |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(crate::i18n::ui_text(ui, "Accent"));
+                    let c = theme.accent;
+                    let mut accent = egui::Color32::from_rgba_unmultiplied(c.r, c.g, c.b, c.a);
+                    if ui.color_edit_button_srgba(&mut accent).changed() {
+                        let [r, g, b, a] = accent.to_srgba_unmultiplied();
+                        appearance.accent = Some(actionlay_layout::color::Color::rgba(r, g, b, a));
+                        changed = true;
+                    }
                 });
-            if units != self.layout.units.unwrap_or_default() {
-                appearance.units = Some(units);
-                changed = true;
-            }
-            ui.horizontal(|ui| {
-                ui.label("Accent");
-                let c = theme.accent;
-                let mut accent = egui::Color32::from_rgba_unmultiplied(c.r, c.g, c.b, c.a);
-                if ui.color_edit_button_srgba(&mut accent).changed() {
-                    let [r, g, b, a] = accent.to_srgba_unmultiplied();
-                    appearance.accent = Some(actionlay_layout::color::Color::rgba(r, g, b, a));
+                let mut opacity = f32::from(theme.panel.a) / 255.0;
+                if ui
+                    .add(
+                        egui::Slider::new(&mut opacity, 0.0..=1.0)
+                            .text(crate::i18n::ui_text(ui, "Panel opacity")),
+                    )
+                    .changed()
+                {
+                    appearance.panel_opacity = Some(opacity);
                     changed = true;
                 }
-            });
-            let mut opacity = f32::from(theme.panel.a) / 255.0;
-            if ui
-                .add(egui::Slider::new(&mut opacity, 0.0..=1.0).text("Panel opacity"))
-                .changed()
-            {
-                appearance.panel_opacity = Some(opacity);
-                changed = true;
-            }
-            ui.small("Widget sizes follow the video when the window is resized.");
-            reset = ui.button("Reset appearance").clicked();
-        });
+                ui.small(crate::i18n::ui_text(
+                    ui,
+                    "Widget sizes follow the video when the window is resized.",
+                ));
+                reset = ui
+                    .button(crate::i18n::ui_text(ui, "Reset appearance"))
+                    .clicked();
+            },
+        );
         if changed || reset {
             self.prefs.appearance = if reset { None } else { Some(appearance) };
             self.set_layout(self.base_layout.clone());
@@ -457,25 +482,30 @@ impl App {
         };
         let mut open = true;
         let mut import = false;
-        egui::Window::new("Import XML layout")
+        egui::Window::new(crate::i18n::text("Import XML layout"))
             .open(&mut open)
             .collapsible(false)
             .show(ctx, |ui| {
-                ui.label(path.file_name().unwrap_or_default().to_string_lossy());
-                ui.label("Reference video resolution");
+                ui.label(crate::i18n::user_text(
+                    ui,
+                    path.file_name().unwrap_or_default().to_string_lossy(),
+                ));
+                ui.label(crate::i18n::ui_text(ui, "Reference video resolution"));
                 ui.horizontal(|ui| {
                     ui.add(
                         egui::DragValue::new(&mut size[0])
                             .range(1..=16384)
-                            .prefix("Width "),
+                            .prefix(crate::i18n::ui_text(ui, "Width ")),
                     );
                     ui.add(
                         egui::DragValue::new(&mut size[1])
                             .range(1..=16384)
-                            .prefix("Height "),
+                            .prefix(crate::i18n::ui_text(ui, "Height ")),
                     );
                 });
-                import = ui.button("Import into layout library").clicked();
+                import = ui
+                    .button(crate::i18n::ui_text(ui, "Import into layout library"))
+                    .clicked();
             });
         self.import_draft = if open {
             Some((path.clone(), size))
@@ -528,21 +558,21 @@ impl App {
     fn map_controls(&mut self, ui: &mut egui::Ui) {
         let mut maps = self.prefs.maps.clone().unwrap_or_default();
         let mut changed = false;
-        ui.collapsing("Map service",|ui| {
-            changed|=ui.checkbox(&mut maps.online,"Download visible map tiles").changed();
-            ui.small("Cached tiles remain available with downloads disabled.");
+        ui.collapsing(crate::i18n::ui_text(ui, "Map service"),|ui| {
+            changed|=ui.checkbox(&mut maps.online,crate::i18n::ui_text(ui, "Download visible map tiles")).changed();
+            ui.small(crate::i18n::ui_text(ui, "Cached tiles remain available with downloads disabled."));
             ui.horizontal(|ui|{
                 for (name,url,attr) in [("OSM","https://tile.openstreetmap.org/{z}/{x}/{y}.png","© OpenStreetMap contributors"),
                     ("CyclOSM","https://a.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png","© CyclOSM · OpenStreetMap contributors"),
                     ("Thunderforest","https://a.tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey={api_key}","© Thunderforest · OpenStreetMap contributors"),
                     ("Geoapify","https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey={api_key}","© Geoapify · OpenStreetMap contributors")] {
-                    if ui.small_button(name).clicked(){maps.url=url.into();maps.attribution=attr.into();changed=true;}
+                    if ui.small_button(crate::i18n::ui_text(ui, name)).clicked(){maps.url=url.into();maps.attribution=attr.into();changed=true;}
                 }
             });
-            ui.label("Tile URL ({z}, {x}, {y}, optional {api_key})");changed|=ui.text_edit_singleline(&mut maps.url).changed();
-            ui.label("API key");changed|=ui.add(egui::TextEdit::singleline(&mut maps.api_key).password(true)).changed();
-            ui.label("Attribution");changed|=ui.text_edit_singleline(&mut maps.attribution).changed();
-            if !maps.valid(){ui.colored_label(egui::Color32::YELLOW,"Downloads wait for a valid URL and attribution.");}
+            ui.label(crate::i18n::ui_text(ui, "Tile URL ({z}, {x}, {y}, optional {api_key})"));changed|=ui.text_edit_singleline(&mut maps.url).changed();
+            ui.label(crate::i18n::ui_text(ui, "API key"));changed|=ui.add(egui::TextEdit::singleline(&mut maps.api_key).password(true)).changed();
+            ui.label(crate::i18n::ui_text(ui, "Attribution"));changed|=ui.text_edit_singleline(&mut maps.attribution).changed();
+            if !maps.valid(){ui.colored_label(egui::Color32::YELLOW,crate::i18n::ui_text(ui, "Downloads wait for a valid URL and attribution."));}
         });
         if changed {
             self.overlay.maps().configure(maps.clone());
@@ -566,32 +596,39 @@ impl App {
         ui.add_enabled_ui(self.pending_edit_action.is_none(), |ui| {
             ui.horizontal_wrapped(|ui| {
                 if ui
-                    .button("Open video…")
-                    .on_hover_text("Open a video file")
+                    .button(crate::i18n::ui_text(ui, "Open video…"))
+                    .on_hover_text(crate::i18n::ui_text(ui, "Open a video file"))
                     .clicked()
                 {
                     command = Some(menus::Command::OpenVideo);
                 }
                 if ui
-                    .add_enabled(self.video_path.is_some(), egui::Button::new("Export..."))
+                    .add_enabled(
+                        self.video_path.is_some(),
+                        egui::Button::new(crate::i18n::text("Export...")),
+                    )
                     .clicked()
                 {
                     command = Some(menus::Command::ExportVideo);
                 }
                 ui.separator();
-                ui.label("Layout");
+                ui.label(crate::i18n::ui_text(ui, "Layout"));
                 egui::ComboBox::from_id_salt("toolbar-layout")
-                    .selected_text(selected)
+                    .selected_text(if self.prefs.last_layout.is_some() {
+                        crate::i18n::user_text(ui, selected)
+                    } else {
+                        crate::i18n::ui_text(ui, selected)
+                    })
                     .width(220.0)
                     .show_ui(ui, |ui| {
-                        ui.weak("Included presets");
+                        ui.weak(crate::i18n::ui_text(ui, "Included presets"));
                         for preset in actionlay_layout::catalog::PRESETS {
                             let active = self.prefs.last_layout.is_none()
                                 && self.prefs.last_builtin.as_deref().unwrap_or("default")
                                     == preset.id;
                             if ui
-                                .selectable_label(active, preset.name)
-                                .on_hover_text(preset.description)
+                                .selectable_label(active, crate::i18n::ui_text(ui, preset.name))
+                                .on_hover_text(crate::i18n::ui_text(ui, preset.description))
                                 .clicked()
                             {
                                 builtin = Some(preset.id);
@@ -600,15 +637,18 @@ impl App {
                         }
                         if !self.prefs.recent_layouts.is_empty() {
                             ui.separator();
-                            ui.weak("Recent layouts");
+                            ui.weak(crate::i18n::ui_text(ui, "Recent layouts"));
                             for path in &self.prefs.recent_layouts {
                                 let name = path.file_name().unwrap_or_default().to_string_lossy();
                                 if ui
                                     .selectable_label(
                                         self.prefs.last_layout.as_ref() == Some(path),
-                                        name,
+                                        crate::i18n::user_text(ui, name),
                                     )
-                                    .on_hover_text(path.display().to_string())
+                                    .on_hover_text(crate::i18n::user_text(
+                                        ui,
+                                        path.display().to_string(),
+                                    ))
                                     .clicked()
                                 {
                                     recent = Some(path.clone());
@@ -617,26 +657,38 @@ impl App {
                             }
                         }
                         ui.separator();
-                        if ui.button("Open layout from file…").clicked() {
+                        if ui
+                            .button(crate::i18n::ui_text(ui, "Open layout from file…"))
+                            .clicked()
+                        {
                             command = Some(menus::Command::OpenLayoutFile);
                             ui.close();
                         }
-                        if ui.button("More layouts and settings…").clicked() {
+                        if ui
+                            .button(crate::i18n::ui_text(ui, "More layouts and settings…"))
+                            .clicked()
+                        {
                             command = Some(menus::Command::SelectLayout);
                             ui.close();
                         }
                     });
                 ui.separator();
-                if ui.button("Edit layout").clicked() {
+                if ui.button(crate::i18n::ui_text(ui, "Edit layout")).clicked() {
                     command = Some(menus::Command::EditLayout);
                 }
-                if ui.button("New layout…").clicked() {
+                if ui.button(crate::i18n::ui_text(ui, "New layout…")).clicked() {
                     command = Some(menus::Command::NewLayout);
                 }
                 ui.separator();
                 let mute_changed = ui
-                    .selectable_label(self.muted, if self.muted { "Unmute" } else { "Mute" })
-                    .on_hover_text("Mute audio without pausing playback")
+                    .selectable_label(
+                        self.muted,
+                        crate::i18n::ui_text(ui, if self.muted { "Unmute" } else { "Mute" }),
+                    )
+                    .on_hover_text(crate::i18n::ui_text(
+                        ui,
+                        "Mute audio without pausing playback",
+                    ))
                     .clicked();
                 if mute_changed {
                     self.muted = !self.muted;
@@ -644,7 +696,7 @@ impl App {
                 let volume_changed = ui
                     .add(
                         egui::Slider::new(&mut self.volume, 0.0..=1.0)
-                            .text("Volume")
+                            .text(crate::i18n::ui_text(ui, "Volume"))
                             .custom_formatter(|value, _| format!("{:.0}%", value * 100.0)),
                     )
                     .changed();
@@ -671,15 +723,15 @@ impl App {
         let mut visible = true;
         let mut maps = self.prefs.maps.clone().unwrap_or_default();
         let mut changed = false;
-        egui::Window::new("Privacy zones")
+        egui::Window::new(crate::i18n::text("Privacy zones"))
             .open(&mut visible)
             .default_width(600.0)
             .show(ctx, |ui| {
-                ui.label("Hide private places, such as your home or workplace, on map overlays. Inside each zone, the position marker and route are hidden.");
-                ui.small("Your zones are saved in user configuration and apply to every video and layout.");
+                ui.label(crate::i18n::ui_text(ui, "Hide private places, such as your home or workplace, on map overlays. Inside each zone, the position marker and route are hidden."));
+                ui.small(crate::i18n::ui_text(ui, "Your zones are saved in user configuration and apply to every video and layout."));
                 ui.separator();
-                ui.label("Set the center using latitude and longitude, then choose a radius in meters. You can also use the GPS position at the current video frame.");
-                ui.small("This affects map overlays only. The video image, original GPS data and telemetry shown by other widgets remain available.");
+                ui.label(crate::i18n::ui_text(ui, "Set the center using latitude and longitude, then choose a radius in meters. You can also use the GPS position at the current video frame."));
+                ui.small(crate::i18n::text("This affects map overlays only. The video image, original GPS data and telemetry shown by other widgets remain available."));
                 ui.separator();
                 let mut remove = None;
                 for (i, zone) in maps.privacy.iter_mut().enumerate() {
@@ -689,7 +741,7 @@ impl App {
                                 egui::DragValue::new(&mut zone.lat)
                                     .speed(0.0001)
                                     .range(-85.0..=85.0)
-                                    .prefix("Lat "),
+                                    .prefix(crate::i18n::ui_text(ui, "Lat ")),
                             )
                             .changed();
                         changed |= ui
@@ -697,18 +749,18 @@ impl App {
                                 egui::DragValue::new(&mut zone.lon)
                                     .speed(0.0001)
                                     .range(-180.0..=180.0)
-                                    .prefix("Lon "),
+                                    .prefix(crate::i18n::ui_text(ui, "Lon ")),
                             )
                             .changed();
                         changed |= ui
                             .add(
                                 egui::DragValue::new(&mut zone.radius_m)
                                     .range(1.0..=100000.0)
-                                    .prefix("Radius ")
-                                    .suffix(" m"),
+                                    .prefix(crate::i18n::ui_text(ui, "Radius "))
+                                    .suffix(crate::i18n::ui_text(ui, " m")),
                             )
                             .changed();
-                        if ui.small_button("Remove").clicked() {
+                        if ui.small_button(crate::i18n::ui_text(ui, "Remove")).clicked() {
                             remove = Some(i);
                         }
                     });
@@ -717,7 +769,7 @@ impl App {
                     maps.privacy.remove(i);
                     changed = true;
                 }
-                if ui.button("Add zone").clicked() {
+                if ui.button(crate::i18n::ui_text(ui, "Add zone")).clicked() {
                     maps.privacy.push(actionlay_maps::PrivacyZone {
                         lat: 0.0,
                         lon: 0.0,
@@ -737,7 +789,7 @@ impl App {
                 if ui
                     .add_enabled(
                         pos.is_some(),
-                        egui::Button::new("Add zone at current position"),
+                        egui::Button::new(crate::i18n::text("Add zone at current position")),
                     )
                     .clicked()
                     && let Some((lat, lon)) = pos
@@ -763,11 +815,14 @@ impl App {
             return;
         }
         let mut visible = true;
-        egui::Window::new("Maps")
+        egui::Window::new(crate::i18n::text("Maps"))
             .open(&mut visible)
             .default_width(580.0)
             .show(ctx, |ui| {
-                ui.label("User preferences · apply to every video and layout");
+                ui.label(crate::i18n::ui_text(
+                    ui,
+                    "User preferences · apply to every video and layout",
+                ));
                 self.map_controls(ui);
             });
         self.select_maps = visible;
@@ -854,29 +909,29 @@ impl App {
         let mut unlink = false;
         let mut changed = false;
         let mut mode_changed = false;
-        egui::Window::new("Video sources").open(&mut visible).default_width(550.0).show(ctx, |ui| {
-            let Some(player) = &self.player else { ui.label("Open a video to link sources."); return; };
-            ui.label(format!("{} video chapter(s)",player.timeline().chapters.len()));
-            mode_changed = ui.checkbox(&mut self.source_settings.open_alone,"Open this file alone (disable automatic chapters)").changed();
+        egui::Window::new(crate::i18n::text("Video sources")).open(&mut visible).default_width(550.0).show(ctx, |ui| {
+            let Some(player) = &self.player else { ui.label(crate::i18n::ui_text(ui, "Open a video to link sources.")); return; };
+            ui.label(crate::i18n::ui_text(ui, format!("{} video chapter(s)",player.timeline().chapters.len())));
+            mode_changed = ui.checkbox(&mut self.source_settings.open_alone,crate::i18n::ui_text(ui, "Open this file alone (disable automatic chapters)")).changed();
             ui.add_enabled_ui(!self.source_settings.open_alone, |ui| {
-                mode_changed |= ui.checkbox(&mut self.source_settings.load_sequence,"Load the complete GoPro sequence from its first chapter").changed();
+                mode_changed |= ui.checkbox(&mut self.source_settings.load_sequence,crate::i18n::ui_text(ui, "Load the complete GoPro sequence from its first chapter")).changed();
             });
             ui.separator();
-            if let Some(path) = &self.source_settings.activity { ui.label(path.display().to_string()); }
-            ui.horizontal(|ui| { link = ui.button("Link GPX/FIT…").clicked(); unlink = ui.add_enabled(self.source_settings.activity.is_some(),egui::Button::new("Unlink")).clicked(); });
-            changed |= ui.add(egui::DragValue::new(&mut self.source_settings.offset).speed(0.1).suffix(" s").prefix("Activity offset ")).changed();
-            ui.small("Positive offset moves activity data later in the video.");
-            ui.label("UTC of the first video frame (optional if the camera has GPS)");
-            changed |= ui.add(egui::TextEdit::singleline(&mut self.source_settings.video_utc).hint_text("2026-09-27T12:15:30Z")).changed();
-            if let Some(utc) = self.camera_telemetry.as_ref().and_then(|t|t.start_utc()) { ui.small(format!("Camera UTC: {utc}")); }
-            if let Some(notice) = &self.source_notice { ui.label(notice); }
-            ui.small("Links and offsets are remembered for this video. External data fills available metrics; camera data fills its gaps.");
+            if let Some(path) = &self.source_settings.activity { ui.label(crate::i18n::user_text(ui, path.display().to_string())); }
+            ui.horizontal(|ui| { link = ui.button(crate::i18n::ui_text(ui, "Link GPX/FIT…")).clicked(); unlink = ui.add_enabled(self.source_settings.activity.is_some(),egui::Button::new(crate::i18n::text("Unlink"))).clicked(); });
+            changed |= ui.add(egui::DragValue::new(&mut self.source_settings.offset).speed(0.1).suffix(crate::i18n::ui_text(ui, " s")).prefix(crate::i18n::ui_text(ui, "Activity offset "))).changed();
+            ui.small(crate::i18n::ui_text(ui, "Positive offset moves activity data later in the video."));
+            ui.label(crate::i18n::ui_text(ui, "UTC of the first video frame (optional if the camera has GPS)"));
+            changed |= ui.add(egui::TextEdit::singleline(&mut self.source_settings.video_utc).hint_text(crate::i18n::ui_text(ui, "2026-09-27T12:15:30Z"))).changed();
+            if let Some(utc) = self.camera_telemetry.as_ref().and_then(|t|t.start_utc()) { ui.small(crate::i18n::ui_text(ui, format!("Camera UTC: {utc}"))); }
+            if let Some(notice) = &self.source_notice { ui.label(crate::i18n::ui_text(ui, notice)); }
+            ui.small(crate::i18n::ui_text(ui, "Links and offsets are remembered for this video. External data fills available metrics; camera data fills its gaps."));
         });
         self.select_sources = visible;
         if link
             && let Some(path) = rfd::FileDialog::new()
-                .set_title("Link activity")
-                .add_filter("Activity", &["gpx", "fit"])
+                .set_title(crate::i18n::native_text("Link activity"))
+                .add_filter(crate::i18n::native_text("Activity"), &["gpx", "fit"])
                 .pick_file()
         {
             self.link_activity(path);
@@ -909,7 +964,7 @@ impl App {
         let mut selected = None;
         let mut browse = false;
         let mut import = false;
-        egui::Window::new("Select Layout")
+        egui::Window::new(crate::i18n::text("Select Layout"))
             .open(&mut visible)
             .collapsible(false)
             .resizable(true)
@@ -918,17 +973,20 @@ impl App {
                 egui::ScrollArea::vertical()
                     .max_height(650.0)
                     .show(ui, |ui| {
-                        ui.heading("Included layouts");
+                        ui.heading(crate::i18n::ui_text(ui, "Included layouts"));
                         for preset in actionlay_layout::catalog::PRESETS {
                             let active = self.prefs.last_layout.is_none()
                                 && self.prefs.last_builtin.as_deref().unwrap_or("default")
                                     == preset.id;
-                            if ui.selectable_label(active, preset.name).clicked() {
+                            if ui
+                                .selectable_label(active, crate::i18n::ui_text(ui, preset.name))
+                                .clicked()
+                            {
                                 builtin = Some(preset.id);
                             }
-                            ui.small(preset.description);
+                            ui.small(crate::i18n::ui_text(ui, preset.description));
                         }
-                        ui.collapsing("Upstream layout library", |ui| {
+                        ui.collapsing(crate::i18n::ui_text(ui, "Upstream layout library"), |ui| {
                             egui::ScrollArea::vertical()
                                 .max_height(240.0)
                                 .show(ui, |ui| {
@@ -937,7 +995,7 @@ impl App {
                                             .selectable_label(
                                                 self.prefs.last_builtin.as_deref()
                                                     == Some(preset.id),
-                                                preset.name,
+                                                crate::i18n::ui_text(ui, preset.name),
                                             )
                                             .clicked()
                                         {
@@ -949,7 +1007,7 @@ impl App {
                         ui.separator();
                         self.appearance_controls(ui);
                         ui.separator();
-                        ui.collapsing("Imported layouts", |ui| {
+                        ui.collapsing(crate::i18n::ui_text(ui, "Imported layouts"), |ui| {
                             if let Some(root) =
                                 directories::ProjectDirs::from("org", "ActionLay", "ActionLay")
                             {
@@ -975,7 +1033,7 @@ impl App {
                                     if ui
                                         .selectable_label(
                                             self.prefs.last_layout.as_ref() == Some(&path),
-                                            name,
+                                            crate::i18n::user_text(ui, name),
                                         )
                                         .clicked()
                                     {
@@ -984,12 +1042,15 @@ impl App {
                                 }
                             }
                         });
-                        ui.heading("Recent layouts");
+                        ui.heading(crate::i18n::ui_text(ui, "Recent layouts"));
                         egui::ScrollArea::vertical()
                             .max_height(280.0)
                             .show(ui, |ui| {
                                 if self.prefs.recent_layouts.is_empty() {
-                                    ui.weak("No layouts loaded from file yet.");
+                                    ui.weak(crate::i18n::ui_text(
+                                        ui,
+                                        "No layouts loaded from file yet.",
+                                    ));
                                 }
                                 for path in &self.prefs.recent_layouts {
                                     let name =
@@ -997,19 +1058,29 @@ impl App {
                                     if ui
                                         .selectable_label(
                                             self.prefs.last_layout.as_ref() == Some(path),
-                                            name,
+                                            crate::i18n::user_text(ui, name),
                                         )
-                                        .on_hover_text(path.display().to_string())
+                                        .on_hover_text(crate::i18n::user_text(
+                                            ui,
+                                            path.display().to_string(),
+                                        ))
                                         .clicked()
                                     {
                                         selected = Some(path.clone());
                                     }
-                                    ui.small(path.display().to_string());
+                                    ui.small(crate::i18n::user_text(
+                                        ui,
+                                        path.display().to_string(),
+                                    ));
                                 }
                             });
                         ui.separator();
-                        browse = ui.button("Open layout from file…").clicked();
-                        import = ui.button("Import layout into library…").clicked();
+                        browse = ui
+                            .button(crate::i18n::ui_text(ui, "Open layout from file…"))
+                            .clicked();
+                        import = ui
+                            .button(crate::i18n::ui_text(ui, "Import layout into library…"))
+                            .clicked();
                     });
             });
         self.select_layout = visible;
@@ -1075,10 +1146,8 @@ impl App {
             menus::Command::SelectLayout => self.select_layout = true,
             menus::Command::MapSettings => self.select_maps = true,
             menus::Command::PrivacySettings => self.select_privacy = true,
-            menus::Command::ToggleDiagnosticData => {
-                self.prefs.show_diagnostic_data = !self.prefs.show_diagnostic_data;
-                self.save_prefs();
-            }
+            menus::Command::InterfaceSettings => self.interface.visible = true,
+            menus::Command::RegionalSettings => self.regional_visible = true,
             menus::Command::Sources => self.select_sources = self.player.is_some(),
             menus::Command::AudioSettings => {
                 match actionlay_media::audio::AudioOutput::devices() {
@@ -1106,17 +1175,23 @@ impl App {
                 let layout = command == menus::Command::OpenLayoutFile;
                 let mut dialog = if layout {
                     rfd::FileDialog::new()
-                        .set_title("Open Layout")
-                        .add_filter("Overlay layout", &["actionlay-layout", "json", "xml"])
+                        .set_title(crate::i18n::native_text("Open Layout"))
+                        .add_filter(
+                            crate::i18n::native_text("Overlay layout"),
+                            &["actionlay-layout", "json", "xml"],
+                        )
                 } else {
-                    rfd::FileDialog::new().set_title("Open Video").add_filter(
-                        "Video",
-                        &[
-                            "mp4", "mov", "m4v", "mkv", "avi", "webm", "mts", "m2ts", "insv", "lrv",
-                        ],
-                    )
+                    rfd::FileDialog::new()
+                        .set_title(crate::i18n::native_text("Open Video"))
+                        .add_filter(
+                            crate::i18n::native_text("Video"),
+                            &[
+                                "mp4", "mov", "m4v", "mkv", "avi", "webm", "mts", "m2ts", "insv",
+                                "lrv",
+                            ],
+                        )
                 }
-                .add_filter("All files", &["*"]);
+                .add_filter(crate::i18n::native_text("All files"), &["*"]);
                 let previous = if layout {
                     self.prefs.last_layout.as_ref()
                 } else {
@@ -1340,6 +1415,7 @@ impl App {
                         continue;
                     }
                     let mode = match widget {
+                        Widget::Map(map) if map.needs_full_track() => MapRoute::Full,
                         Widget::Map(map) => map.route_mode.unwrap_or_default(),
                         _ => route(widget.children()),
                     };
@@ -1408,6 +1484,15 @@ impl App {
 
     fn poll_overlay(&mut self) {
         if let Some(frame) = self.overlay.take_frame() {
+            if self.overlay_ready
+                && self
+                    .loaded_telemetry
+                    .as_ref()
+                    .is_some_and(|tel| !tel.is_loaded_at(frame.t))
+            {
+                self.overlay.recycle(frame.pixmap);
+                return;
+            }
             log::debug!(
                 "overlay frame t={:.3} {}x{} rendered in {:.2} ms",
                 frame.t,
@@ -1437,6 +1522,16 @@ impl App {
             return;
         };
         if !self.overlay_visible || !t.is_finite() {
+            return;
+        }
+        // Unread metadata is buffering, not a missing GPS sample. Keep the last
+        // displayed overlay until this video timestamp has actually been decoded.
+        if self.overlay_ready
+            && self
+                .loaded_telemetry
+                .as_ref()
+                .is_some_and(|tel| !tel.is_loaded_at(t))
+        {
             return;
         }
         let Some((width, height)) = overlay::overlay_size(
@@ -1507,6 +1602,29 @@ impl App {
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let language_changed = self.interface.refresh(&self.prefs, ui.ctx());
+        if self.prefs.regional_units.is_none() {
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_secs(1));
+        }
+        let regional_changed =
+            i18n::regional_settings(ui.ctx(), &mut self.regional_visible, &mut self.prefs);
+        if actionlay_render::regional::configure(self.prefs.regional_units) || regional_changed {
+            self.set_layout(self.base_layout.clone());
+            self.save_prefs();
+        }
+        let settings_changed = self.interface.show(ui.ctx(), &mut self.prefs);
+        if settings_changed {
+            self.save_prefs();
+        }
+        let selection_changed = settings_changed && i18n::activate(self.prefs.language.as_deref());
+        if language_changed || selection_changed {
+            i18n::install_fonts(ui.ctx());
+            match menus::Menus::new(ui.ctx()) {
+                Ok(menus) => self.menus = menus,
+                Err(error) => log::warn!("cannot update interface menus: {error}"),
+            }
+        }
         #[cfg(not(target_os = "macos"))]
         if self.integration.show(ui.ctx(), &mut self.prefs) {
             self.save_prefs();
@@ -1613,23 +1731,30 @@ impl eframe::App for App {
             }
             if let Some(count) = self.chapter_offer {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(format!(
-                        "This is an intermediate GoPro chapter. {count} chapters are available."
+                    ui.label(crate::i18n::ui_text(
+                        ui,
+                        format!(
+                            "This is an intermediate GoPro chapter. {count} chapters are available."
+                        ),
                     ));
                     load_sequence = ui
                         .add_enabled(
                             enabled,
-                            egui::Button::new("Load sequence from first chapter"),
+                            egui::Button::new(crate::i18n::text(
+                                "Load sequence from first chapter",
+                            )),
                         )
                         .clicked();
-                    dismiss_chapters = ui.button("Keep this file").clicked();
+                    dismiss_chapters = ui
+                        .button(crate::i18n::ui_text(ui, "Keep this file"))
+                        .clicked();
                 });
             }
             if let Some(e) = &self.error {
-                ui.colored_label(egui::Color32::LIGHT_RED, e);
+                ui.colored_label(egui::Color32::LIGHT_RED, crate::i18n::ui_text(ui, e));
             }
             if let Some(n) = &notices {
-                ui.small(n);
+                ui.small(crate::i18n::ui_text(ui, n));
             }
         });
         if dismiss_chapters {
@@ -1699,14 +1824,14 @@ impl eframe::App for App {
                     ui.painter().text(
                         rect.center() - egui::vec2(0.0, 32.0),
                         egui::Align2::CENTER_CENTER,
-                        "Open a video",
+                        crate::i18n::text("Open a video"),
                         egui::FontId::proportional(28.0),
                         ui.visuals().text_color(),
                     );
                     ui.painter().text(
                         rect.center() + egui::vec2(0.0, 8.0),
                         egui::Align2::CENTER_CENTER,
-                        "Click here or drag a video into the window",
+                        crate::i18n::text("Click here or drag a video into the window"),
                         egui::FontId::proportional(16.0),
                         ui.visuals().weak_text_color(),
                     );
@@ -1714,9 +1839,9 @@ impl eframe::App for App {
                         rect.center() + egui::vec2(0.0, 38.0),
                         egui::Align2::CENTER_CENTER,
                         if cfg!(target_os = "macos") {
-                            "File / Open Video…   ·   ⌘O"
+                            crate::i18n::text("File / Open Video…   ·   ⌘O")
                         } else {
-                            "File / Open Video…   ·   Ctrl+O"
+                            crate::i18n::text("File / Open Video…   ·   Ctrl+O")
                         },
                         egui::FontId::proportional(14.0),
                         ui.visuals().weak_text_color(),
@@ -1779,6 +1904,11 @@ fn main() -> eframe::Result {
         }
     }
     env_logger::init();
+    let startup_preferences = prefs::default_path()
+        .as_deref()
+        .map(prefs::Prefs::load)
+        .unwrap_or_default();
+    actionlay_render::regional::configure(startup_preferences.regional_units);
     if std::env::args().nth(1).as_deref() == Some("export") {
         if let Err(error) = export_ui::cli() {
             eprintln!("{error:#}");
@@ -1814,6 +1944,9 @@ fn main() -> eframe::Result {
                 .as_deref()
                 .map(prefs::Prefs::load)
                 .unwrap_or_default();
+            actionlay_render::regional::configure(prefs.regional_units);
+            i18n::activate(prefs.language.as_deref());
+            i18n::install_fonts(&cc.egui_ctx);
             let initial = layouts::initial(&prefs);
             let base_layout = Arc::new(initial.layout);
             let mut styled = (*base_layout).clone();
@@ -1827,6 +1960,8 @@ fn main() -> eframe::Result {
                 .maps()
                 .configure(prefs.maps.clone().unwrap_or_default());
             let mut app = App {
+                interface: Default::default(),
+                regional_visible: false,
                 #[cfg(target_os = "macos")]
                 _file_open_handler: file_open_handler,
                 #[cfg(not(target_os = "macos"))]

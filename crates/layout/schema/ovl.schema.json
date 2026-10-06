@@ -1494,6 +1494,13 @@
             "null"
           ]
         },
+        "stale_secs": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "visible": {
           "description": "Default true.",
           "type": [
@@ -1881,6 +1888,13 @@
             }
           ]
         },
+        "route_coverage": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "route_future": {
           "anyOf": [
             {
@@ -1967,6 +1981,16 @@
             "integer",
             "null"
           ]
+        },
+        "zoom_mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MapZoom"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "type": "object"
@@ -1983,6 +2007,13 @@
         "none",
         "past",
         "full"
+      ],
+      "type": "string"
+    },
+    "MapZoom": {
+      "enum": [
+        "fixed",
+        "route"
       ],
       "type": "string"
     },
@@ -2252,6 +2283,14 @@
         },
         "size": {
           "description": "Font size = height of the text box, in layout units.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "stale_secs": {
+          "description": "Retain the previous value during missing data, default 3 seconds.",
           "format": "float",
           "type": [
             "number",
@@ -2858,6 +2897,7 @@
     "Units": {
       "description": "Default unit system of a layout (spec §4.4).",
       "enum": [
+        "default",
         "metric",
         "imperial"
       ],
@@ -3152,7 +3192,7 @@
           "type": "null"
         }
       ],
-      "description": "Default unit system; widgets can override it with `units`. Default metric."
+      "description": "Measurement units"
     },
     "version": {
       "description": "Format version, 1 or higher.",

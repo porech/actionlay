@@ -25,6 +25,8 @@ ActionLay stands on the shoulders of these open-source projects:
 - **[Roboto](https://github.com/googlefonts/roboto)** (Apache-2.0) is the
   overlay font, and **[Tabler Icons](https://tabler.io/icons)** (MIT) provide
   its icons.
+- **[Noto fonts](https://github.com/google/fonts)** (SIL OFL 1.1), embedded as
+  compact subsets, provide multilingual interface glyphs.
 - **[egui / eframe](https://github.com/emilk/egui)** and
   **[wgpu](https://github.com/gfx-rs/wgpu)** power the user interface and the
   GPU rendering.

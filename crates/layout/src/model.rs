@@ -74,6 +74,7 @@ pub enum DateZone {
 #[serde(rename_all = "snake_case")]
 pub enum Units {
     #[default]
+    Default,
     Metric,
     Imperial,
 }
@@ -170,6 +171,9 @@ pub struct MetricUnitNode {
     pub units: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub when_absent: Option<WhenAbsent>,
+    /// Retain the previous value during missing data, default 3 seconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stale_secs: Option<f32>,
     #[serde(flatten)]
     pub style: TextStyleOpt,
     #[serde(flatten)]
@@ -209,6 +213,8 @@ pub struct IconNode {
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct GpsLockIconNode {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stale_secs: Option<f32>,
     #[serde(flatten)]
     pub common: Common,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -509,6 +515,10 @@ pub struct MapNode {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub zoom: Option<u8>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zoom_mode: Option<MapZoom>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub route_coverage: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub radius: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub route: Option<ColorRef>,
@@ -597,12 +607,26 @@ pub enum MapRoute {
     Full,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MapZoom {
+    #[default]
+    Fixed,
+    Route,
+}
+
 impl ChartNode {
     pub fn size(&self) -> [f32; 2] {
         self.size.unwrap_or([420.0, 160.0])
     }
 }
 impl MapNode {
+    pub fn needs_full_track(&self) -> bool {
+        self.route_mode == Some(MapRoute::Full)
+            || self.zoom_mode == Some(MapZoom::Route)
+            || (self.zoom_mode.is_none()
+                && matches!(self.mode, Some(MapMode::Journey | MapMode::Circuit)))
+    }
     pub fn size(&self) -> [f32; 2] {
         self.size.unwrap_or([300.0, 240.0])
     }

@@ -32,6 +32,11 @@ clap.workspace = true
 anyhow.workspace = true
 crossbeam-channel.workspace = true
 ctrlc = "3.5"
+sys-locale = "0.3"
+regex = "1"
+unicode-normalization = "0.1"
+unicode-bidi = "0.3"
+arabic_reshaper = "0.4.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 muda = "0.19.3"

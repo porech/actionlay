@@ -5,7 +5,8 @@ use crate::value;
 use actionlay_layout::color::Color;
 use actionlay_layout::geom::{Anchor, Rect, place};
 use actionlay_layout::model::{
-    ChartNode, GMeterNode, HeadingFilter, MapMode, MapNode, MapOrientation, MapRoute, WhenAbsent,
+    ChartNode, GMeterNode, HeadingFilter, MapMode, MapNode, MapOrientation, MapRoute, MapZoom,
+    WhenAbsent,
 };
 use actionlay_layout::style::{TextKind, TextStyleOpt};
 use actionlay_telemetry::{Metric, Telemetry, Value};
@@ -418,6 +419,49 @@ fn tile_span(origin: f64, size: f32) -> std::ops::RangeInclusive<i64> {
     (origin / 256.0).floor() as i64..=((origin + size as f64) / 256.0).ceil() as i64 - 1
 }
 
+#[derive(Debug)]
+struct RouteView {
+    center: [f64; 2],
+    world: f64,
+}
+
+/// Continuous scale fits the actual rotated route, including dateline crossings.
+fn route_view(
+    points: &[[f64; 2]],
+    size: [f32; 2],
+    angle: f64,
+    occupancy: f64,
+) -> Option<RouteView> {
+    let reference = points.first()?[0];
+    let (sin, cos) = angle.to_radians().sin_cos();
+    let mut min = [f64::INFINITY; 2];
+    let mut max = [f64::NEG_INFINITY; 2];
+    for point in points {
+        let x = reference + actionlay_maps::wrap_delta(point[0] - reference);
+        let y = point[1];
+        let q = [cos * x + sin * y, -sin * x + cos * y];
+        for k in 0..2 {
+            min[k] = min[k].min(q[k]);
+            max[k] = max[k].max(q[k]);
+        }
+    }
+    let middle = [(min[0] + max[0]) / 2.0, (min[1] + max[1]) / 2.0];
+    let center = [
+        cos * middle[0] - sin * middle[1],
+        sin * middle[0] + cos * middle[1],
+    ];
+    let fit = (f64::from(size[0]) * occupancy / (max[0] - min[0]).max(1e-12))
+        .min(f64::from(size[1]) * occupancy / (max[1] - min[1]).max(1e-12));
+    Some(RouteView {
+        center,
+        world: if (max[0] - min[0]).max(max[1] - min[1]) <= 1e-12 {
+            256.0 * 2_f64.powi(19)
+        } else {
+            fit
+        },
+    })
+}
+
 pub(crate) fn draw_map(p: &mut Painter, m: &MapNode, at: Placement, ctx: &Ctx) {
     let settings = ctx.maps.settings();
     let size = m.size();
@@ -461,10 +505,15 @@ pub(crate) fn draw_map(p: &mut Painter, m: &MapNode, at: Placement, ctx: &Ctx) {
         .filter(|q| !settings.privacy.iter().any(|z| z.contains(q.lat, q.lon)))
         .map(|q| actionlay_maps::project(q.lat, q.lon))
         .collect();
-    let overview = matches!(mode, MapMode::Journey | MapMode::Circuit);
+    let relative = m.zoom_mode == Some(MapZoom::Route);
+    let ready = relative && ctx.telemetry.is_some_and(Telemetry::is_complete);
+    let legacy_overview =
+        m.zoom_mode.is_none() && matches!(mode, MapMode::Journey | MapMode::Circuit);
+    let overview = legacy_overview || ready;
+    let mut fitted_world = None;
     let mut zoom = m.zoom.unwrap_or(15);
     let mut center = pos.map(|(a, b)| actionlay_maps::project(a, b));
-    if overview && !visible.is_empty() {
+    if legacy_overview && !visible.is_empty() {
         let reference = visible[0][0];
         let mut min = [f64::INFINITY; 2];
         let mut max = [f64::NEG_INFINITY; 2];
@@ -493,8 +542,16 @@ pub(crate) fn draw_map(p: &mut Painter, m: &MapNode, at: Placement, ctx: &Ctx) {
             zoom -= 1;
         }
     }
+    if ready && let Some(view) = route_view(&visible, size, angle, m.route_coverage.unwrap_or(0.8))
+    {
+        center = Some(view.center);
+        fitted_world = Some(view.world);
+        zoom = (view.world / 256.0).log2().ceil().clamp(0.0, 19.0) as u8;
+    }
     if let Some(center) = center.filter(|_| !masked && (pos.is_some() || overview)) {
-        let world = 256.0 * 2_f64.powi(zoom as i32);
+        let tile_world = 256.0 * 2_f64.powi(zoom as i32);
+        let world = fitted_world.unwrap_or(tile_world);
+        let tile_scale = (world / tile_world) as f32;
         let ww = pm.width() as f32;
         let hh = pm.height() as f32;
         // Do not repaint a moving map until its centre changes by a pixel.
@@ -503,7 +560,7 @@ pub(crate) fn draw_map(p: &mut Painter, m: &MapNode, at: Placement, ctx: &Ctx) {
             (center[1] * world * s as f64).round() / (world * s as f64),
         ];
         let cache_key = format!(
-            "map:{m:?}:{center:?}:{zoom}:{angle}:{s}:{:?}:{}:{}:{settings:?}",
+            "map:{m:?}:{center:?}:{zoom}:{world}:{angle}:{s}:{:?}:{}:{}:{settings:?}",
             ctx.theme,
             ctx.telemetry.map_or(0, Telemetry::identity),
             ctx.maps.revision()
@@ -524,8 +581,10 @@ pub(crate) fn draw_map(p: &mut Painter, m: &MapNode, at: Placement, ctx: &Ctx) {
             if mode != MapMode::Circuit {
                 let cover_w = (cos.abs() * size[0] as f64 + sin.abs() * size[1] as f64) as f32;
                 let cover_h = (sin.abs() * size[0] as f64 + cos.abs() * size[1] as f64) as f32;
-                let left = center[0] * world - f64::from(cover_w) / 2.0;
-                let top = center[1] * world - f64::from(cover_h) / 2.0;
+                let cover_w = cover_w / tile_scale;
+                let cover_h = cover_h / tile_scale;
+                let left = center[0] * tile_world - f64::from(cover_w) / 2.0;
+                let top = center[1] * tile_world - f64::from(cover_h) / 2.0;
                 for y in tile_span(top, cover_h).take(13) {
                     for x in tile_span(left, cover_w).take(13) {
                         if let Some(key) = actionlay_maps::Tile::at(zoom, x, y) {
@@ -533,11 +592,17 @@ pub(crate) fn draw_map(p: &mut Painter, m: &MapNode, at: Placement, ctx: &Ctx) {
                                 cacheable &= !settings.online;
                                 continue;
                             };
-                            let tr = Transform::from_scale(s, s)
+                            let tr = Transform::from_scale(s * tile_scale, s * tile_scale)
                                 .post_translate(
-                                    ((x as f64 * 256.0 - center[0] * world) * s as f64) as f32
+                                    ((x as f64 * 256.0 - center[0] * tile_world)
+                                        * s as f64
+                                        * tile_scale as f64)
+                                        as f32
                                         + ww / 2.0,
-                                    ((y as f64 * 256.0 - center[1] * world) * s as f64) as f32
+                                    ((y as f64 * 256.0 - center[1] * tile_world)
+                                        * s as f64
+                                        * tile_scale as f64)
+                                        as f32
                                         + hh / 2.0,
                                 )
                                 .post_rotate_at(-angle as f32, ww / 2.0, hh / 2.0);
@@ -940,5 +1005,44 @@ mod heading_tests {
             cache.sample(&stopped, Metric::Heading, 1.0, &filter),
             Some(40.0)
         );
+    }
+}
+
+#[cfg(test)]
+mod route_fit_tests {
+    use super::*;
+    #[test]
+    fn route_fills_eighty_percent_and_is_centered_at_any_orientation() {
+        let points = [[0.49, 0.46], [0.51, 0.50], [0.50, 0.52]];
+        for size in [[400.0, 300.0], [250.0, 600.0]] {
+            for angle in [0.0_f64, 45.0, 120.0] {
+                let view = route_view(&points, size, angle, 0.8).unwrap();
+                let (sin, cos) = angle.to_radians().sin_cos();
+                let mut min = [f64::INFINITY; 2];
+                let mut max = [f64::NEG_INFINITY; 2];
+                for point in points {
+                    let x = actionlay_maps::wrap_delta(point[0] - view.center[0]) * view.world;
+                    let y = (point[1] - view.center[1]) * view.world;
+                    let q = [cos * x + sin * y, -sin * x + cos * y];
+                    for k in 0..2 {
+                        min[k] = min[k].min(q[k]);
+                        max[k] = max[k].max(q[k]);
+                    }
+                }
+                let occupancy = ((max[0] - min[0]) / f64::from(size[0]))
+                    .max((max[1] - min[1]) / f64::from(size[1]));
+                assert!((occupancy - 0.8).abs() < 1e-9);
+                for k in 0..2 {
+                    assert!((min[k] + max[k]).abs() < 1e-9, "route centered at {angle}");
+                }
+            }
+        }
+    }
+    #[test]
+    fn dateline_crossing_uses_the_short_route_and_empty_tracks_have_no_fit() {
+        let view = route_view(&[[0.99, 0.5], [0.01, 0.5]], [400.0, 300.0], 0.0, 0.8).unwrap();
+        assert!((view.world - 16000.0).abs() < 1e-6);
+        assert!(actionlay_maps::wrap_delta(view.center[0]).abs() < 1e-9);
+        assert!(route_view(&[], [400.0, 300.0], 0.0, 0.8).is_none());
     }
 }

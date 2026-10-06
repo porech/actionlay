@@ -95,12 +95,23 @@ video or coordinates shown by other widgets.
 | O | Show / hide the overlay |
 
 The diagnostic line beneath the player is hidden by default. Enable
-**Settings → Show diagnostic data** to see decoder, frame and A/V statistics.
+**Settings → Interface → Show diagnostic data** to see decoder, frame and A/V statistics.
+
+**Settings → Interface** also offers a searchable selector for 34 languages.
+**System default** follows the system language; unsupported languages use English.
+**Settings → Regional settings** controls measurement units separately. Layouts
+and widgets use **Default** to inherit their units; explicit units override this.
+Data widgets retain their last valid value during short telemetry gaps, with a
+configurable tolerance of three seconds in included layouts. Network buffering
+keeps the last displayed telemetry until metadata for the frame is available.
+Included layouts show the entire route, centered and fitted to 80% of the map.
+The map widget supports fixed zoom or fitting the complete route. While loading,
+preview uses fixed zoom; export loads the full route before rendering any frame.
 
 ### Export
 
 Choose **Export…** in the toolbar or **File → Export Video…**. Select the mode,
-format, time range and a new destination. Transparent overlays use ProRes 4444
+format, time range and a new destination. Each new export starts with **Video with overlay**. Transparent overlays use ProRes 4444
 or PNG; solid overlays let you choose a background colour, green by default.
 Existing destinations are not overwritten. Cancellation keeps completed frames
 in a playable partial output.

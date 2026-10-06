@@ -78,25 +78,28 @@ pub fn show(
     let duration = player.info().duration;
     ui.horizontal(|ui| {
         if ui
-            .button(if player.is_paused() { "▶" } else { "⏸" })
+            .button(crate::i18n::ui_text(
+                ui,
+                if player.is_paused() { "▶" } else { "⏸" },
+            ))
             .clicked()
         {
             player.toggle();
         }
-        if ui.button("⏮ frame").clicked() {
+        if ui.button(crate::i18n::ui_text(ui, "⏮ frame")).clicked() {
             player.step(-1);
         }
-        if ui.button("frame ⏭").clicked() {
+        if ui.button(crate::i18n::ui_text(ui, "frame ⏭")).clicked() {
             player.step(1);
         }
 
         if player.is_buffering() {
             ui.spinner();
-            ui.label("Buffering…");
+            ui.label(crate::i18n::ui_text(ui, "Buffering…"));
         }
         let pos = player.position();
         let mut value = if scrub.dragging { scrub.target } else { pos };
-        ui.label(format_time(value));
+        ui.label(crate::i18n::user_text(ui, format_time(value)));
         ui.spacing_mut().slider_width = (ui.available_width() - 260.0).max(100.0);
         let response = ui.add(egui::Slider::new(&mut value, 0.0..=duration).show_value(false));
         let out = scrub_action(
@@ -117,14 +120,14 @@ pub fn show(
         if out.resume {
             player.play();
         }
-        ui.label(format_time(duration));
+        ui.label(crate::i18n::user_text(ui, format_time(duration)));
 
         let mut speed = player.speed();
         egui::ComboBox::from_id_salt("speed")
-            .selected_text(format!("{speed}x"))
+            .selected_text(crate::i18n::user_text(ui, format!("{speed}x")))
             .show_ui(ui, |ui| {
                 for s in SPEEDS {
-                    ui.selectable_value(&mut speed, s, format!("{s}x"));
+                    ui.selectable_value(&mut speed, s, crate::i18n::user_text(ui, format!("{s}x")));
                 }
             });
         if speed != player.speed() {
@@ -137,7 +140,7 @@ pub fn show(
     }
     let st = player.stats();
     let v = &player.info().video;
-    ui.small(format!(
+    ui.small(crate::i18n::ui_text(ui, format!(
         "{}x{} {} @ {:.2} fps · decoder: {} · presented {} · dropped {} · audio: {} · A/V {} · {overlay_status}",
         v.width,
         v.height,
@@ -149,7 +152,7 @@ pub fn show(
         if st.audio_active { "on" } else { "off" },
         st.av_offset
             .map_or_else(|| "n/a".to_string(), |o| format!("{:+.0} ms", o * 1000.0))
-    ));
+    )));
 }
 
 pub fn handle_keys(ctx: &egui::Context, player: &mut Player, scrub: &ScrubState) {

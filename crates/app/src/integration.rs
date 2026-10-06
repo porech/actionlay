@@ -51,30 +51,30 @@ impl Dialog {
         let mut open = true;
         let mut action = None;
         let mut changed = false;
-        egui::Window::new("File associations")
+        egui::Window::new(crate::i18n::text("File associations"))
             .open(&mut open)
             .collapsible(false)
             .show(ctx, |ui| {
-                ui.label("Add ActionLay to Open With for MP4, MOV, LRV and INSV videos, for your user account only.");
-                ui.label("This does not change your default video player. Keep ActionLay in a permanent location before registering it.");
+                ui.label(crate::i18n::ui_text(ui, "Add ActionLay to Open With for MP4, MOV, LRV and INSV videos, for your user account only."));
+                ui.label(crate::i18n::ui_text(ui, "This does not change your default video player. Keep ActionLay in a permanent location before registering it."));
                 if self.managed {
-                    ui.label("File associations are already managed by the installer or system package. Use its uninstaller or your package manager to remove them.");
+                    ui.label(crate::i18n::ui_text(ui, "File associations are already managed by the installer or system package. Use its uninstaller or your package manager to remove them."));
                     return;
                 }
                 if let Some(message) = &self.message {
-                    ui.label(message);
+                    ui.label(crate::i18n::ui_text(ui, message));
                 }
                 ui.horizontal(|ui| {
-                    if ui.button(if self.registered { "Update registration" } else { "Add to Open With" }).clicked() {
+                    if ui.button(crate::i18n::ui_text(ui, if self.registered { "Update registration" } else { "Add to Open With" })).clicked() {
                         action = Some(true);
                     }
-                    if ui.add_enabled(self.registered, egui::Button::new("Remove registration")).clicked() {
+                    if ui.add_enabled(self.registered, egui::Button::new(crate::i18n::text("Remove registration"))).clicked() {
                         action = Some(false);
                     }
                 });
                 #[cfg(target_os = "windows")]
                 {
-                    changed |= ui.checkbox(&mut prefs.dismiss_association_prompt, "Don't ask again at startup").changed();
+                    changed |= ui.checkbox(&mut prefs.dismiss_association_prompt, crate::i18n::ui_text(ui, "Don't ask again at startup")).changed();
                 }
             });
         self.open = open;

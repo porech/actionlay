@@ -17,7 +17,8 @@ pub struct Dialog {
     error: Option<String>,
 }
 impl Dialog {
-    pub fn new(settings: Settings, duration: f64) -> Self {
+    pub fn new(mut settings: Settings, duration: f64) -> Self {
+        settings.mode = Mode::Video;
         Self {
             settings,
             start: 0.0,
@@ -29,35 +30,39 @@ impl Dialog {
     pub fn show(&mut self, ctx: &egui::Context) -> (bool, Option<PathBuf>) {
         let mut open = true;
         let mut choose = false;
-        egui::Window::new("Export video / overlay").open(&mut open).resizable(false).show(ctx,|ui| {
-            egui::ComboBox::from_id_salt("export-mode").selected_text(match self.settings.mode { Mode::Video=>"Video with overlay",Mode::Transparent=>"Overlay · transparent",Mode::Solid=>"Overlay · solid background" }).show_ui(ui,|ui| {
-                ui.selectable_value(&mut self.settings.mode,Mode::Video,"Video with overlay");
-                ui.selectable_value(&mut self.settings.mode,Mode::Solid,"Overlay · solid background");
-                ui.selectable_value(&mut self.settings.mode,Mode::Transparent,"Overlay · transparent");
+        egui::Window::new(crate::i18n::text("Export video / overlay")).open(&mut open).resizable(false).show(ctx,|ui| {
+            egui::ComboBox::from_id_salt("export-mode").selected_text(crate::i18n::ui_text(ui, match self.settings.mode { Mode::Video=>"Video with overlay",Mode::Transparent=>"Overlay · transparent",Mode::Solid=>"Overlay · solid background" })).show_ui(ui,|ui| {
+                ui.selectable_value(&mut self.settings.mode,Mode::Video,crate::i18n::ui_text(ui, "Video with overlay"));
+                ui.selectable_value(&mut self.settings.mode,Mode::Solid,crate::i18n::ui_text(ui, "Overlay · solid background"));
+                ui.selectable_value(&mut self.settings.mode,Mode::Transparent,crate::i18n::ui_text(ui, "Overlay · transparent"));
             });
             if self.settings.mode==Mode::Transparent && matches!(self.settings.format,Format::H264|Format::H265) { self.settings.format=Format::Prores; }
-            if self.settings.mode==Mode::Solid { ui.horizontal(|ui| { ui.label("Background"); ui.color_edit_button_srgb(&mut self.settings.color); if ui.button("Green screen").clicked() {self.settings.color=[0,255,0];} }); }
-            egui::ComboBox::from_id_salt("export-format").selected_text(self.settings.format.codec()).show_ui(ui,|ui| {
-                if self.settings.mode!=Mode::Transparent { ui.selectable_value(&mut self.settings.format,Format::H264,"H.264 · MP4"); ui.selectable_value(&mut self.settings.format,Format::H265,"H.265 · MP4"); }
-                ui.selectable_value(&mut self.settings.format,Format::Prores,"ProRes 4444 · MOV");
-                ui.selectable_value(&mut self.settings.format,Format::Png,"PNG sequence");
+            if self.settings.mode==Mode::Solid { ui.horizontal(|ui| { ui.label(crate::i18n::ui_text(ui, "Background")); ui.color_edit_button_srgb(&mut self.settings.color); if ui.button(crate::i18n::ui_text(ui, "Green screen")).clicked() {self.settings.color=[0,255,0];} }); }
+            egui::ComboBox::from_id_salt("export-format").selected_text(crate::i18n::ui_text(ui, self.settings.format.codec())).show_ui(ui,|ui| {
+                if self.settings.mode!=Mode::Transparent { ui.selectable_value(&mut self.settings.format,Format::H264,crate::i18n::ui_text(ui, "H.264 · MP4")); ui.selectable_value(&mut self.settings.format,Format::H265,crate::i18n::ui_text(ui, "H.265 · MP4")); }
+                ui.selectable_value(&mut self.settings.format,Format::Prores,crate::i18n::ui_text(ui, "ProRes 4444 · MOV"));
+                ui.selectable_value(&mut self.settings.format,Format::Png,crate::i18n::ui_text(ui, "PNG sequence"));
             });
-            ui.checkbox(&mut self.settings.hardware,"Prefer hardware encoder");
-            ui.horizontal(|ui| { ui.label("In (seconds)"); ui.add(egui::DragValue::new(&mut self.start).speed(0.1).range(0.0..=self.duration)); });
-            ui.horizontal(|ui| { ui.label("Out (seconds)"); ui.add(egui::DragValue::new(&mut self.end).speed(0.1).range(0.0..=self.duration)); });
-            ui.label("Original resolution and frame timestamps. Video-file audio is copied; overlay-only and PNG exports are silent.");
-            if let Some(error)=&self.error {ui.colored_label(egui::Color32::RED,error);}
-            if ui.button("Choose destination and export…").clicked() {
+            ui.checkbox(&mut self.settings.hardware,crate::i18n::ui_text(ui, "Prefer hardware encoder"));
+            ui.horizontal(|ui| { ui.label(crate::i18n::ui_text(ui, "In (seconds)")); ui.add(egui::DragValue::new(&mut self.start).speed(0.1).range(0.0..=self.duration)); });
+            ui.horizontal(|ui| { ui.label(crate::i18n::ui_text(ui, "Out (seconds)")); ui.add(egui::DragValue::new(&mut self.end).speed(0.1).range(0.0..=self.duration)); });
+            ui.label(crate::i18n::ui_text(ui, "Original resolution and frame timestamps. Video-file audio is copied; overlay-only and PNG exports are silent."));
+            if let Some(error)=&self.error {ui.colored_label(egui::Color32::RED,crate::i18n::ui_text(ui, error));}
+            if ui.button(crate::i18n::ui_text(ui, "Choose destination and export…")).clicked() {
                 if self.end>self.start {choose=true;} else {self.error=Some("Out must be after In".into());}
             }
         });
         let output = if choose {
-            let dialog = rfd::FileDialog::new().set_title("New export destination");
+            let dialog = rfd::FileDialog::new()
+                .set_title(crate::i18n::native_text("New export destination"));
             if self.settings.format == Format::Png {
                 dialog.set_file_name("overlay-frames").save_file()
             } else {
                 dialog
-                    .add_filter("Export", &[self.settings.format.extension()])
+                    .add_filter(
+                        crate::i18n::native_text("Export"),
+                        &[self.settings.format.extension()],
+                    )
                     .set_file_name(format!("export.{}", self.settings.format.extension()))
                     .save_file()
             }
@@ -114,28 +119,48 @@ impl crate::App {
         }
         if let Some(job) = &self.export_job {
             let state = job.progress.lock().unwrap().clone();
+            if !state.done {
+                ctx.request_repaint_after(std::time::Duration::from_secs(1));
+            }
             let mut dismiss = false;
-            egui::Window::new("Export progress")
+            egui::Window::new(crate::i18n::text("Export progress"))
                 .resizable(false)
                 .show(ctx, |ui| {
-                    ui.label(&state.status);
+                    ui.label(crate::i18n::ui_text(ui, &state.status));
                     if state.cancelled {
-                        ui.label("The export contains the completed frames only.");
+                        ui.label(crate::i18n::ui_text(
+                            ui,
+                            "The export contains the completed frames only.",
+                        ));
                     }
                     ui.add(egui::ProgressBar::new(state.fraction).show_percentage());
-                    ui.label(format!(
-                        "{} frames · {:.0}s elapsed",
-                        state.frames, state.elapsed
+                    ui.label(crate::i18n::ui_text(
+                        ui,
+                        format!(
+                            "{} frames · {} elapsed",
+                            state.frames,
+                            duration_text(if state.done {
+                                state.elapsed
+                            } else {
+                                job.started.elapsed().as_secs_f64()
+                            })
+                        ),
                     ));
                     if let Some(remaining) = state.remaining {
-                        ui.label(format!("About {remaining:.0}s remaining"));
+                        ui.label(crate::i18n::ui_text(
+                            ui,
+                            format!("About {} remaining", duration_text(remaining)),
+                        ));
                     }
                     if let Some(error) = &state.error {
-                        ui.colored_label(egui::Color32::RED, error);
+                        ui.colored_label(egui::Color32::RED, crate::i18n::ui_text(ui, error));
                     }
                     if state.done {
-                        dismiss = ui.button("Close").clicked();
-                    } else if ui.button("Cancel export").clicked() {
+                        dismiss = ui.button(crate::i18n::ui_text(ui, "Close")).clicked();
+                    } else if ui
+                        .button(crate::i18n::ui_text(ui, "Cancel export"))
+                        .clicked()
+                    {
                         job.cancel.store(true, Ordering::Relaxed);
                     }
                 });
@@ -242,4 +267,54 @@ fn parse_color(value: &str) -> anyhow::Result<[u8; 3]> {
         u8::from_str_radix(&value[2..4], 16)?,
         u8::from_str_radix(&value[4..6], 16)?,
     ])
+}
+
+/// Compact elapsed/remaining time, rounded down at unit boundaries.
+fn duration_text(seconds: f64) -> String {
+    let total = if seconds.is_finite() {
+        seconds.max(0.0) as u64
+    } else {
+        0
+    };
+    if total < 60 {
+        format!("{total} s")
+    } else if total < 3600 {
+        format!("{} min {} s", total / 60, total % 60)
+    } else {
+        format!(
+            "{} h {} min {} s",
+            total / 3600,
+            total / 60 % 60,
+            total % 60
+        )
+    }
+}
+
+#[cfg(test)]
+mod display_tests {
+    use super::*;
+    #[test]
+    fn duration_boundaries() {
+        for (seconds, expected) in [
+            (0.0, "0 s"),
+            (59.9, "59 s"),
+            (60.0, "1 min 0 s"),
+            (3599.0, "59 min 59 s"),
+            (3600.0, "1 h 0 min 0 s"),
+            (7384.0, "2 h 3 min 4 s"),
+        ] {
+            assert_eq!(duration_text(seconds), expected);
+        }
+    }
+    #[test]
+    fn new_export_defaults_to_video_with_overlay() {
+        let saved = Settings {
+            mode: Mode::Transparent,
+            ..Settings::default()
+        };
+        assert!(matches!(
+            Dialog::new(saved, 10.0).settings.mode,
+            Mode::Video
+        ));
+    }
 }
