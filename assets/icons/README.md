@@ -5,9 +5,9 @@ raised head, visible snout and expressive eyes. The subject follows the wild
 gecko in the reference photograph: natural olive/tan mottling, raised scales,
 five padded toes and a long banded tail.
 
-The gecko entered Alessandro Rinaldi's office while he was working on ActionLay
-and thinking about an application icon. He photographed the unexpected visitor,
-which became the inspiration for the logo.
+While I was working on ActionLay and thinking about an application icon, a wild
+gecko entered my office. I photographed the unexpected visitor, which became
+the inspiration for the logo.
 
 The [original reference photograph](source/IMG_20261006_132445_1.jpg),
 [generated 3D study](source/gecko-study.png) and [prompt](source/prompt.md)
@@ -17,6 +17,7 @@ The SVG contains no embedded raster images or external references.
 
 `actionlay.svg` places the gecko on a teal application tile.
 `dmg.svg` places the same subject on an original silver disk illustration.
+
 ## Licence and attribution
 
 The original reference photograph, generated study, SVG artwork and all derived

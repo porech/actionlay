@@ -113,9 +113,9 @@ for development and [release packaging](docs/releasing.md) for maintainers.
 
 Inspired by [gopro-dashboard-overlay](https://github.com/time4tea/gopro-dashboard-overlay)
 and [Gyroflow](https://github.com/gyroflow/gyroflow). See [all credits](docs/credits.md).
-The gecko icon was inspired by a wild gecko that entered Alessandro Rinaldi's
-office while he was developing ActionLay and thinking about an icon.
-He took the [reference photograph](assets/icons/source/IMG_20261006_132445_1.jpg).
+While I was developing ActionLay and thinking about an icon, a wild gecko
+entered my office. I took this [photograph](assets/icons/source/IMG_20261006_132445_1.jpg),
+and the unexpected visitor became the inspiration for the logo.
 
 ActionLay's code is licensed under [GPL-3.0-or-later](LICENSE). The original gecko
 photograph and logo/icon artwork are available under [CC BY-SA 4.0](assets/icons/LICENSE-CC-BY-SA-4.0.txt)
