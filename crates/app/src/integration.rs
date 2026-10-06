@@ -16,6 +16,7 @@ mod windows;
 pub struct Dialog {
     pub open: bool,
     registered: bool,
+    managed: bool,
     message: Option<String>,
 }
 
@@ -24,9 +25,11 @@ impl Dialog {
     pub fn startup(prefs: &Prefs) -> Self {
         let mut dialog = Self {
             registered: platform::registered(),
+            managed: platform::managed(),
             ..Default::default()
         };
-        if dialog.registered
+        if !dialog.managed
+            && dialog.registered
             && (cfg!(target_os = "windows") || prefs.system_integration_enabled)
             && let Err(error) = platform::register()
         {
@@ -35,7 +38,8 @@ impl Dialog {
         }
         #[cfg(target_os = "windows")]
         {
-            dialog.open |= !dialog.registered && !prefs.dismiss_association_prompt;
+            dialog.open |=
+                !dialog.managed && !dialog.registered && !prefs.dismiss_association_prompt;
         }
         dialog
     }
@@ -53,6 +57,10 @@ impl Dialog {
             .show(ctx, |ui| {
                 ui.label("Add ActionLay to Open With for MP4, MOV, LRV and INSV videos, for your user account only.");
                 ui.label("This does not change your default video player. Keep ActionLay in a permanent location before registering it.");
+                if self.managed {
+                    ui.label("File associations are already managed by the installer or system package. Use its uninstaller or your package manager to remove them.");
+                    return;
+                }
                 if let Some(message) = &self.message {
                     ui.label(message);
                 }

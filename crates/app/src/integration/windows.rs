@@ -3,6 +3,7 @@ use std::path::Path;
 use winreg::{RegKey, enums::*};
 
 const PROG_ID: &str = "ActionLay.Video";
+const INSTALLED_PROG_ID: &str = "ActionLay.InstalledVideo";
 const EXTENSIONS: &[&str] = &[".mp4", ".mov", ".lrv", ".insv"];
 
 fn classes() -> io::Result<RegKey> {
@@ -75,6 +76,20 @@ pub fn registered() -> bool {
         .open_subkey(format!(r"Software\Classes\{PROG_ID}\shell\open\command"))
         .and_then(|key| key.get_value::<String, _>(""))
         .is_ok()
+}
+
+pub fn managed() -> bool {
+    [HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE]
+        .into_iter()
+        .any(|hive| {
+            RegKey::predef(hive)
+                .open_subkey_with_flags(
+                    format!(r"Software\Classes\{INSTALLED_PROG_ID}\shell\open\command"),
+                    KEY_READ | KEY_WOW64_64KEY,
+                )
+                .and_then(|key| key.get_value::<String, _>(""))
+                .is_ok()
+        })
 }
 
 pub fn register() -> io::Result<()> {

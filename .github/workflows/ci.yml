@@ -253,8 +253,72 @@ jobs:
             target/release/actionlay-telemetry.exe
           if-no-files-found: error
 
-  package:
+  package-windows:
     needs: build-test
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: actionlay-x86_64-pc-windows-msvc
+          path: binaries
+      - name: Build Inno Setup installer
+        shell: pwsh
+        run: |
+          python scripts/package-release.py --target windows --binaries binaries --output dist
+          Expand-Archive dist/actionlay-windows-x64.zip dist/windows
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup --yes --no-progress }
+          $version = (Select-String '^version = "([^"]+)"' Cargo.toml).Matches[0].Groups[1].Value
+          & $iscc "/DAppVersion=$version" "/DSourceDir=$pwd\dist\windows\ActionLay" "/DOutputDir=$pwd\dist" packaging/windows/actionlay.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed' }
+          $parsed = [Version]$version
+          $upgrade = "$($parsed.Major).$($parsed.Minor).$($parsed.Build + 1)"
+          & $iscc "/DAppVersion=$upgrade" "/DSourceDir=$pwd\dist\windows\ActionLay" "/DOutputDir=$pwd\dist\upgrade" packaging/windows/actionlay.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Upgrade test installer compilation failed' }
+          "UPGRADE_VERSION=$upgrade" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Verify installer scopes, upgrade and uninstall
+        shell: pwsh
+        run: scripts/verify-windows-installer.ps1 -Installer "$pwd\dist\actionlay-windows-x64-setup.exe" -UpgradeInstaller "$pwd\dist\upgrade\actionlay-windows-x64-setup.exe" -UpgradeVersion "$env:UPGRADE_VERSION"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer
+          path: dist/actionlay-windows-x64-setup.exe
+          if-no-files-found: error
+
+  package-linux:
+    needs: build-test
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: actionlay-x86_64-unknown-linux-gnu
+          path: binaries
+      - name: Install native packaging tools
+        run: sudo apt-get update && sudo apt-get install -y rpm desktop-file-utils shared-mime-info libasound2 libva2 libva-drm2
+      - name: Build DEB and RPM packages
+        run: python3 scripts/package-linux.py --binaries binaries --output dist
+      - name: Verify package contents and DEB installation
+        run: |
+          sudo dpkg -i dist/*.deb
+          desktop-file-validate /usr/share/applications/org.ActionLay.ActionLay.desktop
+          actionlay-telemetry --version
+          cp crates/app/tests/fixtures/export-source.mp4 /tmp/actionlay-test.lrv
+          test "$(xdg-mime query filetype /tmp/actionlay-test.lrv)" = video/x-actionlay-lrv
+          rpm -qpl dist/*.rpm | grep -Fx /usr/bin/actionlay
+          sudo dpkg -r actionlay
+          test ! -e /usr/share/applications/org.ActionLay.ActionLay.desktop
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-native-packages
+          path: dist/*
+          if-no-files-found: error
+
+  package:
+    needs: [build-test, package-windows, package-linux]
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: macos-14
     steps:
@@ -273,10 +337,18 @@ jobs:
         with:
           name: third-party-sources
           path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-installer
+          path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: linux-native-packages
+          path: dist
       - name: Checksums
         run: |
           cd dist
-          shasum -a 256 actionlay-* third-party-sources.tar.gz > SHA256SUMS
+          shasum -a 256 actionlay-* actionlay_* third-party-sources.tar.gz > SHA256SUMS
       - uses: actions/upload-artifact@v7
         with:
           name: release-packages

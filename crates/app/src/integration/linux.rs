@@ -121,6 +121,25 @@ pub fn registered() -> bool {
 }
 
 #[cfg(target_os = "linux")]
+pub fn managed() -> bool {
+    let mut roots: Vec<PathBuf> = std::env::var_os("XDG_DATA_DIRS")
+        .map(|value| std::env::split_paths(&value).collect())
+        .unwrap_or_else(|| {
+            vec![
+                PathBuf::from("/usr/local/share"),
+                PathBuf::from("/usr/share"),
+            ]
+        });
+    if let Ok(user) = data_dir() {
+        roots.push(user);
+    }
+    roots.into_iter().any(|root| {
+        std::fs::read_to_string(root.join("applications").join(DESKTOP))
+            .is_ok_and(|entry| entry.lines().any(|line| line == "X-ActionLay-Managed=true"))
+    })
+}
+
+#[cfg(target_os = "linux")]
 pub fn register() -> io::Result<()> {
     let data = data_dir()?;
     install(&data, &std::env::current_exe()?)?;

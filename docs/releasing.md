@@ -51,3 +51,34 @@ python3 scripts/package-release.py --target linux --binaries /path/to/binaries
 The icon sources and generation instructions are in [assets/icons](../assets/icons/README.md).
 Windows embeds the ICO and version metadata using
 [winresource](https://docs.rs/winresource/0.1.31/winresource/).
+
+## Native installers and Linux repositories
+
+Windows installers use Inno Setup with one stable AppId across versions. The
+wizard supports current-user or all-user (UAC) installation, an optional desktop
+shortcut, and upgrading the existing installation. CI tests both scopes, a newer
+installer version and uninstall without changing default file associations.
+Installer-owned registrations use `ActionLay.InstalledVideo`; portable per-user
+registrations use `ActionLay.Video`. The app detects installer registrations in
+both HKCU and HKLM and does not replace them.
+
+Linux builds produce DEB and RPM packages alongside the portable archive.
+Packages install binaries, a launcher, icon, MIME declarations and notices under
+`/usr`. Their launcher carries `X-ActionLay-Managed=true`, so the app does not
+create duplicate per-user integration. Package install/remove refreshes MIME and
+desktop databases. The glibc 2.35 baseline supports Ubuntu 22.04+, Mint 21+,
+Debian 12+ and recent Fedora-compatible systems; it does not support musl Alpine.
+
+`repositories.yml` runs after successful CI publication and reconstructs both
+stable and nightly APT/DNF repositories from release assets. It verifies and signs
+metadata with the dedicated `GPG_PRIVATE_KEY` secret, signs RPM packages, then
+deploys GitHub Pages at <https://porech.github.io/actionlay/>. A release without
+native packages is not advertised as an available channel. The public key is
+committed at `packaging/linux/repository-key.asc`; private keys must stay outside
+the checkout. The current keyring and exports are in `~/.actionlay-release-signing`
+for a separate backup. Never commit that directory or upload it as an artifact.
+
+The macOS DMG background is in `assets/dmg`. Packaging writes Finder positions
+and the background alias directly using pinned `ds-store`/`mac-alias` tools in a
+temporary venv, without requiring Finder or UI scripting on CI. The installed
+application does not depend on Python.

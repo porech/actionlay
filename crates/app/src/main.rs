@@ -30,6 +30,8 @@ use overlay::{OverlayKey, OverlayRequest, OverlayWorker, Scheduler};
 use video_view::VideoView;
 
 struct App {
+    #[cfg(target_os = "macos")]
+    _file_open_handler: objc2::rc::Retained<integration::macos::FileOpenHandler>,
     #[cfg(not(target_os = "macos"))]
     integration: integration::Dialog,
     export_dialog: Option<export_ui::Dialog>,
@@ -1786,7 +1788,7 @@ fn main() -> eframe::Result {
     }
     let path = std::env::args().nth(1).map(PathBuf::from);
     #[cfg(target_os = "macos")]
-    let _file_open_handler = integration::macos::install();
+    let file_open_handler = integration::macos::install();
     eframe::run_native(
         "ActionLay",
         eframe::NativeOptions {
@@ -1819,12 +1821,14 @@ fn main() -> eframe::Result {
             let layout = Arc::new(styled);
             let ctx = cc.egui_ctx.clone();
             #[cfg(target_os = "macos")]
-            integration::macos::attach(&ctx);
+            integration::macos::attach(&ctx, &file_open_handler);
             let overlay = OverlayWorker::spawn(layout.clone(), move || ctx.request_repaint());
             overlay
                 .maps()
                 .configure(prefs.maps.clone().unwrap_or_default());
             let mut app = App {
+                #[cfg(target_os = "macos")]
+                _file_open_handler: file_open_handler,
                 #[cfg(not(target_os = "macos"))]
                 integration: integration::Dialog::startup(&prefs),
                 export_dialog: None,

@@ -31,14 +31,23 @@ prompt; choose **More info → Run anyway** if you want to run the downloaded bu
 For upcoming changes, use the **[development release](https://github.com/porech/actionlay/releases/tag/nightly)**,
 updated after successful builds of `main`. It may contain unfinished changes.
 
-Development builds support **Open With** for `.mp4`, `.mov`, `.lrv` and `.insv`
-without changing your default player. On macOS, the application bundle declares
-these formats automatically. On Windows and Linux, use **Settings → File
-associations…** to add or remove the integration for your account. Windows also
-offers it at first launch, with a **Don't ask again** option. Keep the extracted
-application in a permanent location; launching a registered copy after moving it
-updates its path. Linux desktop menus may need a new login if the MIME/desktop
-database update tools are unavailable.
+Development builds also include a [Windows installer](https://github.com/porech/actionlay/releases/download/nightly/actionlay-windows-x64-setup.exe)
+and [signed Linux package repositories](https://porech.github.io/actionlay/).
+The Windows installer supports per-user or all-user installation, upgrades,
+uninstall from Windows Apps, and an optional desktop shortcut. Linux packages
+are available for APT (Ubuntu/Mint/Debian) and DNF (Fedora-compatible systems).
+Stable repositories become available with the next release containing native packages.
+
+**Open With** supports `.mp4`, `.mov`, `.lrv` and `.insv` without changing your
+default player. On macOS, the bundle declares these formats automatically and
+the DMG shows where to drag the app. Windows installers and Linux packages
+register them during installation. Portable Windows/Linux copies offer
+**Settings → File associations…** for per-user registration and removal;
+Windows also offers it at startup, with a **Don't ask again** option.
+ActionLay detects installer/package registrations and does not offer a duplicate
+registration. Keep portable copies in a permanent location; launching a registered
+copy after moving it updates its path. Linux desktop menus may need a new login
+if the MIME/desktop database update tools are unavailable.
 
 ## What you can do
 

@@ -1,7 +1,10 @@
 //! Finder sends Apple Events, not argv, including when the app is already running.
 use objc2::rc::Retained;
 use objc2::{MainThreadOnly, define_class, msg_send, sel};
-use objc2_foundation::{NSAppleEventDescriptor, NSAppleEventManager, NSObject, NSObjectProtocol};
+use objc2_foundation::{
+    NSAppleEventDescriptor, NSAppleEventManager, NSNotification, NSNotificationCenter, NSObject,
+    NSObjectProtocol, NSString,
+};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -15,9 +18,15 @@ define_class!(
     pub struct FileOpenHandler;
     unsafe impl NSObjectProtocol for FileOpenHandler {}
     impl FileOpenHandler {
+        #[unsafe(method(applicationLaunching:))]
+        fn launching(&self, _notification: &NSNotification) {
+            register(self);
+        }
         #[unsafe(method(handleOpenDocuments:withReplyEvent:))]
         fn handle(&self, event: &NSAppleEventDescriptor, _reply: &NSAppleEventDescriptor) {
-            FILES.lock().unwrap().extend(paths(event));
+            let files = paths(event);
+            log::debug!("Finder open request: {} files", files.len());
+            FILES.lock().unwrap().extend(files);
             if let Some(ctx) = CONTEXT.lock().unwrap().as_ref() { ctx.request_repaint(); }
         }
     }
@@ -28,20 +37,45 @@ pub fn install() -> Retained<FileOpenHandler> {
     // SAFETY: NSObject's init initializes this fieldless subclass. The selector
     // signature above is the NSAppleEventManager event/reply handler signature.
     unsafe {
+        // AppKit installs its own Apple Event handlers when NSApplication is
+        // initialized. Initialize it first so it cannot replace this handler.
+        let _: *mut objc2::runtime::AnyObject =
+            msg_send![objc2::class!(NSApplication), sharedApplication];
         let handler: Retained<FileOpenHandler> = msg_send![FileOpenHandler::alloc(mtm), init];
-        NSAppleEventManager::sharedAppleEventManager()
-            .setEventHandler_andSelector_forEventClass_andEventID(
+        for name in [
+            "NSApplicationWillFinishLaunchingNotification",
+            "NSApplicationDidFinishLaunchingNotification",
+        ] {
+            NSNotificationCenter::defaultCenter().addObserver_selector_name_object(
                 &handler,
-                sel!(handleOpenDocuments:withReplyEvent:),
-                u32::from_be_bytes(*b"aevt"),
-                u32::from_be_bytes(*b"odoc"),
+                sel!(applicationLaunching:),
+                Some(&NSString::from_str(name)),
+                None,
             );
+        }
+        register(&handler);
         handler
     }
 }
 
-pub fn attach(ctx: &eframe::egui::Context) {
+pub fn attach(ctx: &eframe::egui::Context, handler: &FileOpenHandler) {
     *CONTEXT.lock().unwrap() = Some(ctx.clone());
+    // AppKit has now completed launching the application and installing its
+    // document dispatch. Reapply the handler before returning to the event loop.
+    register(handler);
+}
+
+fn register(handler: &FileOpenHandler) {
+    // SAFETY: the selector's event/reply signature is declared above.
+    unsafe {
+        NSAppleEventManager::sharedAppleEventManager()
+            .setEventHandler_andSelector_forEventClass_andEventID(
+                handler,
+                sel!(handleOpenDocuments:withReplyEvent:),
+                u32::from_be_bytes(*b"aevt"),
+                u32::from_be_bytes(*b"odoc"),
+            );
+    }
 }
 
 pub fn take_files() -> Vec<PathBuf> {

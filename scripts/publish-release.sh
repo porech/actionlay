@@ -28,7 +28,8 @@ Updated after successful builds of main. This prerelease can contain unfinished 
 For regular use, download the [latest stable release](https://github.com/$GITHUB_REPOSITORY/releases/latest).
 
 macOS: universal DMG for Apple Silicon and Intel, macOS 12 or newer.
-Windows: extract the ZIP and run actionlay.exe. Linux: extract the tar.gz and run actionlay.
+Windows: run actionlay-windows-x64-setup.exe, or use the portable ZIP.
+Linux: use the signed APT/DNF repositories at https://porech.github.io/actionlay/, native DEB/RPM packages, or the portable tar.gz.
 Builds are not signed by an identified publisher or Apple-notarized.
 NOTES
   if gh release view "$TAG" >/dev/null 2>&1; then
