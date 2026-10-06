@@ -1,9 +1,13 @@
 # ActionLay icons
 
 `gecko.svg` is the editable vector master: a lively three-quarter view with a
-raised head, visible snout and expressive eyes. The subject follows the owner's
-Mediterranean wall gecko: natural olive/tan mottling, raised scales,
+raised head, visible snout and expressive eyes. The subject follows the wild
+gecko in the reference photograph: natural olive/tan mottling, raised scales,
 five padded toes and a long banded tail.
+
+The gecko entered Alessandro Rinaldi's office while he was working on ActionLay
+and thinking about an application icon. He photographed the unexpected visitor,
+which became the inspiration for the logo.
 
 The [original reference photograph](source/IMG_20261006_132445_1.jpg),
 [generated 3D study](source/gecko-study.png) and [prompt](source/prompt.md)

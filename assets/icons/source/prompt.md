@@ -1,7 +1,9 @@
 # Gecko illustration study
 
 Tool: built-in `imagegen`, transparent background.
-Reference: owner's [original photograph](IMG_20261006_132445_1.jpg), included alongside this prompt.
+Reference: Alessandro Rinaldi's [original photograph](IMG_20261006_132445_1.jpg)
+of a wild gecko that entered his office while he was working on ActionLay,
+included alongside this prompt.
 Output: `gecko-study.png`, subsequently vectorized into `../gecko.svg`.
 
 Prompt:
