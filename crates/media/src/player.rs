@@ -1413,9 +1413,11 @@ mod tests {
             return;
         };
         p.play();
+        // Begin measuring progress after audio output startup latency has
+        // elapsed, with cached packets available for the simulated slow read.
         pump(
             &mut p,
-            |p| !p.is_buffering() && p.buffered_seconds() > 2.5,
+            |p| !p.is_buffering() && p.position() > 0.4 && p.buffered_seconds() > 2.5,
             Duration::from_secs(5),
         );
         stall.store(true, Ordering::SeqCst);
