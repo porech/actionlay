@@ -23,7 +23,7 @@ includes standalone Windows/Linux builds, individual DEB/RPM packages, the
 telemetry CLI and checksums. No GitHub account is required.
 
 FFmpeg is included. Linux builds target Ubuntu 22.04 or newer and require ALSA,
-VA-API and a working graphics driver. `SHA256SUMS` is available in each release.
+VA-API and a graphics backend compatible with wgpu. `SHA256SUMS` is available in each release.
 
 The builds are not signed by an identified publisher or Apple-notarized. On
 macOS, if opening is blocked, allow ActionLay in **System Settings → Privacy &

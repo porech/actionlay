@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/media", "crates/app", "crates/telemetry", "crates/telemetry-cli", "crates/layout", "crates/render", "crates/maps"]
 
 [workspace.package]
-version = "1.0.1"
+version = "1.1.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 publish = false
