@@ -336,6 +336,12 @@ impl GpmfReader {
     pub fn read_range(&mut self, start: f64, end: f64) -> Result<Vec<GpmfPacket>, MediaError> {
         read_range_input(&mut self.input, start, end, &self.cancelled).map(|(packets, _)| packets)
     }
+
+    /// Validate EOF and packet count before declaring a complete route ready.
+    pub fn read_complete(&mut self) -> Result<Vec<GpmfPacket>, MediaError> {
+        read_range_input_policy(&mut self.input, 0.0, f64::INFINITY, &self.cancelled, true)
+            .map(|(packets, _)| packets)
+    }
 }
 
 pub(crate) fn is_gpmd(stream: &ffmpeg::format::stream::Stream) -> bool {
@@ -455,6 +461,12 @@ mod indexed_io_tests {
             assert!(
                 reader.bytes_read() - before <= payload + 1024,
                 "header must be retained across seeks: {name}"
+            );
+            let before = reader.bytes_read();
+            assert_eq!(reader.read_complete().unwrap(), full);
+            assert!(
+                reader.bytes_read() - before < size / 4,
+                "validated full-route read must skip video/audio payload: {name}"
             );
         }
     }

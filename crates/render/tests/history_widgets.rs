@@ -13,6 +13,60 @@ fn render(r: &mut Renderer, l: &Layout, t: &Telemetry, at: f64) -> Pixmap {
     r.render_telemetry_into(l, t, at, &mut p);
     p
 }
+
+#[test]
+fn fitted_route_occupies_eighty_percent_of_the_rendered_map_at_any_scale() {
+    let tel = Telemetry::for_test(
+        4.0,
+        &[
+            (
+                Metric::Lat,
+                vec![(0.0, 45.0), (1.0, 45.0005), (2.0, 45.001)],
+            ),
+            (Metric::Lon, vec![(0.0, 9.0), (1.0, 9.001), (2.0, 9.002)]),
+            (Metric::Cog, vec![(0.0, 90.0), (2.0, 90.0)]),
+        ],
+    );
+    for orientation in ["north_up", "course_up"] {
+        let layout = layout(&format!(
+            r##"[{{"type":"map","size":[340,244],"zoom_mode":"route","route_coverage":0.8,"route_mode":"full","orientation":"{orientation}","background":"#000000","route_width":2,"show_marker":false}}]"##
+        ));
+        for (w, h) in [(480, 270), (960, 540), (1920, 1080)] {
+            let mut image = Pixmap::new(w, h).unwrap();
+            Renderer::new().render_telemetry_into(&layout, &tel, 0.0, &mut image);
+            let points: Vec<_> = image
+                .pixels()
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| {
+                    p.red() > p.green()
+                        && u16::from(p.green()) > 3 * u16::from(p.blue())
+                        && p.red() > 8
+                })
+                .map(|(i, _)| [(i % w as usize) as f64, (i / w as usize) as f64])
+                .collect();
+            assert!(!points.is_empty());
+            let s = h as f64 / 1080.0;
+            let mut occupancy: f64 = 0.0;
+            for (axis, size) in [340.0, 244.0].into_iter().enumerate() {
+                let lo = points.iter().map(|p| p[axis]).fold(f64::INFINITY, f64::min);
+                let hi = points
+                    .iter()
+                    .map(|p| p[axis])
+                    .fold(f64::NEG_INFINITY, f64::max);
+                occupancy = occupancy.max((hi - lo) / (size * s));
+                assert!(
+                    ((lo + hi) / 2.0 - size * s / 2.0).abs() < 2.0,
+                    "map centered at {w}x{h}"
+                );
+            }
+            assert!(
+                (occupancy - 0.8).abs() < 0.025,
+                "{orientation} at {w}x{h}: {occupancy}"
+            );
+        }
+    }
+}
 #[test]
 fn history_widgets_are_deterministic_when_seeking_backwards() {
     let l = layout(

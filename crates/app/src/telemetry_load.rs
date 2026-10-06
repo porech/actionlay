@@ -133,6 +133,17 @@ pub fn spawn(
             if route_cancelled.load(Ordering::SeqCst) {
                 return;
             }
+            // A full-route request needs an explicit validated completion event,
+            // not an optional MP4 packet count or playback reaching EOF.
+            let full = ranges
+                .iter()
+                .any(|(_, end)| *end >= timeline.duration - 0.001);
+            let ranges = if full {
+                vec![(0.0, timeline.duration)]
+            } else {
+                ranges
+            };
+            let mut failed = false;
             for (start, end) in ranges {
                 for chapter in &timeline.chapters {
                     if chapter.start > end || chapter.start + chapter.info.duration < start {
@@ -150,12 +161,18 @@ pub fn spawn(
                                     let _ = extra_tx.send(Err(format!(
                                         "Route metadata could not be opened: {e}"
                                     )));
+                                    failed = true;
                                     continue;
                                 }
                             }
                         }
                     };
-                    match reader.read_range((start - chapter.start).max(0.0), end - chapter.start) {
+                    let result = if full {
+                        reader.read_complete()
+                    } else {
+                        reader.read_range((start - chapter.start).max(0.0), end - chapter.start)
+                    };
+                    match result {
                         Ok(packets) => {
                             for mut packet in packets {
                                 packet.pts += chapter.start;
@@ -169,11 +186,15 @@ pub fn spawn(
                             }
                         }
                         Err(e) => {
+                            failed = true;
                             let _ = extra_tx
                                 .send(Err(format!("Route metadata could not be read: {e}")));
                         }
                     }
                 }
+            }
+            if full && !failed && !route_cancelled.load(Ordering::SeqCst) {
+                let _ = extra_tx.send(Ok(TelemetryEvent::End { from_start: true }));
             }
             reader_busy.store(false, Ordering::SeqCst);
         }
@@ -200,6 +221,10 @@ pub fn spawn(
                 for event in extra_rx.try_iter() {
                     if let Err(warning) = &event {
                         route_warning = Some(warning.clone());
+                        dirty = true;
+                    }
+                    if matches!(&event, Ok(TelemetryEvent::End { from_start: true })) && !complete {
+                        complete = true;
                         dirty = true;
                     }
                     if let Ok(TelemetryEvent::Packet { timestamp, packet }) = event
@@ -499,6 +524,38 @@ pub fn spawn_activity(
 #[cfg(test)]
 mod route_tests {
     use super::*;
+    #[test]
+    fn full_backfill_completes_without_packet_count_or_playback_eof() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/gopro/hero5.mp4");
+        if !path.exists() {
+            return;
+        }
+        let all = read_gpmf_packets(&path).unwrap();
+        let timeline = actionlay_media::chapters::Timeline::open(&path, false).unwrap();
+        let (tx, rx) = mpsc::channel();
+        let loader = spawn(rx, timeline.duration, None, || {});
+        tx.send(TelemetryEvent::Packet {
+            timestamp: (all[0].pts * 1e6).round() as i64,
+            packet: all[0].clone(),
+        })
+        .unwrap();
+        assert!(loader.request_route(timeline.clone(), vec![(all[0].duration, timeline.duration)]));
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(update) = loader.take_update() {
+                assert!(update.warning.is_none(), "{:?}", update.warning);
+                if update.telemetry.is_complete() {
+                    let reference = load_reference(&all, timeline.duration);
+                    assert_eq!(update.telemetry.track(), reference.track());
+                    break;
+                }
+            }
+            assert!(Instant::now() < deadline, "full route stays on fixed zoom");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        // Keep playback's sender alive: completion comes from metadata backfill.
+        drop(tx);
+    }
     #[test]
     fn indexed_backfill_merges_with_playback_packets_without_loading_the_future() {
         let path =

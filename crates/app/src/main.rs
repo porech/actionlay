@@ -1442,7 +1442,8 @@ impl App {
             .editor
             .as_ref()
             .map_or(&self.layout.nodes, |editor| &editor.draft.nodes);
-        let end = match route(nodes) {
+        let route_mode = route(nodes);
+        let end = match route_mode {
             MapRoute::None => return,
             MapRoute::Full => player.info().duration,
             MapRoute::Past => self.shown_t.unwrap_or(0.0),
@@ -1450,25 +1451,32 @@ impl App {
         if end <= self.route_requested_until + 0.001 {
             return;
         }
-        // Already played packets form a contiguous prefix; only fill unread gaps.
-        if self
-            .camera_telemetry
-            .as_ref()
-            .is_some_and(|t| t.is_loaded_through(end))
-        {
+        // Full-route zoom needs a validated complete source. Past-only drawing
+        // can reuse the played prefix and backfill just its unread gaps.
+        if self.camera_telemetry.as_ref().is_some_and(|t| {
+            if route_mode == MapRoute::Full {
+                t.is_complete()
+            } else {
+                t.is_loaded_through(end)
+            }
+        }) {
             return;
         }
         let Some(telemetry) = &self.camera_telemetry else {
             return;
         };
-        let ranges = telemetry
-            .unread_ranges(end)
-            .into_iter()
-            .filter_map(|(start, stop)| {
-                let start = start.max(self.route_requested_until);
-                (stop > start + 0.001).then_some((start, stop))
-            })
-            .collect::<Vec<_>>();
+        let ranges = if route_mode == MapRoute::Full {
+            vec![(0.0, end)]
+        } else {
+            telemetry
+                .unread_ranges(end)
+                .into_iter()
+                .filter_map(|(start, stop)| {
+                    let start = start.max(self.route_requested_until);
+                    (stop > start + 0.001).then_some((start, stop))
+                })
+                .collect::<Vec<_>>()
+        };
         if !ranges.is_empty() && load.request_route(player.timeline().clone(), ranges) {
             self.route_requested_until = end;
         }
