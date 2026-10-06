@@ -311,6 +311,14 @@ jobs:
           rpm -qpl dist/*.rpm | grep -Fx /usr/bin/actionlay
           sudo dpkg -r actionlay
           test ! -e /usr/share/applications/org.ActionLay.ActionLay.desktop
+      - name: Verify RPM installation on Fedora
+        run: |
+          docker run --rm -v "$PWD/dist:/packages:ro" fedora:latest bash -c '
+            dnf install -y /packages/*.rpm >/dev/null &&
+            actionlay-telemetry --version &&
+            test -e /usr/share/applications/org.ActionLay.ActionLay.desktop &&
+            dnf remove -y actionlay >/dev/null &&
+            test ! -e /usr/share/applications/org.ActionLay.ActionLay.desktop'
       - uses: actions/upload-artifact@v7
         with:
           name: linux-native-packages

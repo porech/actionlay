@@ -79,7 +79,7 @@ Summary: Action-camera telemetry dashboards and video export
 License: GPL-3.0-or-later AND (CC-BY-SA-4.0 OR GPL-3.0-or-later)
 URL: https://github.com/porech/actionlay
 BuildArch: x86_64
-Requires: glibc >= 2.35, alsa-lib, libva, libstdc++
+Requires: glibc >= 2.35, alsa-lib, libva, libstdc++, shared-mime-info, desktop-file-utils
 AutoReqProv: no
 %description
 Visual overlay editor with GoPro, DJI/Insta360 and GPX/FIT telemetry.
