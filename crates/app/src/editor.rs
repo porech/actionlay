@@ -1521,7 +1521,7 @@ fn layer_tree(
         };
         let warnings = metric_warnings(node, telemetry);
         let name = if name == node.type_name() {
-            crate::i18n::widget_label(name)
+            crate::i18n::native_text(&crate::i18n::widget_label(name)).to_owned()
         } else {
             name.to_owned()
         };
@@ -1796,15 +1796,15 @@ fn property_object(
         if key == "units" && value.get("metric").is_none() {
             let selected = value["units"].as_str().unwrap_or("default").to_owned();
             let mut chosen = selected.clone();
-            ui.label(crate::i18n::property_label(key));
+            ui.label(crate::i18n::ui_text(ui, crate::i18n::property_label(key)));
             egui::ComboBox::from_id_salt((depth, key))
-                .selected_text(crate::i18n::enum_label(&selected))
+                .selected_text(crate::i18n::ui_text(ui, crate::i18n::enum_label(&selected)))
                 .show_ui(ui, |ui| {
                     for id in ["default", "metric", "imperial"] {
                         ui.selectable_value(
                             &mut chosen,
                             id.to_owned(),
-                            crate::i18n::enum_label(id),
+                            crate::i18n::ui_text(ui, crate::i18n::enum_label(id)),
                         );
                     }
                 });
@@ -1816,7 +1816,7 @@ fn property_object(
         if key == "units" && s.to_string().contains("string") && value.get("metric").is_some() {
             let selected = value["units"].as_str().unwrap_or("default").to_owned();
             let mut chosen = selected.clone();
-            ui.label(crate::i18n::property_label(key));
+            ui.label(crate::i18n::ui_text(ui, crate::i18n::property_label(key)));
             egui::ComboBox::from_id_salt((depth, key))
                 .selected_text(if selected == "default" {
                     crate::i18n::text("Default")
