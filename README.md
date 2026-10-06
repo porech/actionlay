@@ -124,3 +124,13 @@ The binaries include GPL-enabled FFmpeg,
 x264 and x265. Source revisions and build scripts are included in the repository;
 licence notices and source links accompany the downloads. Each release also
 includes the exact FFmpeg/x264/x265 sources in `third-party-sources.tar.gz`.
+
+## Legal notice
+
+ActionLay is an independent project. It is not affiliated with, endorsed,
+sponsored or supported by any of the brands, companies or organizations
+mentioned in this repository. All trademarks and product names belong to their
+respective owners and are used solely for identification and reference.
+
+ActionLay is not affiliated with, endorsed, sponsored or supported by the gecko,
+either. Its visit was unsolicited.
