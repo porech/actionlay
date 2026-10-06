@@ -56,7 +56,7 @@
   "Bottom left": "Nederst till vänster",
   "Bottom right": "Nederst till höger",
   "Bottom to top": "Botten till toppen",
-  "Buffering…": "buffring...",
+  "Buffering…": "Buffring…",
   "Cached tiles remain available with downloads disabled.": "Cachade brickor förblir tillgängliga med nedladdningar inaktiverade.",
   "Cadence": "Kadens",
   "Camera UTC: {utc}": "Kamera UTC: {0}",
@@ -509,5 +509,15 @@
   "Route size": "Ruttstorlek",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Använder hela rutten även när bara den avklarade delen ritas. Zoomnivån är fast under inläsningen.",
   "Route data could not be fully loaded. Export was not started.": "Alla ruttdata kunde inte läsas in. Exporten startades inte.",
-  "Export cancelled": "Export avbruten"
+  "Export cancelled": "Export avbruten",
+  "Advanced": "Avancerat",
+  "Advanced…": "Avancerat…",
+  "Buffer before playback (seconds)": "Buffert före uppspelning (sekunder)",
+  "Buffering": "Buffring",
+  "Compressed packet memory (MiB)": "Minne för komprimerade paket (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "Uppspelningen återupptas när denna mängd är tillgänglig, bufferten är full eller videon slutar.",
+  "Read-ahead (seconds)": "Förhandsläsning (sekunder)",
+  "Read-ahead starts when the video opens, even while paused.": "Förhandsläsning börjar när videon öppnas, även i pausläge.",
+  "Restore defaults": "Återställ standardvärden",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Detta är övre gränser. Antalet paket och avkodade bildrutor begränsar också buffringen; den totala minnesanvändningen kan vara högre."
 }

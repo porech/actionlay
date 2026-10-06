@@ -509,5 +509,15 @@
   "Route size": "Tamaño de la ruta",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Usa toda la ruta aunque solo se dibuje la parte recorrida. Durante la carga se usa un zoom fijo.",
   "Route data could not be fully loaded. Export was not started.": "No se pudieron cargar todos los datos de la ruta. La exportación no se inició.",
-  "Export cancelled": "Exportación cancelada"
+  "Export cancelled": "Exportación cancelada",
+  "Advanced": "Avanzado",
+  "Advanced…": "Avanzado…",
+  "Buffer before playback (seconds)": "Búfer antes de reproducir (segundos)",
+  "Buffering": "Almacenamiento en búfer",
+  "Compressed packet memory (MiB)": "Memoria de paquetes comprimidos (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "La reproducción se reanuda cuando esta cantidad está disponible, el búfer está lleno o el vídeo termina.",
+  "Read-ahead (seconds)": "Lectura anticipada (segundos)",
+  "Read-ahead starts when the video opens, even while paused.": "La lectura anticipada comienza al abrir el vídeo, incluso en pausa.",
+  "Restore defaults": "Restaurar valores predeterminados",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Son límites máximos. El número de paquetes y los fotogramas decodificados también limitan el búfer; el uso total de memoria puede ser mayor."
 }

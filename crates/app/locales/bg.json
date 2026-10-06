@@ -56,7 +56,7 @@
   "Bottom left": "Долу вляво",
   "Bottom right": "Долу вдясно",
   "Bottom to top": "Отдолу нагоре",
-  "Buffering…": "Буфериране...",
+  "Buffering…": "Буфериране…",
   "Cached tiles remain available with downloads disabled.": "Кешираните плочки остават налични с деактивирани изтегляния.",
   "Cadence": "Каданс",
   "Camera UTC: {utc}": "Камера UTC: {0}",
@@ -509,5 +509,15 @@
   "Route size": "Размер на маршрута",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Използва целия маршрут, дори когато се чертае само изминатата част. При зареждане мащабът остава фиксиран.",
   "Route data could not be fully loaded. Export was not started.": "Данните за маршрута не можаха да бъдат заредени изцяло. Експортирането не започна.",
-  "Export cancelled": "Експортирането е отменено"
+  "Export cancelled": "Експортирането е отменено",
+  "Advanced": "Разширени",
+  "Advanced…": "Разширени…",
+  "Buffer before playback (seconds)": "Буфер преди възпроизвеждане (секунди)",
+  "Buffering": "Буфериране",
+  "Compressed packet memory (MiB)": "Памет за компресирани пакети (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "Възпроизвеждането продължава, когато това количество е налично, буферът е пълен или видеото приключи.",
+  "Read-ahead (seconds)": "Предварително четене (секунди)",
+  "Read-ahead starts when the video opens, even while paused.": "Предварителното четене започва при отваряне на видеото, дори когато е на пауза.",
+  "Restore defaults": "Възстановяване на стандартните стойности",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Това са горни граници. Броят пакети и декодираните кадри също ограничават буферирането; общото използване на памет може да е по-голямо."
 }

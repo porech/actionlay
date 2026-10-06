@@ -66,7 +66,8 @@ pub(super) fn spawn(
                     }
                 }
                 let current = shared.generation.load(Ordering::SeqCst) == generation;
-                let full = shared.packet_bytes.load(Ordering::SeqCst) >= MAX_VIDEO_PACKET_BYTES
+                let full = shared.packet_bytes.load(Ordering::SeqCst)
+                    >= shared.buffering.lock().unwrap().packet_bytes()
                     || pending.is_some();
                 let mut buffer = shared.buffer.lock().unwrap();
                 if buffer.generation == generation {

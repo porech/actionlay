@@ -4,6 +4,7 @@
     windows_subsystem = "windows"
 )]
 
+mod advanced;
 mod editor;
 mod export;
 mod export_ui;
@@ -33,6 +34,7 @@ use video_view::VideoView;
 struct App {
     interface: i18n::Interface,
     regional_visible: bool,
+    advanced_visible: bool,
     #[cfg(target_os = "macos")]
     _file_open_handler: objc2::rc::Retained<integration::macos::FileOpenHandler>,
     #[cfg(not(target_os = "macos"))]
@@ -1148,6 +1150,7 @@ impl App {
             menus::Command::PrivacySettings => self.select_privacy = true,
             menus::Command::InterfaceSettings => self.interface.visible = true,
             menus::Command::RegionalSettings => self.regional_visible = true,
+            menus::Command::AdvancedSettings => self.advanced_visible = true,
             menus::Command::Sources => self.select_sources = self.player.is_some(),
             menus::Command::AudioSettings => {
                 match actionlay_media::audio::AudioOutput::devices() {
@@ -1258,7 +1261,10 @@ impl App {
         };
         match Player::open_mode(
             &path,
-            PlayerOptions::default(),
+            PlayerOptions {
+                buffering: self.prefs.buffering,
+                ..Default::default()
+            },
             self.prefs.audio_device.as_deref(),
             join,
         ) {
@@ -1606,6 +1612,16 @@ impl eframe::App for App {
         if self.prefs.regional_units.is_none() {
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_secs(1));
+        }
+        if advanced::show(
+            ui.ctx(),
+            &mut self.advanced_visible,
+            &mut self.prefs.buffering,
+        ) {
+            if let Some(player) = &mut self.player {
+                player.set_buffering(self.prefs.buffering);
+            }
+            self.save_prefs();
         }
         let regional_changed =
             i18n::regional_settings(ui.ctx(), &mut self.regional_visible, &mut self.prefs);
@@ -1962,6 +1978,7 @@ fn main() -> eframe::Result {
             let mut app = App {
                 interface: Default::default(),
                 regional_visible: false,
+                advanced_visible: false,
                 #[cfg(target_os = "macos")]
                 _file_open_handler: file_open_handler,
                 #[cfg(not(target_os = "macos"))]

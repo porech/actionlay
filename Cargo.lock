@@ -199,6 +199,7 @@ dependencies = [
  "ffmpeg-next",
  "log",
  "ringbuf",
+ "serde",
  "thiserror 2.0.21",
 ]
 

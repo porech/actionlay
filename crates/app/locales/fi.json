@@ -56,7 +56,7 @@
   "Bottom left": "Vasen alhaalla",
   "Bottom right": "Alhaalla oikealla",
   "Bottom to top": "Alhaalta ylös",
-  "Buffering…": "puskurointi…",
+  "Buffering…": "Puskurointi…",
   "Cached tiles remain available with downloads disabled.": "Välimuistiin tallennetut ruudut pysyvät saatavilla, kun lataukset on poistettu käytöstä.",
   "Cadence": "Poljinnopeus",
   "Camera UTC: {utc}": "Kamera UTC: {0}",
@@ -509,5 +509,15 @@
   "Route size": "Reitin koko",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Käyttää koko reittiä, vaikka vain kuljettu osuus piirretään. Latauksen aikana käytetään kiinteää zoomausta.",
   "Route data could not be fully loaded. Export was not started.": "Kaikkia reittitietoja ei voitu ladata. Vientiä ei aloitettu.",
-  "Export cancelled": "Vienti peruutettu"
+  "Export cancelled": "Vienti peruutettu",
+  "Advanced": "Lisäasetukset",
+  "Advanced…": "Lisäasetukset…",
+  "Buffer before playback (seconds)": "Puskuri ennen toistoa (sekuntia)",
+  "Buffering": "Puskurointi",
+  "Compressed packet memory (MiB)": "Pakattujen pakettien muisti (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "Toisto jatkuu, kun tämä määrä on saatavilla, puskuri on täynnä tai video päättyy.",
+  "Read-ahead (seconds)": "Ennakkoluku (sekuntia)",
+  "Read-ahead starts when the video opens, even while paused.": "Ennakkoluku alkaa videon avaamisesta, myös tauon aikana.",
+  "Restore defaults": "Palauta oletusasetukset",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Nämä ovat ylärajoja. Myös pakettien määrä ja puretut kuvat rajoittavat puskurointia; kokonaismuistin käyttö voi olla suurempi."
 }

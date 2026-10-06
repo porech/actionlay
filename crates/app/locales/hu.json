@@ -56,7 +56,7 @@
   "Bottom left": "Bal alsó",
   "Bottom right": "Jobbra lent",
   "Bottom to top": "Alulról felfelé",
-  "Buffering…": "pufferelés…",
+  "Buffering…": "Pufferelés…",
   "Cached tiles remain available with downloads disabled.": "A gyorsítótárazott csempék továbbra is elérhetők a letöltések letiltásával.",
   "Cadence": "ütem",
   "Camera UTC: {utc}": "Kamera UTC: {0}",
@@ -509,5 +509,15 @@
   "Route size": "Útvonal mérete",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "A teljes útvonalat használja akkor is, ha csak a megtett szakasz látszik. Betöltés közben a nagyítás rögzített.",
   "Route data could not be fully loaded. Export was not started.": "Az útvonal összes adata nem tölthető be. Az exportálás nem indult el.",
-  "Export cancelled": "Exportálás megszakítva"
+  "Export cancelled": "Exportálás megszakítva",
+  "Advanced": "Speciális",
+  "Advanced…": "Speciális…",
+  "Buffer before playback (seconds)": "Puffer lejátszás előtt (másodperc)",
+  "Buffering": "Pufferelés",
+  "Compressed packet memory (MiB)": "Tömörített csomagok memóriája (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "A lejátszás folytatódik, ha ez a mennyiség elérhető, a puffer megtelt, vagy a videó véget ért.",
+  "Read-ahead (seconds)": "Előreolvasás (másodperc)",
+  "Read-ahead starts when the video opens, even while paused.": "Az előreolvasás a videó megnyitásakor indul, szüneteltetés közben is.",
+  "Restore defaults": "Alapértékek visszaállítása",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Ezek felső korlátok. A csomagok száma és a dekódolt képkockák is korlátozzák a pufferelést; a teljes memóriahasználat nagyobb lehet."
 }

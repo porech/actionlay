@@ -56,7 +56,7 @@
   "Bottom left": "Dưới cùng bên trái",
   "Bottom right": "Dưới cùng bên phải",
   "Bottom to top": "Từ dưới lên trên\nBộ đệm",
-  "Buffering…": "…",
+  "Buffering…": "Lưu vào bộ đệm…",
   "Cached tiles remain available with downloads disabled.": "Các ô được lưu trong bộ nhớ đệm vẫn khả dụng khi tính năng tải xuống bị vô hiệu hóa.\nNhịp",
   "Cadence": "Máy ảnh",
   "Camera UTC: {utc}": "UTC: {0}",
@@ -509,5 +509,15 @@
   "Route size": "Kích thước lộ trình",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Dùng toàn bộ lộ trình ngay cả khi chỉ vẽ phần đã đi. Thu phóng giữ cố định trong khi tải.",
   "Route data could not be fully loaded. Export was not started.": "Không thể tải đầy đủ dữ liệu lộ trình. Việc xuất chưa bắt đầu.",
-  "Export cancelled": "Đã hủy xuất"
+  "Export cancelled": "Đã hủy xuất",
+  "Advanced": "Nâng cao",
+  "Advanced…": "Nâng cao…",
+  "Buffer before playback (seconds)": "Bộ đệm trước khi phát (giây)",
+  "Buffering": "Lưu vào bộ đệm",
+  "Compressed packet memory (MiB)": "Bộ nhớ gói nén (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "Tiếp tục phát khi có đủ lượng này, bộ đệm đầy hoặc video kết thúc.",
+  "Read-ahead (seconds)": "Đọc trước (giây)",
+  "Read-ahead starts when the video opens, even while paused.": "Đọc trước bắt đầu khi mở video, ngay cả khi đang tạm dừng.",
+  "Restore defaults": "Khôi phục mặc định",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Đây là giới hạn trên. Số gói và khung hình đã giải mã cũng giới hạn bộ đệm; tổng mức sử dụng bộ nhớ có thể cao hơn."
 }

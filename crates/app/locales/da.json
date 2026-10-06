@@ -56,7 +56,7 @@
   "Bottom left": "Nederst til venstre",
   "Bottom right": "Nederst til højre",
   "Bottom to top": "Bund til top",
-  "Buffering…": "Buffer…",
+  "Buffering…": "Buffering…",
   "Cached tiles remain available with downloads disabled.": "Cachelagrede fliser forbliver tilgængelige med downloads deaktiveret.",
   "Cadence": "Kadence",
   "Camera UTC: {utc}": "Kamera UTC: {0}",
@@ -509,5 +509,15 @@
   "Route size": "Rutestørrelse",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Bruger hele ruten, selv når kun den gennemførte del tegnes. Zoomniveauet er fast under indlæsning.",
   "Route data could not be fully loaded. Export was not started.": "Rutens data kunne ikke indlæses fuldstændigt. Eksporten blev ikke startet.",
-  "Export cancelled": "Eksport annulleret"
+  "Export cancelled": "Eksport annulleret",
+  "Advanced": "Avanceret",
+  "Advanced…": "Avanceret…",
+  "Buffer before playback (seconds)": "Buffer før afspilning (sekunder)",
+  "Buffering": "Buffering",
+  "Compressed packet memory (MiB)": "Hukommelse til komprimerede pakker (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "Afspilningen fortsætter, når denne mængde er tilgængelig, bufferen er fuld, eller videoen slutter.",
+  "Read-ahead (seconds)": "Forudlæsning (sekunder)",
+  "Read-ahead starts when the video opens, even while paused.": "Forudlæsning starter, når videoen åbnes, også mens den er på pause.",
+  "Restore defaults": "Gendan standardværdier",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Dette er øvre grænser. Antallet af pakker og afkodede billeder begrænser også buffering; det samlede hukommelsesforbrug kan være højere."
 }

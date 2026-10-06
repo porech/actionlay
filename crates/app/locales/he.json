@@ -56,7 +56,7 @@
   "Bottom left": "משמאל למטה",
   "Bottom right": "מימין למטה",
   "Bottom to top": "מלמטה למעלה\nמאגר",
-  "Buffering…": "…",
+  "Buffering…": "אגירה במאגר…",
   "Cached tiles remain available with downloads disabled.": "אריחים במטמון נשארים זמינים כשההורדות מושבתות.",
   "Cadence": "קיידנס\nמצלמה",
   "Camera UTC: {utc}": "UTC: {0}",
@@ -509,5 +509,15 @@
   "Route size": "גודל המסלול",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "משתמש במסלול המלא גם כשמצויר רק החלק שהושלם. התקריב נשאר קבוע בזמן הטעינה.",
   "Route data could not be fully loaded. Export was not started.": "לא ניתן היה לטעון את כל נתוני המסלול. הייצוא לא התחיל.",
-  "Export cancelled": "הייצוא בוטל"
+  "Export cancelled": "הייצוא בוטל",
+  "Advanced": "מתקדם",
+  "Advanced…": "מתקדם…",
+  "Buffer before playback (seconds)": "מאגר לפני ניגון (שניות)",
+  "Buffering": "אגירה במאגר",
+  "Compressed packet memory (MiB)": "זיכרון לחבילות דחוסות (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "הניגון מתחדש כשהכמות הזו זמינה, כשהמאגר מלא או כשהסרטון מסתיים.",
+  "Read-ahead (seconds)": "קריאה מקדימה (שניות)",
+  "Read-ahead starts when the video opens, even while paused.": "הקריאה המקדימה מתחילה עם פתיחת הסרטון, גם בזמן השהיה.",
+  "Restore defaults": "שחזור ברירות המחדל",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "אלו גבולות עליונים. מספר החבילות והפריימים המפוענחים מגבילים גם הם את המאגר; השימוש הכולל בזיכרון עשוי להיות גבוה יותר."
 }

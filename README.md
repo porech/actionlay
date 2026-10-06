@@ -108,6 +108,10 @@ Included layouts show the entire route, centered and fitted to 80% of the map.
 The map widget supports fixed zoom or fitting the complete route. While loading,
 preview uses fixed zoom; export loads the full route before rendering any frame.
 
+**Settings → Advanced** configures read-ahead, the buffer required before playback,
+and memory for compressed packets. Read-ahead starts even while paused; changes
+apply immediately. Defaults are 3 seconds ahead, 2 seconds before playback and 32 MiB.
+
 ### Export
 
 Choose **Export…** in the toolbar or **File → Export Video…**. Select the mode,

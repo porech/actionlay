@@ -88,6 +88,7 @@ fn seek_step_and_automatic_playback_cross_chapter_boundaries() {
     let opts = PlayerOptions {
         audio: false,
         prefer_hw: false,
+        ..Default::default()
     };
     let intermediate = ChapterPlayer::open_with_audio_device(&b, opts, None).unwrap();
     assert_eq!(intermediate.timeline().chapters.len(), 1);

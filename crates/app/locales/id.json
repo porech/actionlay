@@ -56,7 +56,7 @@
   "Bottom left": "Kiri bawah",
   "Bottom right": "Kanan bawah",
   "Bottom to top": "Bawah ke atas\nPenyangga",
-  "Buffering…": "…",
+  "Buffering…": "Penyanggaan…",
   "Cached tiles remain available with downloads disabled.": "Ubin cache tetap tersedia dengan unduhan dinonaktifkan.\nIrama",
   "Cadence": "Kamera",
   "Camera UTC: {utc}": "UTC: {0}",
@@ -509,5 +509,15 @@
   "Route size": "Ukuran rute",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Menggunakan seluruh rute meskipun hanya bagian yang selesai digambar. Zoom tetap digunakan saat memuat.",
   "Route data could not be fully loaded. Export was not started.": "Data rute tidak dapat dimuat seluruhnya. Ekspor tidak dimulai.",
-  "Export cancelled": "Ekspor dibatalkan"
+  "Export cancelled": "Ekspor dibatalkan",
+  "Advanced": "Lanjutan",
+  "Advanced…": "Lanjutan…",
+  "Buffer before playback (seconds)": "Penyangga sebelum pemutaran (detik)",
+  "Buffering": "Penyanggaan",
+  "Compressed packet memory (MiB)": "Memori paket terkompresi (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "Pemutaran dilanjutkan saat jumlah ini tersedia, penyangga penuh, atau video berakhir.",
+  "Read-ahead (seconds)": "Pembacaan awal (detik)",
+  "Read-ahead starts when the video opens, even while paused.": "Pembacaan awal dimulai saat video dibuka, bahkan ketika dijeda.",
+  "Restore defaults": "Pulihkan bawaan",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Ini adalah batas maksimum. Jumlah paket dan bingkai yang didekode juga membatasi penyanggaan; penggunaan memori total bisa lebih tinggi."
 }

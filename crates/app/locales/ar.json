@@ -56,7 +56,7 @@
   "Bottom left": "أسفل اليسار",
   "Bottom right": "أسفل اليمين",
   "Bottom to top": "من الأسفل إلى الأعلى\nالتخزين المؤقت",
-  "Buffering…": "...",
+  "Buffering…": "التخزين المؤقت…",
   "Cached tiles remain available with downloads disabled.": "تظل المربعات المخزنة مؤقتًا متاحة مع تعطيل التنزيلات.\nإيقاع",
   "Cadence": "كاميرا",
   "Camera UTC: {utc}": "UTC: {0}",
@@ -509,5 +509,15 @@
   "Route size": "حجم المسار",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "يستخدم المسار بالكامل حتى عند رسم الجزء المكتمل فقط. يبقى التكبير ثابتًا أثناء التحميل.",
   "Route data could not be fully loaded. Export was not started.": "تعذر تحميل بيانات المسار بالكامل. لم يبدأ التصدير.",
-  "Export cancelled": "أُلغي التصدير"
+  "Export cancelled": "أُلغي التصدير",
+  "Advanced": "متقدمة",
+  "Advanced…": "متقدمة…",
+  "Buffer before playback (seconds)": "التخزين المؤقت قبل التشغيل (ثوانٍ)",
+  "Buffering": "التخزين المؤقت",
+  "Compressed packet memory (MiB)": "ذاكرة الحزم المضغوطة (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "يُستأنف التشغيل عند توفر هذه الكمية أو امتلاء المخزن المؤقت أو انتهاء الفيديو.",
+  "Read-ahead (seconds)": "القراءة المسبقة (ثوانٍ)",
+  "Read-ahead starts when the video opens, even while paused.": "تبدأ القراءة المسبقة عند فتح الفيديو، حتى أثناء الإيقاف المؤقت.",
+  "Restore defaults": "استعادة الإعدادات الافتراضية",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "هذه حدود قصوى. يحد عدد الحزم والإطارات المفكوكة أيضًا من التخزين المؤقت؛ وقد يكون إجمالي استخدام الذاكرة أكبر."
 }

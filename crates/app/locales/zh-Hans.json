@@ -56,7 +56,7 @@
   "Bottom left": "左下",
   "Bottom right": "右下",
   "Bottom to top": "从下到上",
-  "Buffering…": "缓冲...",
+  "Buffering…": "缓冲…",
   "Cached tiles remain available with downloads disabled.": "缓存的图块在禁用下载的情况下仍然可用。",
   "Cadence": "节奏",
   "Camera UTC: {utc}": "相机 UTC：{0}",
@@ -509,5 +509,15 @@
   "Route size": "路线大小",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "即使只绘制已完成的部分，也使用整个路线。加载期间使用固定缩放。",
   "Route data could not be fully loaded. Export was not started.": "无法完整加载路线数据。导出尚未开始。",
-  "Export cancelled": "导出已取消"
+  "Export cancelled": "导出已取消",
+  "Advanced": "高级",
+  "Advanced…": "高级…",
+  "Buffer before playback (seconds)": "播放前缓冲（秒）",
+  "Buffering": "缓冲",
+  "Compressed packet memory (MiB)": "压缩数据包内存（MiB）",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "达到此数据量、缓冲区已满或到达视频末尾时，恢复播放。",
+  "Read-ahead (seconds)": "预读（秒）",
+  "Read-ahead starts when the video opens, even while paused.": "打开视频时即开始预读，即使处于暂停状态。",
+  "Restore defaults": "恢复默认值",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "这些是上限。数据包数量和已解码帧也会限制缓冲量；总内存使用量可能更高。"
 }

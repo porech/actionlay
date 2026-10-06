@@ -56,7 +56,7 @@
   "Bottom left": "A baix a l'esquerra",
   "Bottom right": "A la part inferior dreta",
   "Bottom to top": "De baix a dalt",
-  "Buffering…": "Memòria...",
+  "Buffering…": "Memòria intermèdia…",
   "Cached tiles remain available with downloads disabled.": "Les fitxes en memòria cau continuen disponibles amb les descàrregues desactivades.",
   "Cadence": "Cadència",
   "Camera UTC: {utc}": "Càmera UTC: {0}",
@@ -509,5 +509,15 @@
   "Route size": "Mida del recorregut",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Utilitza tot el recorregut encara que només es dibuixi la part completada. Durant la càrrega s’utilitza un zoom fix.",
   "Route data could not be fully loaded. Export was not started.": "No s’han pogut carregar totes les dades del recorregut. L’exportació no ha començat.",
-  "Export cancelled": "Exportació cancel·lada"
+  "Export cancelled": "Exportació cancel·lada",
+  "Advanced": "Avançat",
+  "Advanced…": "Avançat…",
+  "Buffer before playback (seconds)": "Memòria intermèdia abans de reproduir (segons)",
+  "Buffering": "Memòria intermèdia",
+  "Compressed packet memory (MiB)": "Memòria dels paquets comprimits (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "La reproducció es reprèn quan aquesta quantitat està disponible, la memòria intermèdia és plena o el vídeo acaba.",
+  "Read-ahead (seconds)": "Lectura anticipada (segons)",
+  "Read-ahead starts when the video opens, even while paused.": "La lectura anticipada comença en obrir el vídeo, fins i tot en pausa.",
+  "Restore defaults": "Restaura els valors predeterminats",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Són límits màxims. El nombre de paquets i els fotogrames descodificats també limiten la memòria intermèdia; l’ús total de memòria pot ser superior."
 }

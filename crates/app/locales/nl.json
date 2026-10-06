@@ -56,7 +56,7 @@
   "Bottom left": "Linksonder",
   "Bottom right": "Rechtsonder",
   "Bottom to top": "Van onder naar boven",
-  "Buffering…": "Buffer…",
+  "Buffering…": "Bufferen…",
   "Cached tiles remain available with downloads disabled.": "Gecachte tegels blijven beschikbaar als downloads zijn uitgeschakeld.",
   "Cadence": "Cadans",
   "Camera UTC: {utc}": "-camera UTC: {0}",
@@ -509,5 +509,15 @@
   "Route size": "Routegrootte",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Gebruikt de hele route, ook als alleen het afgelegde deel wordt getekend. Tijdens het laden blijft de zoom vast.",
   "Route data could not be fully loaded. Export was not started.": "De routegegevens konden niet volledig worden geladen. De export is niet gestart.",
-  "Export cancelled": "Export geannuleerd"
+  "Export cancelled": "Export geannuleerd",
+  "Advanced": "Geavanceerd",
+  "Advanced…": "Geavanceerd…",
+  "Buffer before playback (seconds)": "Buffer vóór afspelen (seconden)",
+  "Buffering": "Bufferen",
+  "Compressed packet memory (MiB)": "Geheugen voor gecomprimeerde pakketten (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "Het afspelen hervat zodra deze hoeveelheid beschikbaar is, de buffer vol is of de video eindigt.",
+  "Read-ahead (seconds)": "Vooruit lezen (seconden)",
+  "Read-ahead starts when the video opens, even while paused.": "Vooruit lezen begint bij het openen van de video, ook tijdens pauze.",
+  "Restore defaults": "Standaardwaarden herstellen",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Dit zijn bovengrenzen. Het aantal pakketten en gedecodeerde frames beperken ook het bufferen; het totale geheugengebruik kan hoger zijn."
 }

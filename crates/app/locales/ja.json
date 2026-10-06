@@ -509,5 +509,15 @@
   "Route size": "ルートの大きさ",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "通過済みの区間のみを描画する場合も全ルートを使用します。読み込み中は固定ズームを使用します。",
   "Route data could not be fully loaded. Export was not started.": "ルートの全データを読み込めませんでした。書き出しは開始されていません。",
-  "Export cancelled": "書き出しをキャンセルしました"
+  "Export cancelled": "書き出しをキャンセルしました",
+  "Advanced": "詳細設定",
+  "Advanced…": "詳細設定…",
+  "Buffer before playback (seconds)": "再生前のバッファ（秒）",
+  "Buffering": "バッファリング",
+  "Compressed packet memory (MiB)": "圧縮パケットのメモリ（MiB）",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "この量が読み込まれるか、バッファが満杯になるか、動画の末尾に達すると再生を再開します。",
+  "Read-ahead (seconds)": "先読み（秒）",
+  "Read-ahead starts when the video opens, even while paused.": "動画を開くと、一時停止中でも先読みが始まります。",
+  "Restore defaults": "初期設定に戻す",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "これらは上限です。パケット数とデコード済みフレームもバッファ量を制限します。全体のメモリ使用量はこれより大きくなる場合があります。"
 }

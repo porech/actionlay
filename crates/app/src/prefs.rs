@@ -16,6 +16,8 @@ pub struct Appearance {
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Prefs {
+    #[serde(default)]
+    pub buffering: actionlay_media::player::BufferingOptions,
     /// None follows regional measurement settings, independently of UI language.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub regional_units: Option<actionlay_layout::model::Units>,
@@ -77,6 +79,7 @@ impl Prefs {
         {
             prefs.regional_units = Some(old_units);
         }
+        prefs.buffering = prefs.buffering.normalized();
         normalize(&mut prefs.recent_videos);
         normalize(&mut prefs.recent_layouts);
         // Migrate preferences written before the layout chooser existed.
@@ -116,6 +119,26 @@ fn normalize(recent: &mut Vec<PathBuf>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn buffering_preferences_round_trip_and_normalize_unsafe_limits() {
+        let path = temp("buffering");
+        let prefs = Prefs {
+            buffering: actionlay_media::player::BufferingOptions {
+                read_ahead_seconds: 12.0,
+                start_buffer_seconds: 4.0,
+                packet_memory_mib: 128,
+            },
+            ..Default::default()
+        };
+        prefs.save(&path).unwrap();
+        assert_eq!(Prefs::load(&path), prefs);
+        std::fs::write(&path, r#"{"buffering":{"read_ahead_seconds":0.5,"start_buffer_seconds":4.0,"packet_memory_mib":0}}"#).unwrap();
+        let loaded = Prefs::load(&path);
+        assert_eq!(loaded.buffering.start_buffer_seconds, 0.5);
+        assert_eq!(loaded.buffering.packet_memory_mib, 1);
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
 
     #[test]
     fn legacy_global_units_migrate_without_overriding_layout_units() {

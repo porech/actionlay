@@ -53,9 +53,47 @@ const CHANNEL_CAP: usize = 8;
 const QUEUE_CAP: usize = 4;
 /// Compressed video packets the worker may read ahead to reach audio packets.
 const MAX_VIDEO_PACKETS: usize = 512;
-const MAX_VIDEO_PACKET_BYTES: usize = 32 * 1024 * 1024;
-const READ_AHEAD_SECONDS: f64 = 3.0;
-const START_BUFFER_SECONDS: f64 = 2.0;
+/// User-configurable network buffering. Durations are wall-clock seconds at
+/// the current playback speed; the memory cap covers compressed packets only.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct BufferingOptions {
+    pub read_ahead_seconds: f64,
+    pub start_buffer_seconds: f64,
+    pub packet_memory_mib: usize,
+}
+impl Default for BufferingOptions {
+    fn default() -> Self {
+        Self {
+            read_ahead_seconds: 3.0,
+            start_buffer_seconds: 2.0,
+            packet_memory_mib: 32,
+        }
+    }
+}
+impl BufferingOptions {
+    pub fn normalized(self) -> Self {
+        let defaults = Self::default();
+        let ahead = if self.read_ahead_seconds.is_finite() {
+            self.read_ahead_seconds.clamp(0.1, 120.0)
+        } else {
+            defaults.read_ahead_seconds
+        };
+        let start = if self.start_buffer_seconds.is_finite() {
+            self.start_buffer_seconds.clamp(0.0, ahead)
+        } else {
+            defaults.start_buffer_seconds.min(ahead)
+        };
+        Self {
+            read_ahead_seconds: ahead,
+            start_buffer_seconds: start,
+            packet_memory_mib: self.packet_memory_mib.clamp(1, 1024),
+        }
+    }
+    fn packet_bytes(self) -> usize {
+        self.packet_memory_mib * 1024 * 1024
+    }
+}
 /// Longest the worker waits without checking its commands.
 const POLL: Duration = Duration::from_millis(5);
 /// How long the audio may starve a full video queue, or stand still with
@@ -76,6 +114,7 @@ pub enum TelemetryEvent {
 pub struct PlayerOptions {
     pub prefer_hw: bool,
     pub audio: bool,
+    pub buffering: BufferingOptions,
 }
 
 impl Default for PlayerOptions {
@@ -83,6 +122,7 @@ impl Default for PlayerOptions {
         Self {
             prefer_hw: true,
             audio: true,
+            buffering: BufferingOptions::default(),
         }
     }
 }
@@ -132,6 +172,7 @@ struct Shared {
     cancelled: Arc<AtomicBool>,
     packet_bytes: AtomicUsize,
     read_until: AtomicU64,
+    buffering: Mutex<BufferingOptions>,
     buffer: Mutex<BufferState>,
     /// Latest generation requested by the player.
     generation: AtomicU64,
@@ -206,6 +247,7 @@ impl Player {
         cancelled: Arc<AtomicBool>,
         device: Option<&str>,
     ) -> Result<Self, MediaError> {
+        let buffering = options.buffering.normalized();
         let info = crate::probe::describe(&input)?;
         let audio = if options.audio && info.audio.is_some() {
             match AudioOutput::open_on(device) {
@@ -228,7 +270,8 @@ impl Player {
         let shared = Arc::new(Shared {
             cancelled,
             packet_bytes: AtomicUsize::new(0),
-            read_until: AtomicU64::new(READ_AHEAD_SECONDS.to_bits()),
+            read_until: AtomicU64::new(buffering.read_ahead_seconds.to_bits()),
+            buffering: Mutex::new(buffering),
             buffer: Mutex::new(BufferState {
                 generation: 0,
                 until: 0.0,
@@ -303,6 +346,15 @@ impl Player {
 
     pub fn is_buffering(&self) -> bool {
         self.buffering
+    }
+
+    pub fn set_buffering(&mut self, options: BufferingOptions) {
+        let options = options.normalized();
+        *self.shared.buffering.lock().unwrap() = options;
+        self.shared.read_until.store(
+            (self.current_time() + options.read_ahead_seconds * self.speed()).to_bits(),
+            Ordering::SeqCst,
+        );
     }
 
     pub fn buffered_seconds(&self) -> f64 {
@@ -450,7 +502,8 @@ impl Player {
             eof: false,
         };
         self.shared.read_until.store(
-            (to + READ_AHEAD_SECONDS * self.speed()).to_bits(),
+            (to + self.shared.buffering.lock().unwrap().read_ahead_seconds * self.speed())
+                .to_bits(),
             Ordering::SeqCst,
         );
         if let Some(a) = &self.audio {
@@ -534,7 +587,8 @@ impl Player {
         }
         let buffer = *self.shared.buffer.lock().unwrap();
         if self.buffering {
-            if self.buffered_seconds() < START_BUFFER_SECONDS * self.speed()
+            if self.buffered_seconds()
+                < self.shared.buffering.lock().unwrap().start_buffer_seconds * self.speed()
                 && !buffer.full
                 && !buffer.eof
             {
@@ -551,7 +605,8 @@ impl Player {
         self.watch_audio();
         let now = self.current_time();
         self.shared.read_until.store(
-            (now + READ_AHEAD_SECONDS * self.speed()).to_bits(),
+            (now + self.shared.buffering.lock().unwrap().read_ahead_seconds * self.speed())
+                .to_bits(),
             Ordering::SeqCst,
         );
         if self.audio_driven() {
@@ -932,9 +987,10 @@ impl Worker {
                 audio_now = Some(now);
                 if self.shared.generation.load(Ordering::SeqCst) == p.generation.id {
                     // Continue filling the source while the OS suppresses UI frames.
-                    self.shared
-                        .read_until
-                        .store((now + READ_AHEAD_SECONDS).to_bits(), Ordering::SeqCst);
+                    self.shared.read_until.store(
+                        (now + self.shared.buffering.lock().unwrap().read_ahead_seconds).to_bits(),
+                        Ordering::SeqCst,
+                    );
                 }
             }
 
@@ -1034,7 +1090,7 @@ impl Worker {
             // 5. Consume already-read packets without waiting for storage.
             if !p.demux_eof
                 && p.video_packets.len() < MAX_VIDEO_PACKETS
-                && p.video_packet_bytes < MAX_VIDEO_PACKET_BYTES
+                && p.video_packet_bytes < self.shared.buffering.lock().unwrap().packet_bytes()
             {
                 match packets.try_recv() {
                     Ok(demux::PacketMessage::End { generation })
@@ -1191,6 +1247,62 @@ mod tests {
     use super::*;
     use crate::clock::audio_clock_time;
 
+    #[test]
+    fn buffering_options_keep_resume_within_read_ahead_and_bound_memory() {
+        let options = BufferingOptions {
+            read_ahead_seconds: 0.5,
+            start_buffer_seconds: 20.0,
+            packet_memory_mib: usize::MAX,
+        }
+        .normalized();
+        assert_eq!(options.start_buffer_seconds, 0.5);
+        assert_eq!(options.packet_memory_mib, 1024);
+        let options = BufferingOptions {
+            read_ahead_seconds: f64::NAN,
+            start_buffer_seconds: f64::INFINITY,
+            packet_memory_mib: 0,
+        }
+        .normalized();
+        assert_eq!(options.read_ahead_seconds, 3.0);
+        assert_eq!(options.start_buffer_seconds, 2.0);
+        assert_eq!(options.packet_bytes(), 1024 * 1024);
+    }
+
+    #[test]
+    fn opening_paused_reads_ahead_and_live_settings_extend_the_horizon() {
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../app/tests/fixtures/export-source.mp4");
+        let mut player = Player::open(
+            &path,
+            PlayerOptions {
+                audio: false,
+                prefer_hw: false,
+                buffering: BufferingOptions {
+                    read_ahead_seconds: 0.2,
+                    start_buffer_seconds: 0.1,
+                    ..Default::default()
+                },
+            },
+        )
+        .unwrap();
+        let wait = |player: &Player, target| {
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while player.buffered_seconds() < target && Instant::now() < deadline {
+                std::thread::sleep(POLL);
+            }
+            assert!(player.buffered_seconds() >= target);
+            assert!(player.is_paused());
+            assert_eq!(player.position(), 0.0);
+        };
+        wait(&player, 0.2);
+        assert!(player.buffered_seconds() < 1.0);
+        player.set_buffering(BufferingOptions {
+            read_ahead_seconds: 1.0,
+            ..Default::default()
+        });
+        wait(&player, 1.0);
+    }
+
     struct SlowSource {
         file: std::fs::File,
         stall: Arc<AtomicBool>,
@@ -1243,6 +1355,7 @@ mod tests {
             PlayerOptions {
                 prefer_hw: true,
                 audio: true,
+                ..Default::default()
             },
             cancelled,
         )
@@ -1279,6 +1392,7 @@ mod tests {
             PlayerOptions {
                 prefer_hw: false,
                 audio: true,
+                ..Default::default()
             },
         )
         .unwrap();
@@ -1395,6 +1509,7 @@ mod tests {
             PlayerOptions {
                 prefer_hw: true,
                 audio: false,
+                ..Default::default()
             },
         )
         .unwrap();

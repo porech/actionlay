@@ -56,7 +56,7 @@
   "Bottom left": "Κάτω αριστερά",
   "Bottom right": "Κάτω δεξιά",
   "Bottom to top": "Από κάτω προς τα πάνω",
-  "Buffering…": "Buffering…\nΤα αποθηκευμένα πλακίδια",
+  "Buffering…": "Προσωρινή αποθήκευση…",
   "Cached tiles remain available with downloads disabled.": "παραμένουν διαθέσιμα με τις λήψεις απενεργοποιημένες.",
   "Cadence": "Ρυθμός",
   "Camera UTC: {utc}": "Κάμερα UTC: {0}",
@@ -509,5 +509,15 @@
   "Route size": "Μέγεθος διαδρομής",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Χρησιμοποιεί όλη τη διαδρομή ακόμη και όταν σχεδιάζεται μόνο το ολοκληρωμένο τμήμα. Το ζουμ παραμένει σταθερό κατά τη φόρτωση.",
   "Route data could not be fully loaded. Export was not started.": "Δεν ήταν δυνατή η πλήρης φόρτωση των δεδομένων διαδρομής. Η εξαγωγή δεν ξεκίνησε.",
-  "Export cancelled": "Η εξαγωγή ακυρώθηκε"
+  "Export cancelled": "Η εξαγωγή ακυρώθηκε",
+  "Advanced": "Για προχωρημένους",
+  "Advanced…": "Για προχωρημένους…",
+  "Buffer before playback (seconds)": "Προσωρινή αποθήκευση πριν την αναπαραγωγή (δευτερόλεπτα)",
+  "Buffering": "Προσωρινή αποθήκευση",
+  "Compressed packet memory (MiB)": "Μνήμη συμπιεσμένων πακέτων (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "Η αναπαραγωγή συνεχίζεται όταν αυτή η ποσότητα είναι διαθέσιμη, η προσωρινή μνήμη γεμίσει ή το βίντεο τελειώσει.",
+  "Read-ahead (seconds)": "Ανάγνωση εκ των προτέρων (δευτερόλεπτα)",
+  "Read-ahead starts when the video opens, even while paused.": "Η ανάγνωση εκ των προτέρων ξεκινά κατά το άνοιγμα του βίντεο, ακόμη και σε παύση.",
+  "Restore defaults": "Επαναφορά προεπιλογών",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Αυτά είναι ανώτατα όρια. Ο αριθμός πακέτων και τα αποκωδικοποιημένα καρέ περιορίζουν επίσης την προσωρινή αποθήκευση· η συνολική χρήση μνήμης μπορεί να είναι μεγαλύτερη."
 }

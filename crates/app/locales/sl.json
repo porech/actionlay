@@ -56,7 +56,7 @@
   "Bottom left": "Levo spodaj",
   "Bottom right": "Desno spodaj",
   "Bottom to top": "Od spodaj navzgor",
-  "Buffering…": "Medpomnjenje ...",
+  "Buffering…": "Medpomnjenje…",
   "Cached tiles remain available with downloads disabled.": "Predpomnjene ploščice ostanejo na voljo z onemogočenimi prenosi.",
   "Cadence": "kadenca",
   "Camera UTC: {utc}": "Kamera UTC: {0}",
@@ -509,5 +509,15 @@
   "Route size": "Velikost poti",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Uporabi celotno pot, tudi ko je narisan samo prevoženi del. Med nalaganjem je povečava fiksna.",
   "Route data could not be fully loaded. Export was not started.": "Vseh podatkov poti ni bilo mogoče naložiti. Izvoz se ni začel.",
-  "Export cancelled": "Izvoz preklican"
+  "Export cancelled": "Izvoz preklican",
+  "Advanced": "Napredno",
+  "Advanced…": "Napredno…",
+  "Buffer before playback (seconds)": "Medpomnilnik pred predvajanjem (sekunde)",
+  "Buffering": "Medpomnjenje",
+  "Compressed packet memory (MiB)": "Pomnilnik stisnjenih paketov (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "Predvajanje se nadaljuje, ko je ta količina na voljo, je medpomnilnik poln ali se video konča.",
+  "Read-ahead (seconds)": "Branje vnaprej (sekunde)",
+  "Read-ahead starts when the video opens, even while paused.": "Branje vnaprej se začne ob odprtju videa, tudi med premorom.",
+  "Restore defaults": "Obnovi privzete vrednosti",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "To so zgornje meje. Število paketov in dekodirane sličice prav tako omejujejo medpomnjenje; skupna poraba pomnilnika je lahko večja."
 }

@@ -17,6 +17,7 @@ pub enum Command {
     PrivacySettings,
     InterfaceSettings,
     RegionalSettings,
+    AdvancedSettings,
     #[cfg(not(target_os = "macos"))]
     FileAssociations,
     Sources,
@@ -156,6 +157,12 @@ impl Menus {
             true,
             None,
         );
+        let advanced = MenuItem::with_id(
+            "advanced-settings",
+            crate::i18n::native_text("Advanced…"),
+            true,
+            None,
+        );
         let settings = Submenu::with_items(
             crate::i18n::native_text("Settings"),
             true,
@@ -166,6 +173,7 @@ impl Menus {
                 &PredefinedMenuItem::separator(),
                 &interface,
                 &regional,
+                &advanced,
             ],
         )?;
         let new = MenuItem::with_id(
@@ -236,6 +244,7 @@ impl Menus {
                 "privacy-settings" => Command::PrivacySettings,
                 "interface-settings" => Command::InterfaceSettings,
                 "regional-settings" => Command::RegionalSettings,
+                "advanced-settings" => Command::AdvancedSettings,
                 "sources" => Command::Sources,
                 "clear-recent-videos" => Command::ClearRecentVideos,
                 "close-video" => Command::CloseVideo,
@@ -421,6 +430,10 @@ impl Menus {
                     }
                     if ui.button(crate::i18n::text("Regional settings…")).clicked() {
                         command = Some(Command::RegionalSettings);
+                        ui.close();
+                    }
+                    if ui.button(crate::i18n::text("Advanced…")).clicked() {
+                        command = Some(Command::AdvancedSettings);
                         ui.close();
                     }
                     ui.separator();

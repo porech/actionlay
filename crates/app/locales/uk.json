@@ -509,5 +509,15 @@
   "Route size": "Розмір маршруту",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Використовує весь маршрут, навіть коли показано лише пройдену частину. Під час завантаження масштаб залишається фіксованим.",
   "Route data could not be fully loaded. Export was not started.": "Не вдалося повністю завантажити дані маршруту. Експорт не розпочато.",
-  "Export cancelled": "Експорт скасовано"
+  "Export cancelled": "Експорт скасовано",
+  "Advanced": "Додатково",
+  "Advanced…": "Додатково…",
+  "Buffer before playback (seconds)": "Буфер перед відтворенням (секунди)",
+  "Buffering": "Буферизація",
+  "Compressed packet memory (MiB)": "Пам’ять стиснених пакетів (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "Відтворення поновлюється, коли цей обсяг доступний, буфер заповнений або відео закінчується.",
+  "Read-ahead (seconds)": "Випереджальне читання (секунди)",
+  "Read-ahead starts when the video opens, even while paused.": "Випереджальне читання починається під час відкриття відео, навіть на паузі.",
+  "Restore defaults": "Відновити типові значення",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Це верхні межі. Кількість пакетів і декодовані кадри також обмежують буферизацію; загальне використання пам’яті може бути вищим."
 }

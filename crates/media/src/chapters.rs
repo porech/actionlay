@@ -272,6 +272,10 @@ impl ChapterPlayer {
     pub fn is_buffering(&self) -> bool {
         self.player.is_buffering()
     }
+    pub fn set_buffering(&mut self, options: crate::player::BufferingOptions) {
+        self.options.buffering = options.normalized();
+        self.player.set_buffering(self.options.buffering);
+    }
     pub fn buffered_seconds(&self) -> f64 {
         self.player.buffered_seconds()
     }

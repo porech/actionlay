@@ -509,5 +509,15 @@
   "Route size": "Размер маршрута",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Использует весь маршрут, даже если показана только пройденная часть. При загрузке масштаб остаётся фиксированным.",
   "Route data could not be fully loaded. Export was not started.": "Не удалось полностью загрузить данные маршрута. Экспорт не был начат.",
-  "Export cancelled": "Экспорт отменён"
+  "Export cancelled": "Экспорт отменён",
+  "Advanced": "Дополнительно",
+  "Advanced…": "Дополнительно…",
+  "Buffer before playback (seconds)": "Буфер перед воспроизведением (секунды)",
+  "Buffering": "Буферизация",
+  "Compressed packet memory (MiB)": "Память сжатых пакетов (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "Воспроизведение возобновляется, когда этот объём доступен, буфер заполнен или видео заканчивается.",
+  "Read-ahead (seconds)": "Опережающее чтение (секунды)",
+  "Read-ahead starts when the video opens, even while paused.": "Опережающее чтение начинается при открытии видео, даже на паузе.",
+  "Restore defaults": "Восстановить значения по умолчанию",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Это верхние пределы. Количество пакетов и декодированные кадры также ограничивают буферизацию; общий расход памяти может быть выше."
 }

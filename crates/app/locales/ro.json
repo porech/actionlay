@@ -56,7 +56,7 @@
   "Bottom left": "stânga jos",
   "Bottom right": "dreapta jos",
   "Bottom to top": "De jos în sus",
-  "Buffering…": "Buffering...",
+  "Buffering…": "Stocare în tampon…",
   "Cached tiles remain available with downloads disabled.": "Plăcile stocate în cache rămân disponibile cu descărcările dezactivate.",
   "Cadence": "Cadence",
   "Camera UTC: {utc}": "Camera UTC: {0}",
@@ -509,5 +509,15 @@
   "Route size": "Dimensiunea traseului",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Folosește întregul traseu chiar dacă se desenează doar partea parcursă. Zoomul rămâne fix în timpul încărcării.",
   "Route data could not be fully loaded. Export was not started.": "Nu au putut fi încărcate toate datele traseului. Exportul nu a început.",
-  "Export cancelled": "Export anulat"
+  "Export cancelled": "Export anulat",
+  "Advanced": "Avansat",
+  "Advanced…": "Avansat…",
+  "Buffer before playback (seconds)": "Tampon înainte de redare (secunde)",
+  "Buffering": "Stocare în tampon",
+  "Compressed packet memory (MiB)": "Memorie pentru pachete comprimate (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "Redarea se reia când această cantitate este disponibilă, tamponul este plin sau videoclipul se termină.",
+  "Read-ahead (seconds)": "Citire în avans (secunde)",
+  "Read-ahead starts when the video opens, even while paused.": "Citirea în avans începe la deschiderea videoclipului, chiar și în pauză.",
+  "Restore defaults": "Restabilește valorile implicite",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Acestea sunt limite maxime. Numărul de pachete și cadrele decodificate limitează și ele tamponul; consumul total de memorie poate fi mai mare."
 }

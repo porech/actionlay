@@ -56,7 +56,7 @@
   "Bottom left": "Vlevo dole",
   "Bottom right": "Vpravo dole",
   "Bottom to top": "Zespodu nahoru\nVyrovnávací paměť",
-  "Buffering…": "…",
+  "Buffering…": "Vyrovnávací paměť…",
   "Cached tiles remain available with downloads disabled.": "Dlaždice uložené v mezipaměti zůstávají k dispozici s deaktivovaným stahováním.",
   "Cadence": "Kadence\nKamera",
   "Camera UTC: {utc}": "UTC: {0}",
@@ -509,5 +509,15 @@
   "Route size": "Velikost trasy",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Používá celou trasu, i když se kreslí pouze projetá část. Během načítání je přiblížení pevné.",
   "Route data could not be fully loaded. Export was not started.": "Nepodařilo se načíst všechna data trasy. Export nebyl zahájen.",
-  "Export cancelled": "Export zrušen"
+  "Export cancelled": "Export zrušen",
+  "Advanced": "Pokročilé",
+  "Advanced…": "Pokročilé…",
+  "Buffer before playback (seconds)": "Vyrovnávací paměť před přehráváním (sekundy)",
+  "Buffering": "Vyrovnávací paměť",
+  "Compressed packet memory (MiB)": "Paměť komprimovaných paketů (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "Přehrávání pokračuje, jakmile je toto množství dostupné, paměť je plná nebo video končí.",
+  "Read-ahead (seconds)": "Čtení dopředu (sekundy)",
+  "Read-ahead starts when the video opens, even while paused.": "Čtení dopředu začíná při otevření videa, i když je pozastavené.",
+  "Restore defaults": "Obnovit výchozí hodnoty",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Jde o horní limity. Počet paketů a dekódované snímky také omezují ukládání do vyrovnávací paměti; celkové využití paměti může být vyšší."
 }

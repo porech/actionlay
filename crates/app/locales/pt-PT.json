@@ -56,7 +56,7 @@
   "Bottom left": "canto inferior esquerdo",
   "Bottom right": "canto inferior direito",
   "Bottom to top": "De baixo para cima\nBuffer",
-  "Buffering…": "…",
+  "Buffering…": "Memória intermédia…",
   "Cached tiles remain available with downloads disabled.": "Os blocos armazenados em cache permanecem disponíveis com os downloads desativados.\nCadência",
   "Cadence": "Câmera",
   "Camera UTC: {utc}": "UTC: {0}",
@@ -509,5 +509,15 @@
   "Route size": "Tamanho do percurso",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Utiliza o percurso completo mesmo quando só se desenha a parte percorrida. O zoom fica fixo durante o carregamento.",
   "Route data could not be fully loaded. Export was not started.": "Não foi possível carregar todos os dados do percurso. A exportação não foi iniciada.",
-  "Export cancelled": "Exportação cancelada"
+  "Export cancelled": "Exportação cancelada",
+  "Advanced": "Avançado",
+  "Advanced…": "Avançado…",
+  "Buffer before playback (seconds)": "Memória intermédia antes da reprodução (segundos)",
+  "Buffering": "Memória intermédia",
+  "Compressed packet memory (MiB)": "Memória de pacotes comprimidos (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "A reprodução continua quando esta quantidade está disponível, a memória intermédia está cheia ou o vídeo termina.",
+  "Read-ahead (seconds)": "Leitura antecipada (segundos)",
+  "Read-ahead starts when the video opens, even while paused.": "A leitura antecipada começa ao abrir o vídeo, mesmo em pausa.",
+  "Restore defaults": "Restaurar predefinições",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "São limites máximos. O número de pacotes e os fotogramas descodificados também limitam a memória intermédia; a utilização total de memória pode ser superior."
 }

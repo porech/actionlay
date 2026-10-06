@@ -39,6 +39,7 @@ fn no_audio() -> PlayerOptions {
     PlayerOptions {
         prefer_hw: true,
         audio: false,
+        ..Default::default()
     }
 }
 

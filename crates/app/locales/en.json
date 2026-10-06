@@ -509,5 +509,15 @@
   "Route size": "Route size",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.",
   "Route data could not be fully loaded. Export was not started.": "Route data could not be fully loaded. Export was not started.",
-  "Export cancelled": "Export cancelled"
+  "Export cancelled": "Export cancelled",
+  "Advanced": "Advanced",
+  "Advanced…": "Advanced…",
+  "Buffer before playback (seconds)": "Buffer before playback (seconds)",
+  "Buffering": "Buffering",
+  "Compressed packet memory (MiB)": "Compressed packet memory (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "Playback resumes when this amount is available, the buffer is full, or the video ends.",
+  "Read-ahead (seconds)": "Read-ahead (seconds)",
+  "Read-ahead starts when the video opens, even while paused.": "Read-ahead starts when the video opens, even while paused.",
+  "Restore defaults": "Restore defaults",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher."
 }

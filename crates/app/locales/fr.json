@@ -56,7 +56,7 @@
   "Bottom left": "En bas à gauche",
   "Bottom right": "En bas à droite",
   "Bottom to top": "De bas en haut",
-  "Buffering…": "Tampon…",
+  "Buffering…": "Mise en mémoire tampon…",
   "Cached tiles remain available with downloads disabled.": "Les vignettes mises en cache restent disponibles avec les téléchargements désactivés.",
   "Cadence": "Cadence\nCaméra",
   "Camera UTC: {utc}": "UTC : {0}",
@@ -509,5 +509,15 @@
   "Route size": "Taille du parcours",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Utilise le parcours entier, même si seule la partie parcourue est tracée. Le zoom reste fixe pendant le chargement.",
   "Route data could not be fully loaded. Export was not started.": "Les données du parcours n’ont pas pu être chargées entièrement. L’export n’a pas démarré.",
-  "Export cancelled": "Export annulé"
+  "Export cancelled": "Export annulé",
+  "Advanced": "Avancé",
+  "Advanced…": "Avancé…",
+  "Buffer before playback (seconds)": "Tampon avant lecture (secondes)",
+  "Buffering": "Mise en mémoire tampon",
+  "Compressed packet memory (MiB)": "Mémoire des paquets compressés (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "La lecture reprend lorsque cette quantité est disponible, que le tampon est plein ou que la vidéo se termine.",
+  "Read-ahead (seconds)": "Lecture anticipée (secondes)",
+  "Read-ahead starts when the video opens, even while paused.": "La lecture anticipée commence dès l’ouverture de la vidéo, même en pause.",
+  "Restore defaults": "Rétablir les valeurs par défaut",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Ce sont des limites maximales. Le nombre de paquets et les images décodées limitent aussi le tampon ; la mémoire totale utilisée peut être supérieure."
 }

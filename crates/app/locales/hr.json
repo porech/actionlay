@@ -56,7 +56,7 @@
   "Bottom left": "Dolje lijevo",
   "Bottom right": "Dolje desno",
   "Bottom to top": "Odozdo prema gore",
-  "Buffering…": "Spremanje u međuspremnik…",
+  "Buffering…": "Međuspremnik…",
   "Cached tiles remain available with downloads disabled.": "Predmemorirane pločice ostaju dostupne s onemogućenim preuzimanjima.",
   "Cadence": "Kadenca",
   "Camera UTC: {utc}": "Kamera UTC: {0}",
@@ -509,5 +509,15 @@
   "Route size": "Veličina rute",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Koristi cijelu rutu čak i kada se crta samo prijeđeni dio. Tijekom učitavanja zumiranje je fiksno.",
   "Route data could not be fully loaded. Export was not started.": "Nije bilo moguće učitati sve podatke rute. Izvoz nije pokrenut.",
-  "Export cancelled": "Izvoz otkazan"
+  "Export cancelled": "Izvoz otkazan",
+  "Advanced": "Napredno",
+  "Advanced…": "Napredno…",
+  "Buffer before playback (seconds)": "Međuspremnik prije reprodukcije (sekunde)",
+  "Buffering": "Međuspremnik",
+  "Compressed packet memory (MiB)": "Memorija komprimiranih paketa (MiB)",
+  "Playback resumes when this amount is available, the buffer is full, or the video ends.": "Reprodukcija se nastavlja kada je ta količina dostupna, međuspremnik je pun ili video završi.",
+  "Read-ahead (seconds)": "Čitanje unaprijed (sekunde)",
+  "Read-ahead starts when the video opens, even while paused.": "Čitanje unaprijed započinje pri otvaranju videa, čak i tijekom pauze.",
+  "Restore defaults": "Vrati zadane vrijednosti",
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "To su gornje granice. Broj paketa i dekodirani kadrovi također ograničavaju međuspremnik; ukupna upotreba memorije može biti veća."
 }
