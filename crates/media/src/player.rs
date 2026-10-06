@@ -1296,7 +1296,10 @@ mod tests {
         let started = Instant::now();
         let mut late_frames = 0;
         let mut last_report = Instant::now();
-        while started.elapsed() < Duration::from_secs(3) {
+        // Software decoding and audio callbacks can both be slow on hosted
+        // macOS runners. Wait for enough late frames, bounded by a deadline,
+        // rather than assuming the lag will develop within three seconds.
+        while late_frames < 10 && started.elapsed() < Duration::from_secs(10) {
             if let Some(frame) = p.poll_frame()
                 && p.current_time() - frame.pts > 0.25
             {
