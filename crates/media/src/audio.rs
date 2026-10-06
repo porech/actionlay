@@ -12,7 +12,7 @@ use ffmpeg_next::{
 };
 use ringbuf::{HeapCons, HeapProd, HeapRb, traits::*};
 
-use crate::{MediaError, clock::audio_clock_time};
+use crate::{MediaError, clock::AudioClock};
 
 pub struct AudioChunk {
     pub pts: f64,
@@ -123,7 +123,7 @@ pub struct AudioOutput {
     consumer_slot: Arc<Mutex<Option<HeapCons<f32>>>>,
     shared: Arc<Shared>,
     sample_rate: u32,
-    base_pts: f64,
+    clock: AudioClock,
 }
 
 impl AudioOutput {
@@ -214,7 +214,7 @@ impl AudioOutput {
             consumer_slot,
             shared,
             sample_rate,
-            base_pts: 0.0,
+            clock: AudioClock::new(0.0),
         })
     }
 
@@ -233,11 +233,12 @@ impl AudioOutput {
 
     /// Drops queued audio and restarts the clock at `base_pts` (used on seek).
     pub fn reset(&mut self, base_pts: f64) {
-        if let Some(c) = self.consumer_slot.lock().unwrap().as_mut() {
+        let mut consumer = self.consumer_slot.lock().unwrap();
+        if let Some(c) = consumer.as_mut() {
             c.clear();
         }
         self.shared.frames_played.store(0, Ordering::Relaxed);
-        self.base_pts = base_pts;
+        self.clock = AudioClock::new(base_pts);
     }
 
     /// Frames the output callback has consumed since the last reset. Unlike
@@ -248,11 +249,11 @@ impl AudioOutput {
     }
 
     pub fn clock(&self) -> f64 {
-        audio_clock_time(
-            self.base_pts,
+        self.clock.sample(
             self.shared.frames_played.load(Ordering::Relaxed),
             self.sample_rate,
             Duration::from_micros(self.shared.latency_us.load(Ordering::Relaxed)),
+            self.shared.muted.load(Ordering::Relaxed),
         )
     }
 

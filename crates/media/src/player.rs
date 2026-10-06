@@ -1558,6 +1558,45 @@ mod tests {
         );
     }
     #[test]
+    fn underrun_resumes_without_seek_and_position_stays_monotonic() {
+        let Some((mut p, stall, blocked)) = slow_player(Duration::from_secs(5)) else {
+            return;
+        };
+        p.play();
+        pump(
+            &mut p,
+            |p| !p.is_buffering() && p.position() > 0.2 && p.buffered_seconds() > 2.5,
+            Duration::from_secs(5),
+        );
+        stall.store(true, Ordering::SeqCst);
+        pump(
+            &mut p,
+            |_| blocked.load(Ordering::SeqCst),
+            Duration::from_secs(5),
+        );
+        pump(&mut p, |p| p.is_buffering(), Duration::from_secs(5));
+        let frozen = p.position();
+        let mut previous = frozen;
+        let deadline = Instant::now() + Duration::from_secs(8);
+        while p.position() < frozen + 1.0 && Instant::now() < deadline {
+            p.poll_frame();
+            let current = p.position();
+            assert!(
+                current >= previous,
+                "position reversed: {previous} -> {current}"
+            );
+            previous = current;
+            std::thread::sleep(POLL);
+        }
+        assert!(
+            p.position() >= frozen + 1.0,
+            "automatic resume did not progress"
+        );
+        assert!(!p.is_buffering());
+        assert!(!p.is_paused());
+    }
+
+    #[test]
     fn underrun_freezes_both_clocks_and_pause_cancels_autoresume() {
         let Some((mut p, stall, blocked)) = slow_player(Duration::from_secs(5)) else {
             return;

@@ -1,6 +1,33 @@
 //! Playback clocks. Audio drives playback at 1x; otherwise a system clock
 //! scaled by the playback speed does.
+use std::cell::Cell;
 use std::time::{Duration, Instant};
+
+/// Output latency is an estimate and may jump after an underrun. Such changes
+/// must not move playback backwards, or move a frozen/empty output at all.
+#[derive(Debug)]
+pub(crate) struct AudioClock {
+    base: f64,
+    last: Cell<(u64, f64)>,
+}
+
+impl AudioClock {
+    pub fn new(base: f64) -> Self {
+        Self {
+            base,
+            last: Cell::new((0, base)),
+        }
+    }
+    pub fn sample(&self, frames: u64, rate: u32, latency: Duration, paused: bool) -> f64 {
+        let (previous_frames, previous_time) = self.last.get();
+        if paused || frames == previous_frames {
+            return previous_time;
+        }
+        let time = audio_clock_time(self.base, frames, rate, latency).max(previous_time);
+        self.last.set((frames, time));
+        time
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct SystemClock {
@@ -119,6 +146,42 @@ mod tests {
         assert!(approx(
             audio_clock_time(10.0, 0, 48_000, Duration::from_millis(20)),
             10.0
+        ));
+    }
+
+    #[test]
+    fn audio_latency_jitter_and_buffering_do_not_reverse_or_move_a_frozen_clock() {
+        let clock = AudioClock::new(10.0);
+        assert!(approx(
+            clock.sample(48_000, 48_000, Duration::from_millis(20), false),
+            10.98
+        ));
+        // No new audio: changing the driver's latency estimate cannot move us.
+        for latency in [0, 200, 10, 100] {
+            assert!(approx(
+                clock.sample(48_000, 48_000, Duration::from_millis(latency), false),
+                10.98
+            ));
+            assert!(approx(
+                clock.sample(50_000, 48_000, Duration::from_millis(latency), true),
+                10.98
+            ));
+        }
+        // More samples but a larger reported latency: hold until it catches up.
+        assert!(approx(
+            clock.sample(48_480, 48_000, Duration::from_millis(100), false),
+            10.98
+        ));
+        assert!(approx(
+            clock.sample(52_800, 48_000, Duration::from_millis(20), false),
+            11.08
+        ));
+        // Explicit seek/reset starts an independent timeline and can go back.
+        let clock = AudioClock::new(2.0);
+        assert!(approx(clock.sample(0, 48_000, Duration::ZERO, false), 2.0));
+        assert!(approx(
+            clock.sample(480, 48_000, Duration::ZERO, false),
+            2.01
         ));
     }
 }
