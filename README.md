@@ -113,7 +113,7 @@ for development and [release packaging](docs/releasing.md) for maintainers.
 
 Inspired by [gopro-dashboard-overlay](https://github.com/time4tea/gopro-dashboard-overlay)
 and [Gyroflow](https://github.com/gyroflow/gyroflow). See [all credits](docs/credits.md).
-The gecko icon is illustrated from the project owner's photographs.
+The gecko icon is illustrated from the project owner's [reference photograph](assets/icons/source/IMG_20261006_132445_1.jpg).
 
 ActionLay is [GPL-3.0-or-later](LICENSE). The binaries include GPL-enabled FFmpeg,
 x264 and x265. Source revisions and build scripts are included in the repository;
