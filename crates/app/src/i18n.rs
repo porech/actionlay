@@ -515,6 +515,37 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn menu_translations_are_complete_single_labels() {
+        // Extract the actual native menu keys so new entries join this check.
+        let labels = Regex::new(r#"native_text\("([^"]+)"\)"#).unwrap();
+        for captures in labels.captures_iter(include_str!("menus.rs")) {
+            let source = &captures[1];
+            for (language, catalogue) in LANGUAGES.iter().zip(catalogues()) {
+                let value = &catalogue.logical[source];
+                assert!(
+                    !value.contains(['\n', '\r']),
+                    "{}: {source}: {value:?}",
+                    language.code
+                );
+                assert!(
+                    value.chars().any(char::is_alphabetic),
+                    "{}: {source}: {value:?}",
+                    language.code
+                );
+            }
+        }
+        let italian = &catalogues()[resolve("it")].logical;
+        for (source, value) in italian {
+            if !source.contains('\n') {
+                assert!(
+                    !value.contains('\n'),
+                    "Italian string contains another label: {source}: {value:?}"
+                );
+            }
+        }
+    }
     #[test]
     fn search_matches_native_names_english_names_and_codes() {
         assert!(matches(&LANGUAGES[resolve("fr")], "francais"));
