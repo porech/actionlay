@@ -1350,10 +1350,12 @@ mod tests {
         );
         assert!(p.poll_frame().is_none(), "presented old background frames");
         let target = p.position();
+        // The fixture has an 8.3-second GOP. Software-only hosted runners
+        // must decode from the first keyframe to recover this four-second seek.
         pump(
             &mut p,
             |p| !p.is_buffering() && !p.is_awaiting_frame(),
-            Duration::from_secs(5),
+            Duration::from_secs(15),
         );
         assert!((p.last_frame_pts - target).abs() < 0.15);
         assert!(p.stats().audio_active);
