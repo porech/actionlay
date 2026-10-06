@@ -5,6 +5,8 @@
 )]
 
 mod editor;
+mod export;
+mod export_ui;
 mod layouts;
 mod menus;
 mod overlay;
@@ -26,6 +28,8 @@ use overlay::{OverlayKey, OverlayRequest, OverlayWorker, Scheduler};
 use video_view::VideoView;
 
 struct App {
+    export_dialog: Option<export_ui::Dialog>,
+    export_job: Option<export::Job>,
     editor: Option<editor::Editor>,
     pending_edit_action: Option<EditAction>,
     egui_ctx: egui::Context,
@@ -563,6 +567,12 @@ impl App {
                 {
                     command = Some(menus::Command::OpenVideo);
                 }
+                if ui
+                    .add_enabled(self.video_path.is_some(), egui::Button::new("Export..."))
+                    .clicked()
+                {
+                    command = Some(menus::Command::ExportVideo);
+                }
                 ui.separator();
                 ui.label("Layout");
                 egui::ComboBox::from_id_salt("toolbar-layout")
@@ -793,6 +803,23 @@ impl App {
             return;
         }
         match command {
+            menus::Command::ExportVideo => {
+                if self.video_path.is_some()
+                    && self
+                        .export_job
+                        .as_ref()
+                        .is_none_or(|j| j.progress.lock().unwrap().done)
+                {
+                    if let Some(p) = &mut self.player {
+                        p.pause();
+                    }
+                    let duration = self.player.as_ref().map_or(0.0, |p| p.info().duration);
+                    self.export_dialog = Some(export_ui::Dialog::new(
+                        self.prefs.export.clone().unwrap_or_default(),
+                        duration,
+                    ));
+                }
+            }
             menus::Command::EditLayout => self.begin_edit(false),
             menus::Command::NewLayout => self.begin_edit(true),
             menus::Command::SaveLayout => {
@@ -1122,6 +1149,17 @@ impl App {
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        self.show_export(ui.ctx());
+        if ui.ctx().input(|i| i.viewport().close_requested())
+            && self
+                .export_job
+                .as_ref()
+                .is_some_and(|j| !j.progress.lock().unwrap().done)
+        {
+            ui.ctx()
+                .send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            self.error = Some("Cancel the export and wait for it to finish before closing".into());
+        }
         if ui.ctx().input(|i| i.viewport().close_requested())
             && self.editor.as_ref().is_some_and(editor::Editor::dirty)
         {
@@ -1317,7 +1355,26 @@ impl eframe::App for App {
 }
 
 fn main() -> eframe::Result {
+    #[cfg(target_os = "windows")]
+    if std::env::args().nth(1).as_deref() == Some("export") {
+        #[link(name = "kernel32")]
+        unsafe extern "system" {
+            fn AttachConsole(process_id: u32) -> i32;
+        }
+        // SAFETY: attach to the invoking console if present; redirected handles
+        // are retained by Windows. A missing parent console is harmless.
+        unsafe {
+            AttachConsole(u32::MAX);
+        }
+    }
     env_logger::init();
+    if std::env::args().nth(1).as_deref() == Some("export") {
+        if let Err(error) = export_ui::cli() {
+            eprintln!("{error:#}");
+            std::process::exit(1);
+        }
+        return Ok(());
+    }
     let path = std::env::args().nth(1).map(PathBuf::from);
     eframe::run_native(
         "ActionLay",
@@ -1349,6 +1406,8 @@ fn main() -> eframe::Result {
                 .maps()
                 .configure(prefs.maps.clone().unwrap_or_default());
             let mut app = App {
+                export_dialog: None,
+                export_job: None,
                 editor: None,
                 pending_edit_action: None,
                 menus: menus::Menus::new(&cc.egui_ctx)?,

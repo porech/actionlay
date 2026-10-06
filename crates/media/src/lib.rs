@@ -3,6 +3,7 @@ pub mod audio;
 pub mod clock;
 pub mod color;
 mod error;
+pub mod export;
 pub mod ffmpeg_info;
 pub mod frame;
 pub mod gpmf;

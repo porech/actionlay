@@ -8,11 +8,11 @@ top: speed, altitude, maps, heart rate and more. You can also design the
 dashboard visually and export the result. It is free, open source, and ships
 as a single executable for Windows, macOS and Linux.
 
-> **Status: early prototype (milestones M1–M4 done).** ActionLay plays
+> **Status: early prototype (milestones M1–M5 done).** ActionLay plays
 > GoPro footage with hardware decoding and a live telemetry dashboard, including
 > maps, charts, circular instruments and a G-meter. Upstream XML layouts can be
 > imported. The M4 visual editor can create and save portable layouts,
-> with or without an open video. Video export comes next; see the
+> with or without an open video. M5 exports video or overlay-only tracks; see the
 > [roadmap](#roadmap). Expect rough edges.
 
 ## What works today
@@ -87,6 +87,14 @@ as a single executable for Windows, macOS and Linux.
   only include fonts whose licence permits redistribution. Preview background
   images are editor aids. See [the editor report](docs/m4-editor-report.md).
 
+- **Video export**: Export in the toolbar or File menu renders the selected range
+  at source resolution, with progress, ETA and cancellation. Choose video with
+  overlay, transparent overlay, or overlay on a solid colour (green by default).
+  H.264/H.265 MP4, ProRes 4444 MOV and PNG sequences are available. Video files
+  copy source audio; overlay-only and PNG output are silent. Hardware encoding
+  uses NVENC or VideoToolbox with software fallback. Export currently uses
+  eight-bit SDR decoding; see [the export report](docs/m5-export-report.md).
+
 ## Roadmap
 
 | Milestone | What you get |
@@ -96,7 +104,7 @@ as a single executable for Windows, macOS and Linux.
 | **M2** ✅ | Dashboard overlay drawn live on the video |
 | **M3** ✅ | All dashboard widgets: gauges, charts, compasses, moving and journey maps, plus a G-meter. Every widget is deeply customisable, with good defaults and a polished look when data is missing. Layouts from gopro-dashboard-overlay can be imported |
 | **M4** ✅ | Visual layout editor: add, move, resize and style widgets, with anchors that adapt to any resolution or aspect ratio. It warns you when a widget can't work with the data in your video, and layouts can be shared as files |
-| M5 | Export: the final video, or a transparent overlay-only track (ProRes 4444 / PNG) for your video editor |
+| **M5** ✅ | Export the final video, a transparent overlay (ProRes 4444 / PNG), or an overlay on a selectable solid background, green by default |
 | M6 | GPX/FIT files from bike computers and watches, other cameras (DJI, Insta360, …), and GoPro chapters joined automatically |
 | M7 | Polished releases for Windows, macOS and Linux |
 
@@ -156,10 +164,30 @@ The bar at the bottom also has the seek slider, the playback speed and some
 playback statistics: the decoder in use, the dropped frames, the
 audio/video offset and the time it takes to draw the overlay.
 
+### Export
+
+Choose **Export...** in the toolbar or **File → Export Video…**. Pick a mode,
+format and in/out range, then choose a new destination. For green screen, use
+**Overlay · solid background**; the colour picker allows any solid background.
+Transparent output uses ProRes 4444 or PNG. Cancel keeps completed frames in a
+valid partial output. Existing destinations are never overwritten.
+
+The same export pipeline is available from the command line:
+
+```text
+actionlay export --out ride.mp4 --start 5 --end 20 VIDEO.MP4
+actionlay export --mode solid --background 00FF00 --out overlay.mp4 VIDEO.MP4
+actionlay export --mode transparent --out overlay.mov VIDEO.MP4
+actionlay export --mode transparent --format png --out overlay-frames VIDEO.MP4
+```
+
+Use `--layout FILE` for a specific layout or portable package and `--software`
+for software encoding. Otherwise the remembered layout and appearance are used.
+
 ## Building from source
 
 You need Rust (the version is pinned in `rust-toolchain.toml` and installed
-automatically by rustup), Git, Make, and the tools needed to build FFmpeg:
+automatically by rustup), Git, Make, CMake, pkg-config, and the tools needed to build FFmpeg:
 `nasm` and a C compiler. On Linux you also need the `libva` and ALSA
 development headers.
 
@@ -173,7 +201,9 @@ make run ARGS="path/to/video.mp4"   # optionally open a video on launch
 The Makefile sets `FFMPEG_DIR` automatically for each command. `make build`
 builds the release binaries in `target/release/`; `make check` checks formatting
 and runs Clippy, and `make fmt` formats Rust code. Run `make help` for all commands.
-The first FFmpeg build takes a few minutes; subsequent calls reuse it.
+The first build also compiles pinned static x264/x265 encoder libraries and takes
+several minutes; subsequent calls reuse them. Windows uses a static C/C++ runtime.
+CMake must be on PATH; MSYS2 provides pkg-config through the `pkgconf` package.
 CI uses the same Makefile targets on all three platforms.
 
 To use Cargo directly, run `bash scripts/build-ffmpeg.sh`, then

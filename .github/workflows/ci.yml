@@ -35,14 +35,14 @@ jobs:
       - name: Install build tools (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install nasm
+          brew install nasm cmake pkg-config
           if [ "${{ steps.samples-cache.outputs.cache-hit }}" != "true" ]; then brew install ffmpeg; fi
 
       - name: Install build tools (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y nasm libva-dev libasound2-dev
+          sudo apt-get install -y nasm cmake pkg-config libva-dev libasound2-dev
           if [ "${{ steps.samples-cache.outputs.cache-hit }}" != "true" ]; then sudo apt-get install -y ffmpeg; fi
 
       - name: MSVC environment (Windows)
@@ -72,13 +72,13 @@ jobs:
         with:
           msystem: UCRT64
           path-type: inherit
-          install: make nasm diffutils git
+          install: make nasm diffutils git pkgconf
 
       - name: Cache FFmpeg
         uses: actions/cache@v6
         with:
           path: third_party/ffmpeg
-          key: ffmpeg-${{ matrix.target }}-${{ hashFiles('scripts/ffmpeg-version.env', 'scripts/build-ffmpeg.sh') }}
+          key: ffmpeg-${{ matrix.target }}-${{ hashFiles('scripts/ffmpeg-version.env', 'scripts/build-ffmpeg.sh', 'scripts/build-encoders.sh') }}
 
       - name: Build FFmpeg (macOS/Linux)
         if: runner.os != 'Windows'
@@ -114,7 +114,7 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ matrix.target }}-${{ hashFiles('scripts/ffmpeg-version.env', 'scripts/build-ffmpeg.sh') }}
+          key: ${{ matrix.target }}-${{ hashFiles('scripts/ffmpeg-version.env', 'scripts/build-ffmpeg.sh', 'scripts/build-encoders.sh') }}
           cache-on-failure: true
 
       - name: Synthetic samples (macOS/Linux)

@@ -15,6 +15,12 @@ fn main() {
     let mut seen = BTreeSet::new();
     let mut tokens = text.split_whitespace();
     while let Some(token) = tokens.next() {
+        // These are search paths, not libraries (in particular -libpath must
+        // not be mistaken for a Unix -l option). Dependency archives are
+        // copied beside libav* by the build script.
+        if token.starts_with("-libpath:") || token.starts_with("-L") {
+            continue;
+        }
         let directive = if token == "-framework" {
             tokens.next().map(|f| format!("framework={f}"))
         } else if let Some(lib) = token.strip_prefix("-l") {

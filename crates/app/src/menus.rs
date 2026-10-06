@@ -10,6 +10,7 @@ pub enum Command {
     SaveLayout,
     SaveLayoutAs,
     ExportLayout,
+    ExportVideo,
     ExitEditor,
     AudioSettings,
     OpenLayoutFile,
@@ -24,6 +25,7 @@ pub struct Menus {
     // Keep the native menu and its items alive for the application's lifetime.
     _menu: muda::Menu,
     close: muda::MenuItem,
+    export_video: muda::MenuItem,
     has_video: std::cell::Cell<bool>,
     editor_items: [muda::MenuItem; 4],
     edit: muda::MenuItem,
@@ -77,6 +79,7 @@ impl Menus {
             ],
         )?;
         let recent = Submenu::new("Recent Videos", true);
+        let export_video = MenuItem::with_id("export-video", "Export Video…", false, None);
         let file = Submenu::with_items(
             "File",
             true,
@@ -84,6 +87,7 @@ impl Menus {
                 &open,
                 &recent,
                 &layout,
+                &export_video,
                 &PredefinedMenuItem::separator(),
                 &close,
             ],
@@ -121,6 +125,7 @@ impl Menus {
                 "save-layout" => Command::SaveLayout,
                 "save-layout-as" => Command::SaveLayoutAs,
                 "export-layout" => Command::ExportLayout,
+                "export-video" => Command::ExportVideo,
                 "exit-editor" => Command::ExitEditor,
                 "audio-settings" => Command::AudioSettings,
                 "clear-recent-videos" => Command::ClearRecentVideos,
@@ -143,6 +148,7 @@ impl Menus {
         Ok(Self {
             _menu: menu,
             close,
+            export_video,
             has_video: std::cell::Cell::new(false),
             editor_items: [save, save_as, export, exit],
             edit,
@@ -163,6 +169,7 @@ impl Menus {
             item.set_enabled(editing);
         }
         self.edit.set_enabled(!editing);
+        self.export_video.set_enabled(has_video);
         if self.has_video.replace(has_video) != has_video {
             self.close.set_enabled(has_video);
         }
@@ -269,6 +276,7 @@ impl Menus {
                             true,
                         ),
                         ("Close Video    Ctrl+W", Command::CloseVideo, has_video),
+                        ("Export Video…", Command::ExportVideo, has_video),
                         ("Quit    Ctrl+Q", Command::Quit, true),
                     ] {
                         if ui.add_enabled(enabled, egui::Button::new(label)).clicked() {

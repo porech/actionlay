@@ -53,9 +53,19 @@ impl Drop for QuietLog {
 /// a truncated recording) is logged and the packets read so far are returned
 /// instead of an error: partial telemetry is better than none.
 pub fn read_gpmf_packets(path: &Path) -> Result<Vec<GpmfPacket>, MediaError> {
+    read_gpmf_packets_with_cancel(
+        path,
+        std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+    )
+}
+
+pub fn read_gpmf_packets_with_cancel(
+    path: &Path,
+    cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) -> Result<Vec<GpmfPacket>, MediaError> {
     ffmpeg_info::init();
     let _quiet = QuietLog::new();
-    let mut input = ffmpeg::format::input(path)?;
+    let mut input = crate::input::open(path, cancel.clone())?;
     let Some(index) = input.streams().find(is_gpmd).map(|s| s.index()) else {
         return Ok(Vec::new());
     };
@@ -80,6 +90,9 @@ pub fn read_gpmf_packets(path: &Path) -> Result<Vec<GpmfPacket>, MediaError> {
     let mut packet = ffmpeg::Packet::empty();
     let mut invalid_in_a_row = 0;
     loop {
+        if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+            break;
+        }
         match packet.read(&mut input) {
             Ok(()) => invalid_in_a_row = 0,
             Err(ffmpeg::Error::Eof) => break,

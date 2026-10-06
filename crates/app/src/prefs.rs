@@ -17,6 +17,8 @@ pub struct Appearance {
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Prefs {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub export: Option<crate::export::Settings>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audio_device: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub maps: Option<actionlay_maps::Settings>,

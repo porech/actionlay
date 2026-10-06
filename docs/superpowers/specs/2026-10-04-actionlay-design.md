@@ -220,6 +220,9 @@ Video and chapters, layout reference, GPX/FIT, sync offsets, scale mode, privacy
 - Pipeline with parallel stages: HW decoding → multi-threaded overlay render (independent frames) → compositing → encoding.
 - **Final video**: H.264/H.265 with HW encoder (VideoToolbox, NVENC/QSV/AMF, VA-API), x264/x265 fallback. Audio copied. Frame rate and resolution of the original.
 - **Overlay only**: ProRes 4444 with alpha, or PNG sequence.
+- Overlay-only output can also use a fixed, user-selectable background colour.
+  Default colour: chroma-key green (`#00FF00`). Opaque overlay output additionally
+  supports H.264/H.265 MP4. Transparent output requires ProRes 4444 or PNG.
 - Exportable range (in/out), progress with estimated time, cancellation that leaves a valid file.
 - CLI: `actionlay export --layout L --out O VIDEO…` with the same crates.
 
