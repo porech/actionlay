@@ -7,6 +7,7 @@
 mod editor;
 mod export;
 mod export_ui;
+mod integration;
 mod layouts;
 mod menus;
 mod overlay;
@@ -29,6 +30,8 @@ use overlay::{OverlayKey, OverlayRequest, OverlayWorker, Scheduler};
 use video_view::VideoView;
 
 struct App {
+    #[cfg(not(target_os = "macos"))]
+    integration: integration::Dialog,
     export_dialog: Option<export_ui::Dialog>,
     export_job: Option<export::Job>,
     editor: Option<editor::Editor>,
@@ -1038,6 +1041,8 @@ impl App {
             return;
         }
         match command {
+            #[cfg(not(target_os = "macos"))]
+            menus::Command::FileAssociations => self.integration.open = true,
             menus::Command::ExportVideo => {
                 if self.video_path.is_some()
                     && self
@@ -1500,6 +1505,14 @@ impl App {
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        #[cfg(not(target_os = "macos"))]
+        if self.integration.show(ui.ctx(), &mut self.prefs) {
+            self.save_prefs();
+        }
+        #[cfg(target_os = "macos")]
+        for path in integration::macos::take_files() {
+            self.open(path);
+        }
         self.show_export(ui.ctx());
         if ui.ctx().input(|i| i.viewport().close_requested())
             && self
@@ -1772,6 +1785,8 @@ fn main() -> eframe::Result {
         return Ok(());
     }
     let path = std::env::args().nth(1).map(PathBuf::from);
+    #[cfg(target_os = "macos")]
+    let _file_open_handler = integration::macos::install();
     eframe::run_native(
         "ActionLay",
         eframe::NativeOptions {
@@ -1803,11 +1818,15 @@ fn main() -> eframe::Result {
             layouts::apply_appearance(&mut styled, prefs.appearance.as_ref());
             let layout = Arc::new(styled);
             let ctx = cc.egui_ctx.clone();
+            #[cfg(target_os = "macos")]
+            integration::macos::attach(&ctx);
             let overlay = OverlayWorker::spawn(layout.clone(), move || ctx.request_repaint());
             overlay
                 .maps()
                 .configure(prefs.maps.clone().unwrap_or_default());
             let mut app = App {
+                #[cfg(not(target_os = "macos"))]
+                integration: integration::Dialog::startup(&prefs),
                 export_dialog: None,
                 export_job: None,
                 editor: None,

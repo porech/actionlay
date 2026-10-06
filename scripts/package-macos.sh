@@ -39,6 +39,24 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>CFBundleIconFile</key><string>ActionLay.icns</string>
 <key>LSMinimumSystemVersion</key><string>12.0</string>
 <key>NSHighResolutionCapable</key><true/>
+<key>CFBundleDocumentTypes</key><array><dict>
+<key>CFBundleTypeName</key><string>Action camera video</string>
+<key>CFBundleTypeRole</key><string>Viewer</string>
+<key>LSHandlerRank</key><string>Alternate</string>
+<key>LSItemContentTypes</key><array>
+<string>public.mpeg-4</string><string>com.apple.quicktime-movie</string>
+<string>org.actionlay.lrv-video</string><string>org.actionlay.insv-video</string>
+</array></dict></array>
+<key>UTImportedTypeDeclarations</key><array>
+<dict><key>UTTypeIdentifier</key><string>org.actionlay.lrv-video</string>
+<key>UTTypeDescription</key><string>Action camera low-resolution video</string>
+<key>UTTypeConformsTo</key><array><string>public.mpeg-4</string></array>
+<key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>lrv</string></array></dict></dict>
+<dict><key>UTTypeIdentifier</key><string>org.actionlay.insv-video</string>
+<key>UTTypeDescription</key><string>Insta360 video</string>
+<key>UTTypeConformsTo</key><array><string>public.mpeg-4</string></array>
+<key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>insv</string></array></dict></dict>
+</array>
 </dict></plist>
 PLIST
 plutil -lint "$APP/Contents/Info.plist"

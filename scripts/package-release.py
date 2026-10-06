@@ -67,7 +67,8 @@ def main():
             (stage / 'actionlay.desktop').write_text(
                 '[Desktop Entry]\nType=Application\nName=ActionLay\n'
                 'Comment=Action-camera telemetry dashboards\nExec=actionlay %f\n'
-                'Icon=actionlay\nTerminal=false\nCategories=AudioVideo;Video;\n', encoding='utf-8')
+                'Icon=actionlay\nTerminal=false\nCategories=AudioVideo;Video;\n'
+                'MimeType=video/mp4;video/quicktime;video/x-actionlay-lrv;video/x-actionlay-insv;\n', encoding='utf-8')
             destination = args.output / 'actionlay-linux-x64.tar.gz'
             with tarfile.open(destination, 'w:gz') as archive:
                 archive.add(stage, arcname='ActionLay')

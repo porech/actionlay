@@ -17,6 +17,10 @@ pub struct Appearance {
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Prefs {
     #[serde(default)]
+    pub system_integration_enabled: bool,
+    #[serde(default)]
+    pub dismiss_association_prompt: bool,
+    #[serde(default)]
     pub show_diagnostic_data: bool,
     #[serde(default)]
     pub video_sources: std::collections::BTreeMap<String, SourceSettings>,
@@ -100,6 +104,8 @@ mod tests {
     fn preset_and_appearance_survive_immediate_save() {
         let path = temp("appearance");
         let prefs = Prefs {
+            system_integration_enabled: true,
+            dismiss_association_prompt: true,
             audio_device: Some("BlackHole 2ch".into()),
             last_builtin: Some("training".into()),
             appearance: Some(Appearance {

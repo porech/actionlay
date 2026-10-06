@@ -16,6 +16,8 @@ pub enum Command {
     MapSettings,
     PrivacySettings,
     ToggleDiagnosticData,
+    #[cfg(not(target_os = "macos"))]
+    FileAssociations,
     Sources,
     OpenLayoutFile,
     OpenRecentVideo(usize),
@@ -319,6 +321,10 @@ impl Menus {
                     }
                 });
                 ui.menu_button("Settings", |ui| {
+                    if ui.button("File associations…").clicked() {
+                        command = Some(Command::FileAssociations);
+                        ui.close();
+                    }
                     let mut diagnostics = prefs.show_diagnostic_data;
                     if ui
                         .checkbox(&mut diagnostics, "Show diagnostic data")

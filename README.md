@@ -31,6 +31,15 @@ prompt; choose **More info → Run anyway** if you want to run the downloaded bu
 For upcoming changes, use the **[development release](https://github.com/porech/actionlay/releases/tag/nightly)**,
 updated after successful builds of `main`. It may contain unfinished changes.
 
+Development builds support **Open With** for `.mp4`, `.mov`, `.lrv` and `.insv`
+without changing your default player. On macOS, the application bundle declares
+these formats automatically. On Windows and Linux, use **Settings → File
+associations…** to add or remove the integration for your account. Windows also
+offers it at first launch, with a **Don't ask again** option. Keep the extracted
+application in a permanent location; launching a registered copy after moving it
+updates its path. Linux desktop menus may need a new login if the MIME/desktop
+database update tools are unavailable.
+
 ## What you can do
 
 - **View telemetry while watching footage.** GoPro GPS, speed, altitude,
