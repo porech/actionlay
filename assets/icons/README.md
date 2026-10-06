@@ -13,7 +13,9 @@ The SVG contains no embedded raster images or external references.
 
 `actionlay.svg` places the gecko on a teal application tile.
 `dmg.svg` places the same subject on an original silver disk illustration.
-The artwork is distributed under the repository's GPL-3.0-or-later licence.
+The original reference photograph, generated study, SVG artwork and all derived
+icons are distributed under the same [GPL-3.0-or-later licence](../../LICENSE)
+as ActionLay.
 
 Regenerate both compositions, PNG sizes and Windows ICO/macOS ICNS with:
 
