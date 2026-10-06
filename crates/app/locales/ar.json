@@ -519,5 +519,8 @@
   "Read-ahead (seconds)": "القراءة المسبقة (ثوانٍ)",
   "Read-ahead starts when the video opens, even while paused.": "تبدأ القراءة المسبقة عند فتح الفيديو، حتى أثناء الإيقاف المؤقت.",
   "Restore defaults": "استعادة الإعدادات الافتراضية",
-  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "هذه حدود قصوى. يحد عدد الحزم والإطارات المفكوكة أيضًا من التخزين المؤقت؛ وقد يكون إجمالي استخدام الذاكرة أكبر."
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "هذه حدود قصوى. يحد عدد الحزم والإطارات المفكوكة أيضًا من التخزين المؤقت؛ وقد يكون إجمالي استخدام الذاكرة أكبر.",
+  "Full screen": "ملء الشاشة",
+  "Exit full screen": "الخروج من ملء الشاشة",
+  "F11 · Esc to exit": "F11 · Esc للخروج"
 }

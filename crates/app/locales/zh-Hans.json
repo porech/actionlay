@@ -519,5 +519,8 @@
   "Read-ahead (seconds)": "预读（秒）",
   "Read-ahead starts when the video opens, even while paused.": "打开视频时即开始预读，即使处于暂停状态。",
   "Restore defaults": "恢复默认值",
-  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "这些是上限。数据包数量和已解码帧也会限制缓冲量；总内存使用量可能更高。"
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "这些是上限。数据包数量和已解码帧也会限制缓冲量；总内存使用量可能更高。",
+  "Full screen": "全屏",
+  "Exit full screen": "退出全屏",
+  "F11 · Esc to exit": "F11 · 按 Esc 退出"
 }

@@ -519,5 +519,8 @@
   "Read-ahead (seconds)": "Odczyt z wyprzedzeniem (sekundy)",
   "Read-ahead starts when the video opens, even while paused.": "Odczyt z wyprzedzeniem rozpoczyna się po otwarciu filmu, także podczas pauzy.",
   "Restore defaults": "Przywróć wartości domyślne",
-  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Są to górne limity. Liczba pakietów i zdekodowane klatki również ograniczają buforowanie; całkowite użycie pamięci może być większe."
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Są to górne limity. Liczba pakietów i zdekodowane klatki również ograniczają buforowanie; całkowite użycie pamięci może być większe.",
+  "Full screen": "Pełny ekran",
+  "Exit full screen": "Opuść pełny ekran",
+  "F11 · Esc to exit": "F11 · Esc, aby wyjść"
 }

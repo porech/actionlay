@@ -519,5 +519,8 @@
   "Read-ahead (seconds)": "İleri okuma (saniye)",
   "Read-ahead starts when the video opens, even while paused.": "İleri okuma, video açıldığında, duraklatılmış olsa bile başlar.",
   "Restore defaults": "Varsayılanları geri yükle",
-  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Bunlar üst sınırlardır. Paket sayısı ve çözülmüş kareler de arabelleği sınırlar; toplam bellek kullanımı daha yüksek olabilir."
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Bunlar üst sınırlardır. Paket sayısı ve çözülmüş kareler de arabelleği sınırlar; toplam bellek kullanımı daha yüksek olabilir.",
+  "Full screen": "Tam ekran",
+  "Exit full screen": "Tam ekrandan çık",
+  "F11 · Esc to exit": "F11 · Çıkmak için Esc"
 }

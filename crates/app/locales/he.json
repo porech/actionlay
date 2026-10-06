@@ -519,5 +519,8 @@
   "Read-ahead (seconds)": "קריאה מקדימה (שניות)",
   "Read-ahead starts when the video opens, even while paused.": "הקריאה המקדימה מתחילה עם פתיחת הסרטון, גם בזמן השהיה.",
   "Restore defaults": "שחזור ברירות המחדל",
-  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "אלו גבולות עליונים. מספר החבילות והפריימים המפוענחים מגבילים גם הם את המאגר; השימוש הכולל בזיכרון עשוי להיות גבוה יותר."
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "אלו גבולות עליונים. מספר החבילות והפריימים המפוענחים מגבילים גם הם את המאגר; השימוש הכולל בזיכרון עשוי להיות גבוה יותר.",
+  "Full screen": "מסך מלא",
+  "Exit full screen": "יציאה ממסך מלא",
+  "F11 · Esc to exit": "F11 · Esc ליציאה"
 }

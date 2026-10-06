@@ -519,5 +519,8 @@
   "Read-ahead (seconds)": "Forudlæsning (sekunder)",
   "Read-ahead starts when the video opens, even while paused.": "Forudlæsning starter, når videoen åbnes, også mens den er på pause.",
   "Restore defaults": "Gendan standardværdier",
-  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Dette er øvre grænser. Antallet af pakker og afkodede billeder begrænser også buffering; det samlede hukommelsesforbrug kan være højere."
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Dette er øvre grænser. Antallet af pakker og afkodede billeder begrænser også buffering; det samlede hukommelsesforbrug kan være højere.",
+  "Full screen": "Fuld skærm",
+  "Exit full screen": "Afslut fuld skærm",
+  "F11 · Esc to exit": "F11 · Esc for at afslutte"
 }

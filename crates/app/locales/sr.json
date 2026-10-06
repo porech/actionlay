@@ -519,5 +519,8 @@
   "Read-ahead (seconds)": "Читање унапред (секунде)",
   "Read-ahead starts when the video opens, even while paused.": "Читање унапред почиње при отварању видеа, чак и током паузе.",
   "Restore defaults": "Врати подразумеване вредности",
-  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "То су горње границе. Број пакета и декодирани кадрови такође ограничавају баферовање; укупна употреба меморије може бити већа."
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "То су горње границе. Број пакета и декодирани кадрови такође ограничавају баферовање; укупна употреба меморије може бити већа.",
+  "Full screen": "Цео екран",
+  "Exit full screen": "Изађи из целог екрана",
+  "F11 · Esc to exit": "F11 · Esc за излаз"
 }

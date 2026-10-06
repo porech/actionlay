@@ -519,5 +519,8 @@
   "Read-ahead (seconds)": "Leitura antecipada (segundos)",
   "Read-ahead starts when the video opens, even while paused.": "A leitura antecipada começa ao abrir o vídeo, mesmo em pausa.",
   "Restore defaults": "Restaurar predefinições",
-  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "São limites máximos. O número de pacotes e os fotogramas descodificados também limitam a memória intermédia; a utilização total de memória pode ser superior."
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "São limites máximos. O número de pacotes e os fotogramas descodificados também limitam a memória intermédia; a utilização total de memória pode ser superior.",
+  "Full screen": "Ecrã inteiro",
+  "Exit full screen": "Sair do ecrã inteiro",
+  "F11 · Esc to exit": "F11 · Esc para sair"
 }

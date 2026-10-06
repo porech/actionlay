@@ -91,8 +91,14 @@ video or coordinates shown by other widgets.
 | ⌘⇧O / Ctrl+Shift+O | Select layout |
 | ⌘W / Ctrl+W | Close video |
 | Space | Play / pause |
+| F11 or double-click the video | Toggle full screen (player only) |
+| Esc | Leave full screen |
 | → / ← | Next / previous frame |
 | O | Show / hide the overlay |
+
+In full screen, move the mouse to show playback controls; they and the pointer hide
+after three seconds of inactivity. Full screen is unavailable in the layout editor.
+The app remembers the normal window position and size, and whether it was maximized.
 
 The diagnostic line beneath the player is hidden by default. Enable
 **Settings → Interface → Show diagnostic data** to see decoder, frame and A/V statistics.

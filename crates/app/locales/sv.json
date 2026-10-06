@@ -519,5 +519,8 @@
   "Read-ahead (seconds)": "Förhandsläsning (sekunder)",
   "Read-ahead starts when the video opens, even while paused.": "Förhandsläsning börjar när videon öppnas, även i pausläge.",
   "Restore defaults": "Återställ standardvärden",
-  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Detta är övre gränser. Antalet paket och avkodade bildrutor begränsar också buffringen; den totala minnesanvändningen kan vara högre."
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Detta är övre gränser. Antalet paket och avkodade bildrutor begränsar också buffringen; den totala minnesanvändningen kan vara högre.",
+  "Full screen": "Helskärm",
+  "Exit full screen": "Lämna helskärm",
+  "F11 · Esc to exit": "F11 · Esc för att lämna"
 }

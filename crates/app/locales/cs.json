@@ -519,5 +519,8 @@
   "Read-ahead (seconds)": "Čtení dopředu (sekundy)",
   "Read-ahead starts when the video opens, even while paused.": "Čtení dopředu začíná při otevření videa, i když je pozastavené.",
   "Restore defaults": "Obnovit výchozí hodnoty",
-  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Jde o horní limity. Počet paketů a dekódované snímky také omezují ukládání do vyrovnávací paměti; celkové využití paměti může být vyšší."
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Jde o horní limity. Počet paketů a dekódované snímky také omezují ukládání do vyrovnávací paměti; celkové využití paměti může být vyšší.",
+  "Full screen": "Celá obrazovka",
+  "Exit full screen": "Ukončit celou obrazovku",
+  "F11 · Esc to exit": "F11 · Esc pro ukončení"
 }

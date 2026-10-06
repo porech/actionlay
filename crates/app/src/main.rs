@@ -17,6 +17,7 @@ mod prefs;
 mod telemetry_load;
 mod transport;
 mod video_view;
+mod window;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -32,6 +33,7 @@ use overlay::{OverlayKey, OverlayRequest, OverlayWorker, Scheduler};
 use video_view::VideoView;
 
 struct App {
+    window: window::State,
     interface: i18n::Interface,
     regional_visible: bool,
     advanced_visible: bool,
@@ -111,6 +113,7 @@ enum EditAction {
 
 impl App {
     fn begin_edit(&mut self, new: bool) {
+        self.window.set_fullscreen(&self.egui_ctx, false);
         if self.editor.is_some() {
             return;
         }
@@ -1615,29 +1618,71 @@ impl App {
 }
 
 impl eframe::App for App {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+    fn on_exit(&mut self) {
+        self.save_prefs();
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+        if self.window.capture(frame, &mut self.prefs.window) {
+            self.save_prefs();
+        }
+        ui.ctx().request_repaint_after(Duration::from_millis(500));
+        let can_fullscreen = self.player.is_some() && self.editor.is_none();
+        self.window.sync_fullscreen(frame, ui.ctx(), can_fullscreen);
+        if !can_fullscreen {
+            self.window.set_fullscreen(ui.ctx(), false);
+        }
+        if can_fullscreen {
+            let (toggle, exit) = ui.ctx().input_mut(|i| {
+                let toggle = !i.events.iter().any(|e| {
+                    matches!(
+                        e,
+                        egui::Event::Key {
+                            key: egui::Key::F11,
+                            repeat: true,
+                            ..
+                        }
+                    )
+                }) && i.consume_key(egui::Modifiers::NONE, egui::Key::F11);
+                (
+                    toggle,
+                    self.window.fullscreen
+                        && i.consume_key(egui::Modifiers::NONE, egui::Key::Escape),
+                )
+            });
+            if (toggle && !ui.ctx().egui_wants_keyboard_input()) || (exit && self.window.fullscreen)
+            {
+                self.window
+                    .set_fullscreen(ui.ctx(), !exit && !self.window.fullscreen);
+            }
+        }
+        let fullscreen = self.window.fullscreen;
+        let controls_visible =
+            !fullscreen || self.window.controls_visible(ui.ctx(), self.scrub.dragging);
         let language_changed = self.interface.refresh(&self.prefs, ui.ctx());
         if self.prefs.regional_units.is_none() {
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_secs(1));
         }
-        if advanced::show(
-            ui.ctx(),
-            &mut self.advanced_visible,
-            &mut self.prefs.buffering,
-        ) {
+        if !fullscreen
+            && advanced::show(
+                ui.ctx(),
+                &mut self.advanced_visible,
+                &mut self.prefs.buffering,
+            )
+        {
             if let Some(player) = &mut self.player {
                 player.set_buffering(self.prefs.buffering);
             }
             self.save_prefs();
         }
-        let regional_changed =
-            i18n::regional_settings(ui.ctx(), &mut self.regional_visible, &mut self.prefs);
+        let regional_changed = !fullscreen
+            && i18n::regional_settings(ui.ctx(), &mut self.regional_visible, &mut self.prefs);
         if actionlay_render::regional::configure(self.prefs.regional_units) || regional_changed {
             self.set_layout(self.base_layout.clone());
             self.save_prefs();
         }
-        let settings_changed = self.interface.show(ui.ctx(), &mut self.prefs);
+        let settings_changed = !fullscreen && self.interface.show(ui.ctx(), &mut self.prefs);
         if settings_changed {
             self.save_prefs();
         }
@@ -1650,14 +1695,16 @@ impl eframe::App for App {
             }
         }
         #[cfg(not(target_os = "macos"))]
-        if self.integration.show(ui.ctx(), &mut self.prefs) {
+        if !fullscreen && self.integration.show(ui.ctx(), &mut self.prefs) {
             self.save_prefs();
         }
         #[cfg(target_os = "macos")]
         for path in integration::macos::take_files() {
             self.open(path);
         }
-        self.show_export(ui.ctx());
+        if !fullscreen {
+            self.show_export(ui.ctx());
+        }
         if ui.ctx().input(|i| i.viewport().close_requested())
             && self
                 .export_job
@@ -1675,12 +1722,14 @@ impl eframe::App for App {
                 .send_viewport_cmd(egui::ViewportCommand::CancelClose);
             self.request_edit_action(EditAction::Command(menus::Command::Quit), ui.ctx());
         }
-        if let Some(command) = self.menus.show(
-            ui,
-            self.player.is_some(),
-            self.editor.is_some(),
-            &self.prefs,
-        ) {
+        if !fullscreen
+            && let Some(command) = self.menus.show(
+                ui,
+                self.player.is_some(),
+                self.editor.is_some(),
+                &self.prefs,
+            )
+        {
             self.command(command, ui.ctx());
         }
         let dropped: Vec<PathBuf> = ui.ctx().input(|i| {
@@ -1739,48 +1788,52 @@ impl eframe::App for App {
         let notices = self.notices();
         let mut load_sequence = false;
         let mut dismiss_chapters = false;
-        egui::Panel::bottom("transport").show(ui, |ui| {
-            let enabled = self.pending_edit_action.is_none()
-                && self.editor.as_ref().is_none_or(|e| e.video_background);
-            if let Some(p) = &mut self.player {
-                ui.add_enabled_ui(enabled, |ui| {
-                    transport::show(
-                        ui,
-                        p,
-                        &mut self.scrub,
-                        &status,
-                        self.prefs.show_diagnostic_data,
-                    )
-                });
-            }
-            if let Some(count) = self.chapter_offer {
-                ui.horizontal_wrapped(|ui| {
-                    ui.label(crate::i18n::ui_text(
+        let mut toggle_fullscreen = false;
+        if !fullscreen {
+            egui::Panel::bottom("transport").show(ui, |ui| {
+                let enabled = self.pending_edit_action.is_none()
+                    && self.editor.as_ref().is_none_or(|e| e.video_background);
+                if let Some(p) = &mut self.player {
+                    ui.add_enabled_ui(enabled, |ui| {
+                        toggle_fullscreen = transport::show(
+                            ui,
+                            p,
+                            &mut self.scrub,
+                            &status,
+                            self.prefs.show_diagnostic_data,
+                            self.editor.is_none().then_some(false),
+                        )
+                    });
+                }
+                if let Some(count) = self.chapter_offer {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(crate::i18n::ui_text(
                         ui,
                         format!(
                             "This is an intermediate GoPro chapter. {count} chapters are available."
                         ),
                     ));
-                    load_sequence = ui
-                        .add_enabled(
-                            enabled,
-                            egui::Button::new(crate::i18n::text(
-                                "Load sequence from first chapter",
-                            )),
-                        )
-                        .clicked();
-                    dismiss_chapters = ui
-                        .button(crate::i18n::ui_text(ui, "Keep this file"))
-                        .clicked();
-                });
-            }
-            if let Some(e) = &self.error {
-                ui.colored_label(egui::Color32::LIGHT_RED, crate::i18n::ui_text(ui, e));
-            }
-            if let Some(n) = &notices {
-                ui.small(crate::i18n::ui_text(ui, n));
-            }
-        });
+                        load_sequence = ui
+                            .add_enabled(
+                                enabled,
+                                egui::Button::new(crate::i18n::text(
+                                    "Load sequence from first chapter",
+                                )),
+                            )
+                            .clicked();
+                        dismiss_chapters = ui
+                            .button(crate::i18n::ui_text(ui, "Keep this file"))
+                            .clicked();
+                    });
+                }
+                if let Some(e) = &self.error {
+                    ui.colored_label(egui::Color32::LIGHT_RED, crate::i18n::ui_text(ui, e));
+                }
+                if let Some(n) = &notices {
+                    ui.small(crate::i18n::ui_text(ui, n));
+                }
+            });
+        }
         if dismiss_chapters {
             self.chapter_offer = None;
         }
@@ -1792,10 +1845,12 @@ impl eframe::App for App {
                 self.open(path);
             }
         }
-        self.audio_dialog(ui.ctx());
-        self.maps_dialog(ui.ctx());
-        self.privacy_dialog(ui.ctx());
-        self.sources_dialog(ui.ctx());
+        if !fullscreen {
+            self.audio_dialog(ui.ctx());
+            self.maps_dialog(ui.ctx());
+            self.privacy_dialog(ui.ctx());
+            self.sources_dialog(ui.ctx());
+        }
         if let Some(mut editor) = self.editor.take() {
             editor.set_maps(self.overlay.maps().clone());
             let video_size = self
@@ -1832,11 +1887,18 @@ impl eframe::App for App {
                 None => {}
             }
         } else {
-            egui::Panel::top("layout-toolbar").show(ui, |ui| {
-                self.layout_toolbar(ui);
-            });
+            if !fullscreen {
+                egui::Panel::top("layout-toolbar").show(ui, |ui| {
+                    self.layout_toolbar(ui);
+                });
+            }
             let mut open_clicked = false;
-            egui::CentralPanel::default().show(ui, |ui| {
+            let panel = if fullscreen {
+                egui::CentralPanel::default().frame(egui::Frame::NONE.fill(egui::Color32::BLACK))
+            } else {
+                egui::CentralPanel::default()
+            };
+            panel.show(ui, |ui| {
                 let rect = ui.available_rect_before_wrap();
                 if self.player.is_none() {
                     let response = ui
@@ -1873,6 +1935,16 @@ impl eframe::App for App {
                     open_clicked = response.clicked();
                     return;
                 }
+                if ui
+                    .interact(
+                        rect,
+                        egui::Id::new("video-fullscreen"),
+                        egui::Sense::click(),
+                    )
+                    .double_clicked()
+                {
+                    toggle_fullscreen = true;
+                }
                 // snapped once: the paint viewport and the overlay texture share its size
                 let video = self.view.video_rect(rect, ui.ctx().pixels_per_point());
                 if let Some(video) = video {
@@ -1885,9 +1957,37 @@ impl eframe::App for App {
                 self.command(menus::Command::OpenVideo, ui.ctx());
             }
         }
-        self.layout_chooser(ui.ctx());
-        self.import_dialog(ui.ctx());
-        self.edit_confirmation(ui.ctx());
+        if fullscreen && controls_visible {
+            egui::Area::new(egui::Id::new("fullscreen-transport"))
+                .anchor(egui::Align2::CENTER_BOTTOM, [0.0, -16.0])
+                .order(egui::Order::Foreground)
+                .show(ui.ctx(), |ui| {
+                    egui::Frame::popup(ui.style()).show(ui, |ui| {
+                        ui.set_width((ui.ctx().content_rect().width() - 48.0).max(100.0));
+                        if let Some(player) = &mut self.player {
+                            toggle_fullscreen |= transport::show(
+                                ui,
+                                player,
+                                &mut self.scrub,
+                                &status,
+                                self.prefs.show_diagnostic_data,
+                                Some(true),
+                            );
+                        }
+                    });
+                });
+        }
+        if toggle_fullscreen {
+            self.window.set_fullscreen(ui.ctx(), !fullscreen);
+        }
+        if fullscreen && !controls_visible && !toggle_fullscreen {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::None);
+        }
+        if !fullscreen {
+            self.layout_chooser(ui.ctx());
+            self.import_dialog(ui.ctx());
+            self.edit_confirmation(ui.ctx());
+        }
         if self.title_dirty {
             let title = self
                 .video_path
@@ -1947,7 +2047,7 @@ fn main() -> eframe::Result {
         "ActionLay",
         eframe::NativeOptions {
             viewport: egui::ViewportBuilder::default()
-                .with_inner_size([1200.0, 800.0])
+                .with_inner_size([960.0, 640.0])
                 .with_min_inner_size([720.0, 480.0])
                 .with_icon(
                     eframe::icon_data::from_png_bytes(include_bytes!(
@@ -1955,6 +2055,8 @@ fn main() -> eframe::Result {
                     ))
                     .expect("embedded app icon"),
                 ),
+            centered: true,
+            persist_window: false,
             ..Default::default()
         },
         Box::new(move |cc| {
@@ -1964,10 +2066,11 @@ fn main() -> eframe::Result {
                 .expect("wgpu renderer required");
             let max_texture = rs.device.limits().max_texture_dimension_2d;
             let prefs_path = prefs::default_path();
-            let prefs = prefs_path
+            let mut prefs = prefs_path
                 .as_deref()
                 .map(prefs::Prefs::load)
                 .unwrap_or_default();
+            let window = window::State::new(cc, &mut prefs.window);
             actionlay_render::regional::configure(prefs.regional_units);
             i18n::activate(prefs.language.as_deref());
             i18n::install_fonts(&cc.egui_ctx);
@@ -1984,6 +2087,7 @@ fn main() -> eframe::Result {
                 .maps()
                 .configure(prefs.maps.clone().unwrap_or_default());
             let mut app = App {
+                window,
                 interface: Default::default(),
                 regional_visible: false,
                 advanced_visible: false,

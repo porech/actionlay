@@ -519,5 +519,8 @@
   "Read-ahead (seconds)": "Read-ahead (seconds)",
   "Read-ahead starts when the video opens, even while paused.": "Read-ahead starts when the video opens, even while paused.",
   "Restore defaults": "Restore defaults",
-  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher."
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.",
+  "Full screen": "Full screen",
+  "Exit full screen": "Exit full screen",
+  "F11 · Esc to exit": "F11 · Esc to exit"
 }

@@ -74,7 +74,9 @@ pub fn show(
     scrub: &mut ScrubState,
     overlay_status: &str,
     show_diagnostics: bool,
-) {
+    fullscreen: Option<bool>,
+) -> bool {
+    let mut toggle_fullscreen = false;
     let duration = player.info().duration;
     ui.horizontal(|ui| {
         if ui
@@ -100,7 +102,8 @@ pub fn show(
         let pos = player.position();
         let mut value = if scrub.dragging { scrub.target } else { pos };
         ui.label(crate::i18n::user_text(ui, format_time(value)));
-        ui.spacing_mut().slider_width = (ui.available_width() - 260.0).max(100.0);
+        ui.spacing_mut().slider_width =
+            (ui.available_width() - if fullscreen.is_some() { 380.0 } else { 260.0 }).max(100.0);
         let response = ui.add(egui::Slider::new(&mut value, 0.0..=duration).show_value(false));
         let out = scrub_action(
             scrub,
@@ -130,13 +133,26 @@ pub fn show(
                     ui.selectable_value(&mut speed, s, crate::i18n::user_text(ui, format!("{s}x")));
                 }
             });
+        if let Some(fullscreen) = fullscreen {
+            toggle_fullscreen = ui
+                .button(crate::i18n::ui_text(
+                    ui,
+                    if fullscreen {
+                        "Exit full screen"
+                    } else {
+                        "Full screen"
+                    },
+                ))
+                .on_hover_text(crate::i18n::text("F11 · Esc to exit"))
+                .clicked();
+        }
         if speed != player.speed() {
             player.set_speed(speed);
         }
     });
 
     if !show_diagnostics {
-        return;
+        return toggle_fullscreen;
     }
     let st = player.stats();
     let v = &player.info().video;
@@ -153,6 +169,7 @@ pub fn show(
         st.av_offset
             .map_or_else(|| "n/a".to_string(), |o| format!("{:+.0} ms", o * 1000.0))
     )));
+    toggle_fullscreen
 }
 
 pub fn handle_keys(ctx: &egui::Context, player: &mut Player, scrub: &ScrubState) {

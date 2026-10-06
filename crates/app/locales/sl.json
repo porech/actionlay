@@ -519,5 +519,8 @@
   "Read-ahead (seconds)": "Branje vnaprej (sekunde)",
   "Read-ahead starts when the video opens, even while paused.": "Branje vnaprej se začne ob odprtju videa, tudi med premorom.",
   "Restore defaults": "Obnovi privzete vrednosti",
-  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "To so zgornje meje. Število paketov in dekodirane sličice prav tako omejujejo medpomnjenje; skupna poraba pomnilnika je lahko večja."
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "To so zgornje meje. Število paketov in dekodirane sličice prav tako omejujejo medpomnjenje; skupna poraba pomnilnika je lahko večja.",
+  "Full screen": "Celozaslonski način",
+  "Exit full screen": "Zapusti celozaslonski način",
+  "F11 · Esc to exit": "F11 · Esc za izhod"
 }

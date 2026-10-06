@@ -519,5 +519,8 @@
   "Read-ahead (seconds)": "Ennakkoluku (sekuntia)",
   "Read-ahead starts when the video opens, even while paused.": "Ennakkoluku alkaa videon avaamisesta, myös tauon aikana.",
   "Restore defaults": "Palauta oletusasetukset",
-  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Nämä ovat ylärajoja. Myös pakettien määrä ja puretut kuvat rajoittavat puskurointia; kokonaismuistin käyttö voi olla suurempi."
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Nämä ovat ylärajoja. Myös pakettien määrä ja puretut kuvat rajoittavat puskurointia; kokonaismuistin käyttö voi olla suurempi.",
+  "Full screen": "Koko näyttö",
+  "Exit full screen": "Poistu koko näytöstä",
+  "F11 · Esc to exit": "F11 · Esc poistuu"
 }

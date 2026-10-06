@@ -519,5 +519,8 @@
   "Read-ahead (seconds)": "Ανάγνωση εκ των προτέρων (δευτερόλεπτα)",
   "Read-ahead starts when the video opens, even while paused.": "Η ανάγνωση εκ των προτέρων ξεκινά κατά το άνοιγμα του βίντεο, ακόμη και σε παύση.",
   "Restore defaults": "Επαναφορά προεπιλογών",
-  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Αυτά είναι ανώτατα όρια. Ο αριθμός πακέτων και τα αποκωδικοποιημένα καρέ περιορίζουν επίσης την προσωρινή αποθήκευση· η συνολική χρήση μνήμης μπορεί να είναι μεγαλύτερη."
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Αυτά είναι ανώτατα όρια. Ο αριθμός πακέτων και τα αποκωδικοποιημένα καρέ περιορίζουν επίσης την προσωρινή αποθήκευση· η συνολική χρήση μνήμης μπορεί να είναι μεγαλύτερη.",
+  "Full screen": "Πλήρης οθόνη",
+  "Exit full screen": "Έξοδος από πλήρη οθόνη",
+  "F11 · Esc to exit": "F11 · Esc για έξοδο"
 }

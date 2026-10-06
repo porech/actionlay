@@ -519,5 +519,8 @@
   "Read-ahead (seconds)": "Előreolvasás (másodperc)",
   "Read-ahead starts when the video opens, even while paused.": "Az előreolvasás a videó megnyitásakor indul, szüneteltetés közben is.",
   "Restore defaults": "Alapértékek visszaállítása",
-  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Ezek felső korlátok. A csomagok száma és a dekódolt képkockák is korlátozzák a pufferelést; a teljes memóriahasználat nagyobb lehet."
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Ezek felső korlátok. A csomagok száma és a dekódolt képkockák is korlátozzák a pufferelést; a teljes memóriahasználat nagyobb lehet.",
+  "Full screen": "Teljes képernyő",
+  "Exit full screen": "Kilépés a teljes képernyőből",
+  "F11 · Esc to exit": "F11 · Esc a kilépéshez"
 }

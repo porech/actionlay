@@ -519,5 +519,8 @@
   "Read-ahead (seconds)": "미리 읽기 (초)",
   "Read-ahead starts when the video opens, even while paused.": "동영상을 열면 일시 정지 중에도 미리 읽기가 시작됩니다.",
   "Restore defaults": "기본값 복원",
-  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "이 값은 상한입니다. 패킷 수와 디코딩된 프레임도 버퍼링을 제한하며, 전체 메모리 사용량은 더 많을 수 있습니다."
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "이 값은 상한입니다. 패킷 수와 디코딩된 프레임도 버퍼링을 제한하며, 전체 메모리 사용량은 더 많을 수 있습니다.",
+  "Full screen": "전체 화면",
+  "Exit full screen": "전체 화면 종료",
+  "F11 · Esc to exit": "F11 · Esc로 종료"
 }

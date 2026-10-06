@@ -519,5 +519,8 @@
   "Read-ahead (seconds)": "Đọc trước (giây)",
   "Read-ahead starts when the video opens, even while paused.": "Đọc trước bắt đầu khi mở video, ngay cả khi đang tạm dừng.",
   "Restore defaults": "Khôi phục mặc định",
-  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Đây là giới hạn trên. Số gói và khung hình đã giải mã cũng giới hạn bộ đệm; tổng mức sử dụng bộ nhớ có thể cao hơn."
+  "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Đây là giới hạn trên. Số gói và khung hình đã giải mã cũng giới hạn bộ đệm; tổng mức sử dụng bộ nhớ có thể cao hơn.",
+  "Full screen": "Toàn màn hình",
+  "Exit full screen": "Thoát toàn màn hình",
+  "F11 · Esc to exit": "F11 · Esc để thoát"
 }

@@ -16,6 +16,8 @@ pub struct Appearance {
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Prefs {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window: Option<crate::window::Geometry>,
     #[serde(default)]
     pub buffering: actionlay_media::player::BufferingOptions,
     /// None follows regional measurement settings, independently of UI language.
@@ -119,6 +121,22 @@ fn normalize(recent: &mut Vec<PathBuf>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn normal_geometry_and_maximized_state_survive_restart() {
+        let path = temp("window");
+        let prefs = Prefs {
+            window: Some(crate::window::Geometry {
+                position: Some([-1700, 130]),
+                size: [1000.0, 650.0],
+                maximized: true,
+            }),
+            ..Default::default()
+        };
+        prefs.save(&path).unwrap();
+        assert_eq!(Prefs::load(&path), prefs);
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
 
     #[test]
     fn buffering_preferences_round_trip_and_normalize_unsafe_limits() {
