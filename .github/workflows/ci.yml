@@ -298,7 +298,7 @@ jobs:
           name: actionlay-x86_64-unknown-linux-gnu
           path: binaries
       - name: Install native packaging tools
-        run: sudo apt-get update && sudo apt-get install -y rpm desktop-file-utils shared-mime-info libasound2 libva2 libva-drm2
+        run: sudo apt-get update && sudo apt-get install -y rpm desktop-file-utils shared-mime-info libglib2.0-bin libasound2 libva2 libva-drm2
       - name: Build DEB and RPM packages
         run: python3 scripts/package-linux.py --binaries binaries --output dist
       - name: Verify package contents and DEB installation
@@ -307,7 +307,16 @@ jobs:
           desktop-file-validate /usr/share/applications/org.ActionLay.ActionLay.desktop
           actionlay-telemetry --version
           cp crates/app/tests/fixtures/export-source.mp4 /tmp/actionlay-test.lrv
-          test "$(xdg-mime query filetype /tmp/actionlay-test.lrv)" = video/x-actionlay-lrv
+          # Desktop detectors may identify the MP4 container rather than its
+          # camera-specific subtype. ActionLay must be offered for both.
+          detected="$(xdg-mime query filetype /tmp/actionlay-test.lrv)"
+          echo "LRV detected as: $detected"
+          case "$detected" in video/x-actionlay-lrv|video/mp4) ;; *) exit 1 ;; esac
+          for mime in video/mp4 video/quicktime video/x-actionlay-lrv video/x-actionlay-insv; do
+            gio mime "$mime" | grep -F org.ActionLay.ActionLay.desktop
+          done
+          grep -F 'video/x-actionlay-lrv:*.lrv' /usr/share/mime/globs2
+          grep -F 'video/x-actionlay-insv:*.insv' /usr/share/mime/globs2
           rpm -qpl dist/*.rpm | grep -Fx /usr/bin/actionlay
           sudo dpkg -r actionlay
           test ! -e /usr/share/applications/org.ActionLay.ActionLay.desktop
