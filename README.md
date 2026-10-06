@@ -12,13 +12,15 @@ or a separate overlay for your video editor. Free and open source.
 
 ## Download
 
-**[Download the latest stable release](https://github.com/porech/actionlay/releases/latest)** — no GitHub account required.
-
 | System | Download | Install |
 |---|---|---|
 | macOS 12+, Apple Silicon **and Intel** | [Universal DMG](https://github.com/porech/actionlay/releases/latest/download/actionlay-macos-universal.dmg) | Open the DMG and drag ActionLay to Applications |
-| Windows 10/11, 64-bit | [Windows ZIP](https://github.com/porech/actionlay/releases/latest/download/actionlay-windows-x64.zip) | Extract the ZIP and run `actionlay.exe` |
-| Linux, 64-bit | [Linux tar.gz](https://github.com/porech/actionlay/releases/latest/download/actionlay-linux-x64.tar.gz) | Extract the archive and run `./actionlay` |
+| Windows 10/11, 64-bit | [Windows installer](https://github.com/porech/actionlay/releases/latest/download/actionlay-windows-x64-setup.exe) | Choose installation for yourself or everyone; desktop shortcut optional |
+| Linux, 64-bit | [Package repositories and setup instructions](https://porech.github.io/actionlay/) | Add the APT or DNF repository, then install `actionlay` |
+
+The **[latest release](https://github.com/porech/actionlay/releases/latest)** also
+includes standalone Windows/Linux builds, individual DEB/RPM packages, the
+telemetry CLI and checksums. No GitHub account is required.
 
 FFmpeg is included. Linux builds target Ubuntu 22.04 or newer and require ALSA,
 VA-API and a working graphics driver. `SHA256SUMS` is available in each release.
@@ -31,12 +33,9 @@ prompt; choose **More info → Run anyway** if you want to run the downloaded bu
 For upcoming changes, use the **[development release](https://github.com/porech/actionlay/releases/tag/nightly)**,
 updated after successful builds of `main`. It may contain unfinished changes.
 
-Development builds also include a [Windows installer](https://github.com/porech/actionlay/releases/download/nightly/actionlay-windows-x64-setup.exe)
-and [signed Linux package repositories](https://porech.github.io/actionlay/).
 The Windows installer supports per-user or all-user installation, upgrades,
-uninstall from Windows Apps, and an optional desktop shortcut. Linux packages
+and uninstall from Windows Apps. Linux packages
 are available for APT (Ubuntu/Mint/Debian) and DNF (Fedora-compatible systems).
-Stable repositories become available with the next release containing native packages.
 
 **Open With** supports `.mp4`, `.mov`, `.lrv` and `.insv` without changing your
 default player. On macOS, the bundle declares these formats automatically and

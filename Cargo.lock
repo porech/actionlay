@@ -128,7 +128,7 @@ dependencies = [
 
 [[package]]
 name = "actionlay-app"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "actionlay-layout",
  "actionlay-maps",
@@ -161,7 +161,7 @@ dependencies = [
 
 [[package]]
 name = "actionlay-layout"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "chrono",
  "jsonschema",
@@ -176,7 +176,7 @@ dependencies = [
 
 [[package]]
 name = "actionlay-maps"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "directories",
  "reqwest",
@@ -186,7 +186,7 @@ dependencies = [
 
 [[package]]
 name = "actionlay-media"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "cpal",
@@ -199,7 +199,7 @@ dependencies = [
 
 [[package]]
 name = "actionlay-render"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "actionlay-layout",
  "actionlay-maps",
@@ -215,7 +215,7 @@ dependencies = [
 
 [[package]]
 name = "actionlay-telemetry"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "actionlay-media",
  "chrono",
@@ -229,7 +229,7 @@ dependencies = [
 
 [[package]]
 name = "actionlay-telemetry-cli"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "actionlay-media",
  "actionlay-telemetry",

@@ -1,18 +1,18 @@
-ActionLay 1.0.0 adds telemetry dashboards to action-camera footage and lets you design and export your own overlays.
+ActionLay 1.0.1 makes installation and updates easier on Windows, macOS and Linux.
 
-- GoPro telemetry, automatic chapter sequences, and linked GPX/FIT activities.
-- Native DJI/Insta360 telemetry where supported by telemetry-parser.
-- Visual layout editor, portable layouts with assets/fonts, and imported upstream XML dashboards.
-- Configurable maps, route colours/orientation and global privacy zones.
-- Video export, transparent ProRes/PNG overlays, and solid-colour backgrounds.
-- Optional diagnostic data beneath the player, hidden by default.
-- A gecko icon illustrated from the project owner's photographs.
+- Windows installer built with Inno Setup: per-user or all-users installation, optional desktop shortcut, Start Menu entry, upgrades and uninstall from Windows Apps.
+- Signed APT and DNF repositories, with native DEB/RPM packages and application-menu entries.
+- Universal macOS DMG with a branded drag-to-Applications window.
+- Open With support for MP4, MOV, LRV and INSV on all desktop platforms. Installer/package registrations are detected automatically; default players are preserved.
+- macOS opens files passed by Finder both at startup and while ActionLay is running.
 
 Download the package for your system:
 
 - **macOS 12+**, Apple Silicon and Intel: open `actionlay-macos-universal.dmg`, then drag ActionLay to Applications.
-- **Windows 10/11 x64**: extract `actionlay-windows-x64.zip` and run `actionlay.exe`.
-- **Linux x64** (Ubuntu 22.04 or newer): extract `actionlay-linux-x64.tar.gz` and run `./actionlay`. ALSA, VA-API and a working graphics driver are required.
+- **Windows 10/11 x64**: run `actionlay-windows-x64-setup.exe`.
+- **Linux x64**: follow the [APT/DNF repository instructions](https://porech.github.io/actionlay/). Ubuntu 22.04+, Mint 21+, Debian 12+ and Fedora-compatible systems with glibc 2.35+ are supported. A working graphics driver is required.
+
+Standalone Windows ZIP and Linux tar.gz builds, individual DEB/RPM packages, source archives and `SHA256SUMS` are also attached to this release.
 
 The telemetry CLI is included. On macOS it is inside `ActionLay.app/Contents/MacOS/`.
 
