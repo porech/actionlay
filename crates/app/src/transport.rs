@@ -68,7 +68,13 @@ pub fn format_time(seconds: f64) -> String {
 const SPEEDS: [f64; 6] = [0.25, 0.5, 1.0, 1.5, 2.0, 4.0];
 
 /// `overlay_status` ends the stats line (e.g. `overlay 4.2 ms`).
-pub fn show(ui: &mut egui::Ui, player: &mut Player, scrub: &mut ScrubState, overlay_status: &str) {
+pub fn show(
+    ui: &mut egui::Ui,
+    player: &mut Player,
+    scrub: &mut ScrubState,
+    overlay_status: &str,
+    show_diagnostics: bool,
+) {
     let duration = player.info().duration;
     ui.horizontal(|ui| {
         if ui
@@ -126,6 +132,9 @@ pub fn show(ui: &mut egui::Ui, player: &mut Player, scrub: &mut ScrubState, over
         }
     });
 
+    if !show_diagnostics {
+        return;
+    }
     let st = player.stats();
     let v = &player.info().video;
     ui.small(format!(

@@ -15,6 +15,7 @@ pub enum Command {
     AudioSettings,
     MapSettings,
     PrivacySettings,
+    ToggleDiagnosticData,
     Sources,
     OpenLayoutFile,
     OpenRecentVideo(usize),
@@ -29,6 +30,7 @@ pub struct Menus {
     _menu: muda::Menu,
     close: muda::MenuItem,
     export_video: muda::MenuItem,
+    diagnostics: muda::CheckMenuItem,
     has_video: std::cell::Cell<bool>,
     editor_items: [muda::MenuItem; 4],
     edit: muda::MenuItem,
@@ -100,7 +102,24 @@ impl Menus {
         let sources = MenuItem::with_id("sources", "Video sources…", true, None);
         file.append(&sources)?;
         let privacy = MenuItem::with_id("privacy-settings", "Privacy zones…", true, None);
-        let settings = Submenu::with_items("Settings", true, &[&audio, &maps, &privacy])?;
+        let diagnostics = muda::CheckMenuItem::with_id(
+            "show-diagnostic-data",
+            "Show diagnostic data",
+            true,
+            false,
+            None,
+        );
+        let settings = Submenu::with_items(
+            "Settings",
+            true,
+            &[
+                &audio,
+                &maps,
+                &privacy,
+                &PredefinedMenuItem::separator(),
+                &diagnostics,
+            ],
+        )?;
         let new = MenuItem::with_id("new-layout", "New Layout…", true, key(Code::KeyN, false));
         let edit = MenuItem::with_id("edit-layout", "Edit Layout", true, key(Code::KeyE, false));
         let save = MenuItem::with_id("save-layout", "Save", false, key(Code::KeyS, false));
@@ -137,6 +156,7 @@ impl Menus {
                 "audio-settings" => Command::AudioSettings,
                 "map-settings" => Command::MapSettings,
                 "privacy-settings" => Command::PrivacySettings,
+                "show-diagnostic-data" => Command::ToggleDiagnosticData,
                 "sources" => Command::Sources,
                 "clear-recent-videos" => Command::ClearRecentVideos,
                 "close-video" => Command::CloseVideo,
@@ -159,6 +179,7 @@ impl Menus {
             _menu: menu,
             close,
             export_video,
+            diagnostics,
             has_video: std::cell::Cell::new(false),
             editor_items: [save, save_as, export, exit],
             edit,
@@ -179,6 +200,7 @@ impl Menus {
             item.set_enabled(editing);
         }
         self.edit.set_enabled(!editing);
+        self.diagnostics.set_checked(prefs.show_diagnostic_data);
         self.export_video.set_enabled(has_video);
         if self.has_video.replace(has_video) != has_video {
             self.close.set_enabled(has_video);
@@ -297,6 +319,15 @@ impl Menus {
                     }
                 });
                 ui.menu_button("Settings", |ui| {
+                    let mut diagnostics = prefs.show_diagnostic_data;
+                    if ui
+                        .checkbox(&mut diagnostics, "Show diagnostic data")
+                        .changed()
+                    {
+                        command = Some(Command::ToggleDiagnosticData);
+                        ui.close();
+                    }
+                    ui.separator();
                     if ui.button("Privacy zones…").clicked() {
                         command = Some(Command::PrivacySettings);
                         ui.close();

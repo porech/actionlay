@@ -1068,6 +1068,10 @@ impl App {
             menus::Command::SelectLayout => self.select_layout = true,
             menus::Command::MapSettings => self.select_maps = true,
             menus::Command::PrivacySettings => self.select_privacy = true,
+            menus::Command::ToggleDiagnosticData => {
+                self.prefs.show_diagnostic_data = !self.prefs.show_diagnostic_data;
+                self.save_prefs();
+            }
             menus::Command::Sources => self.select_sources = self.player.is_some(),
             menus::Command::AudioSettings => {
                 match actionlay_media::audio::AudioOutput::devices() {
@@ -1583,7 +1587,13 @@ impl eframe::App for App {
                 && self.editor.as_ref().is_none_or(|e| e.video_background);
             if let Some(p) = &mut self.player {
                 ui.add_enabled_ui(enabled, |ui| {
-                    transport::show(ui, p, &mut self.scrub, &status)
+                    transport::show(
+                        ui,
+                        p,
+                        &mut self.scrub,
+                        &status,
+                        self.prefs.show_diagnostic_data,
+                    )
                 });
             }
             if let Some(count) = self.chapter_offer {

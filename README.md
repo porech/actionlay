@@ -77,6 +77,9 @@ video or coordinates shown by other widgets.
 | → / ← | Next / previous frame |
 | O | Show / hide the overlay |
 
+The diagnostic line beneath the player is hidden by default. Enable
+**Settings → Show diagnostic data** to see decoder, frame and A/V statistics.
+
 ### Export
 
 Choose **Export…** in the toolbar or **File → Export Video…**. Select the mode,

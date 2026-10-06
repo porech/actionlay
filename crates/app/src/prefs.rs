@@ -17,6 +17,8 @@ pub struct Appearance {
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Prefs {
     #[serde(default)]
+    pub show_diagnostic_data: bool,
+    #[serde(default)]
     pub video_sources: std::collections::BTreeMap<String, SourceSettings>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub export: Option<crate::export::Settings>,

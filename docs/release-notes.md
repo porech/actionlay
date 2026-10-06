@@ -5,6 +5,7 @@ ActionLay 1.0.0 adds telemetry dashboards to action-camera footage and lets you 
 - Visual layout editor, portable layouts with assets/fonts, and imported upstream XML dashboards.
 - Configurable maps, route colours/orientation and global privacy zones.
 - Video export, transparent ProRes/PNG overlays, and solid-colour backgrounds.
+- Optional diagnostic data beneath the player, hidden by default.
 - A gecko icon illustrated from the project owner's photographs.
 
 Download the package for your system:
