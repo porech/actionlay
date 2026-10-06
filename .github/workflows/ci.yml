@@ -27,7 +27,7 @@ jobs:
             target: x86_64-unknown-linux-gnu
     runs-on: ${{ matrix.os }}
     env:
-      MACOSX_DEPLOYMENT_TARGET: "13.0"
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
     defaults:
       run:
         shell: bash
@@ -230,6 +230,16 @@ jobs:
         if: runner.os == 'Windows'
         run: python scripts/verify-windows-resources.py target/release/actionlay.exe
 
+      - name: Package pinned dependency sources
+        if: runner.os == 'Linux'
+        run: python3 scripts/package-sources.py
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Linux'
+        with:
+          name: third-party-sources
+          path: dist/third-party-sources.tar.gz
+          if-no-files-found: error
+
       - name: Upload binaries
         uses: actions/upload-artifact@v7
         with:
@@ -259,10 +269,14 @@ jobs:
         run: |
           python3 scripts/package-release.py --target windows --binaries binaries/actionlay-x86_64-pc-windows-msvc --output dist
           python3 scripts/package-release.py --target linux --binaries binaries/actionlay-x86_64-unknown-linux-gnu --output dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: third-party-sources
+          path: dist
       - name: Checksums
         run: |
           cd dist
-          shasum -a 256 actionlay-* > SHA256SUMS
+          shasum -a 256 actionlay-* third-party-sources.tar.gz > SHA256SUMS
       - uses: actions/upload-artifact@v7
         with:
           name: release-packages

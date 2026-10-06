@@ -157,8 +157,11 @@ impl Activity {
     }
 
     pub fn from_fit(mut reader: impl std::io::Read) -> Result<Self, ExternalError> {
-        let mut records =
-            fitparser::from_reader(&mut reader).map_err(|e| ExternalError::Read(e.to_string()))?;
+        let mut records = fitparser::de::from_reader_with_options(
+            &mut reader,
+            &std::collections::HashSet::from([fitparser::de::DecodeOption::KeepCompositeFields]),
+        )
+        .map_err(|e| ExternalError::Read(e.to_string()))?;
         // FIT messages may be grouped by type rather than chronological order.
         // Apply state-changing events before sensor records at the same time.
         records.sort_by_key(|record| {
@@ -219,6 +222,25 @@ impl Activity {
             let mut values = gears.clone();
             let mut utc = None;
             for field in record.fields() {
+                // fitparser emits synthetic enhanced aliases alongside explicit
+                // enhanced fields, then sorts both under the same field number.
+                // Retaining composites identifies aliases by their legacy value;
+                // discard that value only when a distinct enhanced value exists.
+                let legacy_name = match field.name() {
+                    "enhanced_speed" => Some("speed"),
+                    "enhanced_altitude" => Some("altitude"),
+                    _ => None,
+                };
+                let generated_alias = legacy_name.is_some_and(|legacy| {
+                    record.fields().iter().any(|candidate| {
+                        candidate.name() == legacy && candidate.value() == field.value()
+                    }) && record.fields().iter().any(|candidate| {
+                        candidate.name() == field.name() && candidate.value() != field.value()
+                    })
+                });
+                if generated_alias {
+                    continue;
+                }
                 if field.name() == "timestamp"
                     && let fitparser::Value::Timestamp(t) = field.value()
                 {

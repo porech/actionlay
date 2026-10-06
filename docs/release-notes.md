@@ -9,7 +9,7 @@ ActionLay 1.0.0 adds telemetry dashboards to action-camera footage and lets you 
 
 Download the package for your system:
 
-- **macOS 13+**, Apple Silicon and Intel: open `actionlay-macos-universal.dmg`, then drag ActionLay to Applications.
+- **macOS 12+**, Apple Silicon and Intel: open `actionlay-macos-universal.dmg`, then drag ActionLay to Applications.
 - **Windows 10/11 x64**: extract `actionlay-windows-x64.zip` and run `actionlay.exe`.
 - **Linux x64** (Ubuntu 22.04 or newer): extract `actionlay-linux-x64.tar.gz` and run `./actionlay`. ALSA, VA-API and a working graphics driver are required.
 

@@ -8,7 +8,7 @@ TARGET="${1:-$(rustc -vV | sed -n 's/^host: //p')}"
 PREFIX="$ROOT/third_party/ffmpeg/$TARGET"
 SRC="$ROOT/third_party/src/ffmpeg-$FFMPEG_TAG"
 
-if [ -f "$PREFIX/export-v3-static" ]; then
+if [ -f "$PREFIX/export-v4-static" ]; then
   echo "FFmpeg already built in $PREFIX"
   exit 0
 fi
@@ -70,7 +70,10 @@ esac
 
 cd "$SRC"
 make distclean >/dev/null 2>&1 || true
-./configure "${COMMON[@]}" "${PLATFORM[@]}"
+if ! ./configure "${COMMON[@]}" "${PLATFORM[@]}"; then
+  tail -n 150 ffbuild/config.log >&2
+  exit 1
+fi
 make -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
 make install
 
@@ -93,6 +96,6 @@ shopt -s nullglob
 archives=("$ENCODERS"/lib/*.a "$ENCODERS"/lib/*.lib)
 if [ "${#archives[@]}" = 0 ]; then echo "Missing static encoder archives" >&2; exit 1; fi
 cp "${archives[@]}" "$PREFIX/lib/"
-touch "$PREFIX/export-v3-static"
+touch "$PREFIX/export-v4-static"
 
 echo "FFmpeg $FFMPEG_TAG installed in $PREFIX"

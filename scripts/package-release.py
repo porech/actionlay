@@ -24,7 +24,8 @@ def notices(destination):
         f'Complete ActionLay source and build scripts:\nhttps://github.com/porech/actionlay/tree/{sha}\n'
         f'https://github.com/porech/actionlay/archive/{sha}.tar.gz\n\n'
         'ActionLay is GPL-3.0-or-later. FFmpeg is built with GPL enabled, never nonfree.\n'
-        'The pinned FFmpeg, x264 and x265 source revisions and download locations\n'
+        'The release includes third-party-sources.tar.gz with the exact FFmpeg/x264/x265 sources.\n'
+        'Their source revisions and download locations\n'
         'are in scripts/ffmpeg-version.env, scripts/build-ffmpeg.sh and scripts/build-encoders.sh.\n'
         'The Rust dependency versions are pinned in Cargo.lock. Roboto is Apache-2.0;\n'
         'Tabler icons are MIT. Their notices are included alongside this file.\n', encoding='utf-8')

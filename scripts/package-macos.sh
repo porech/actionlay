@@ -37,7 +37,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>CFBundleShortVersionString</key><string>$VERSION</string>
 <key>CFBundleVersion</key><string>$BUILD</string>
 <key>CFBundleIconFile</key><string>ActionLay.icns</string>
-<key>LSMinimumSystemVersion</key><string>13.0</string>
+<key>LSMinimumSystemVersion</key><string>12.0</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST

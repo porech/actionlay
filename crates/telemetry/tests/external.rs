@@ -105,7 +105,7 @@ fn crc(bytes: &[u8]) -> u16 {
     }
     crc
 }
-fn fit() -> Vec<u8> {
+fn fit(enhanced_speed: u32, enhanced_altitude: u32) -> Vec<u8> {
     // A little-endian FIT record definition, then two one-second records.
     let fields = [
         (253, 4, 0x86),
@@ -118,6 +118,7 @@ fn fit() -> Vec<u8> {
         (7, 2, 0x84),
         (13, 1, 1),
         (73, 4, 0x86),
+        (78, 4, 0x86),
     ];
     let mut data = vec![0x40, 0, 0, 20, 0, fields.len() as u8];
     for (n, size, kind) in fields {
@@ -133,7 +134,8 @@ fn fit() -> Vec<u8> {
         data.extend(5000u16.to_le_bytes()); // 5 m/s, overridden by enhanced speed
         data.extend(250u16.to_le_bytes());
         data.push((-5i8) as u8);
-        data.extend(6000u32.to_le_bytes()); // 6 m/s
+        data.extend(enhanced_speed.to_le_bytes());
+        data.extend(enhanced_altitude.to_le_bytes());
     }
     let mut out = vec![12, 0x20, 0, 0];
     out.extend((data.len() as u32).to_le_bytes());
@@ -144,21 +146,31 @@ fn fit() -> Vec<u8> {
 }
 #[test]
 fn fit_scaling_enhanced_fields_temperature_and_crc_validation() {
-    let mut bytes = fit();
-    let a = Activity::from_fit(Cursor::new(&bytes)).unwrap();
-    let tel = a.standalone();
-    let s = tel.sample(0.0);
-    for (m, v) in [
-        (Metric::Lat, 45.0),
-        (Metric::Lon, -22.5),
-        (Metric::Alt, 100.0),
-        (Metric::Speed, 6.0),
-        (Metric::Hr, 120.0),
-        (Metric::Cadence, 80.0),
-        (Metric::Power, 250.0),
-        (Metric::Temp, -5.0),
-    ] {
-        assert_eq!(s.get(m), Value::Present(v), "{m:?}");
+    let mut bytes = fit(6000, 3500);
+    for _ in 0..32 {
+        let a = Activity::from_fit(Cursor::new(&bytes)).unwrap();
+        let tel = a.standalone();
+        let s = tel.sample(0.0);
+        for (m, v) in [
+            (Metric::Lat, 45.0),
+            (Metric::Lon, -22.5),
+            (Metric::Alt, 200.0),
+            (Metric::Speed, 6.0),
+            (Metric::Hr, 120.0),
+            (Metric::Cadence, 80.0),
+            (Metric::Power, 250.0),
+            (Metric::Temp, -5.0),
+        ] {
+            assert_eq!(s.get(m), Value::Present(v), "{m:?}");
+        }
+    }
+    // Enhanced values must also win when smaller than their legacy aliases.
+    for _ in 0..32 {
+        let a = Activity::from_fit(Cursor::new(fit(4000, 2750))).unwrap();
+        let tel = a.standalone();
+        let sample = tel.sample(0.0);
+        assert_eq!(sample.get(Metric::Speed), Value::Present(4.0));
+        assert_eq!(sample.get(Metric::Alt), Value::Present(50.0));
     }
     bytes[20] ^= 1;
     assert!(Activity::from_fit(Cursor::new(&bytes)).is_err());

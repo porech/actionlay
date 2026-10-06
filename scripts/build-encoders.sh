@@ -6,7 +6,7 @@ TARGET="${1:?Rust target required}"
 PREFIX="$ROOT/third_party/encoders/$TARGET"
 X264_REV=c24e06c2e184345ceb33eb20a15d1024d9fd3497
 X265_REV=07295ba7ab551bb9c1580fdaee3200f1b45711b7
-if [ -f "$PREFIX/static-v3" ]; then exit 0; fi
+if [ -f "$PREFIX/static-v4" ]; then exit 0; fi
 mkdir -p "$ROOT/third_party/src" "$PREFIX"
 for name in x264 x265; do
   if [ ! -d "$ROOT/third_party/src/$name/.git" ]; then
@@ -21,6 +21,7 @@ git -C "$ROOT/third_party/src/x265" checkout "$X265_REV"
 # NEW works with both CMake 3 and 4; keep the source revision pinned.
 sed -i.bak -e 's/cmake_policy(SET CMP0025 OLD)/cmake_policy(SET CMP0025 NEW)/' \
   -e 's/cmake_policy(SET CMP0054 OLD)/cmake_policy(SET CMP0054 NEW)/' \
+  -e 's/STREQUAL "Clang"/MATCHES "Clang"/' \
   "$ROOT/third_party/src/x265/source/CMakeLists.txt"
 JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
 cd "$ROOT/third_party/src/x264"
@@ -47,4 +48,4 @@ if [[ "$TARGET" = *windows-msvc ]]; then
   [ ! -f "$PREFIX/lib/libx264.lib" ] || cp "$PREFIX/lib/libx264.lib" "$PREFIX/lib/x264.lib"
   [ ! -f "$PREFIX/lib/x265-static.lib" ] || cp "$PREFIX/lib/x265-static.lib" "$PREFIX/lib/x265.lib"
 fi
-touch "$PREFIX/static-v3"
+touch "$PREFIX/static-v4"

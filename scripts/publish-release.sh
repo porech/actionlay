@@ -27,7 +27,7 @@ Development build from commit [$GITHUB_SHA](https://github.com/$GITHUB_REPOSITOR
 Updated after successful builds of main. This prerelease can contain unfinished changes.
 For regular use, download the [latest stable release](https://github.com/$GITHUB_REPOSITORY/releases/latest).
 
-macOS: universal DMG for Apple Silicon and Intel, macOS 13 or newer.
+macOS: universal DMG for Apple Silicon and Intel, macOS 12 or newer.
 Windows: extract the ZIP and run actionlay.exe. Linux: extract the tar.gz and run actionlay.
 Builds are not signed by an identified publisher or Apple-notarized.
 NOTES

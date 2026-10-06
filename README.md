@@ -16,7 +16,7 @@ or a separate overlay for your video editor. Free and open source.
 
 | System | Download | Install |
 |---|---|---|
-| macOS 13+, Apple Silicon **and Intel** | [Universal DMG](https://github.com/porech/actionlay/releases/latest/download/actionlay-macos-universal.dmg) | Open the DMG and drag ActionLay to Applications |
+| macOS 12+, Apple Silicon **and Intel** | [Universal DMG](https://github.com/porech/actionlay/releases/latest/download/actionlay-macos-universal.dmg) | Open the DMG and drag ActionLay to Applications |
 | Windows 10/11, 64-bit | [Windows ZIP](https://github.com/porech/actionlay/releases/latest/download/actionlay-windows-x64.zip) | Extract the ZIP and run `actionlay.exe` |
 | Linux, 64-bit | [Linux tar.gz](https://github.com/porech/actionlay/releases/latest/download/actionlay-linux-x64.tar.gz) | Extract the archive and run `./actionlay` |
 
@@ -103,7 +103,7 @@ actionlay export --out ride.mp4 --start 5 --end 20 GX010123.MP4
 actionlay export --mode transparent --out overlay.mov GX010123.MP4
 ```
 
-Run each tool with `--help` for options. See [building from source](docs/building.md)
+Use `actionlay-telemetry --help` or `actionlay export --help` for options. See [building from source](docs/building.md)
 for development and [release packaging](docs/releasing.md) for maintainers.
 
 ## Credits and licence
@@ -114,4 +114,5 @@ The gecko icon is illustrated from the project owner's photographs.
 
 ActionLay is [GPL-3.0-or-later](LICENSE). The binaries include GPL-enabled FFmpeg,
 x264 and x265. Source revisions and build scripts are included in the repository;
-licence notices and source links accompany the downloads.
+licence notices and source links accompany the downloads. Each release also
+includes the exact FFmpeg/x264/x265 sources in `third-party-sources.tar.gz`.

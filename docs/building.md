@@ -24,7 +24,7 @@ To use Cargo directly, run `bash scripts/build-ffmpeg.sh`, then
 `source scripts/env.sh` in your terminal before running Cargo commands.
 
 On Windows, build FFmpeg from an MSYS2 shell that inherits the Visual Studio
-environment. The exact steps are in [.github/workflows/ci.yml](.github/workflows/ci.yml).
+environment. The exact steps are in [.github/workflows/ci.yml](../.github/workflows/ci.yml).
 
 To run the tests, first generate the synthetic sample videos. This needs an
 `ffmpeg` command with libx264 and libx265:

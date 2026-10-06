@@ -1,7 +1,7 @@
 # Releases
 
 CI tests and builds Windows x64, Linux x64, macOS ARM64 and macOS Intel.
-Both Mac builds use a macOS 13 deployment target. Native builds are merged with
+Both Mac builds use a macOS 12 deployment target. Native builds are merged with
 `lipo` into universal `actionlay` and `actionlay-telemetry` executables in
 `ActionLay.app`, then packaged in a compressed DMG with an Applications shortcut.
 
@@ -15,6 +15,8 @@ describes the architecture merge. Native runners use the documented
 [GitHub macOS runner architectures](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 
 All packages contain licence notices and a link to their exact build source.
+Each release also includes `third-party-sources.tar.gz` containing the pristine
+pinned FFmpeg/x264/x265 trees and the matching build/compatibility scripts.
 The build job's artifacts are intermediate inputs; downloads are published as
 GitHub Release assets once **all** builds and packaging checks succeed.
 
