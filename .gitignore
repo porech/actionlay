@@ -7,3 +7,5 @@
 .DS_Store
 /.superpowers/
 /third_party/
+
+/dist/

@@ -35,16 +35,16 @@ fn touch(dir: &Path, name: &str) -> PathBuf {
 #[test]
 fn discovery_is_ordered_conservative_and_handles_legacy_names() {
     let d = Temp::new();
-    let a = touch(&d.0, "GX013370.MP4");
-    let b = touch(&d.0, "GX023370.MP4");
-    touch(&d.0, "GX013371.MP4");
+    let a = touch(&d.0, "GX014821.MP4");
+    let b = touch(&d.0, "GX024821.MP4");
+    touch(&d.0, "GX014822.MP4");
     assert_eq!(discover(&b), vec![a.clone(), b.clone()]);
     assert!(is_first_chapter(&a));
     assert!(!is_first_chapter(&b));
-    let c = touch(&d.0, "GX043370.MP4");
+    let c = touch(&d.0, "GX044821.MP4");
     assert_eq!(discover(&a), vec![a.clone()]);
     std::fs::remove_file(c).unwrap();
-    touch(&d.0, "gx013370.mp4"); // duplicate chapter is ambiguous
+    touch(&d.0, "gx014821.mp4"); // duplicate chapter is ambiguous
     if std::fs::read_dir(&d.0).unwrap().count() > 3 {
         assert_eq!(discover(&a), vec![a]);
     }

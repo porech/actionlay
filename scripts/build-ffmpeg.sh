@@ -8,7 +8,7 @@ TARGET="${1:-$(rustc -vV | sed -n 's/^host: //p')}"
 PREFIX="$ROOT/third_party/ffmpeg/$TARGET"
 SRC="$ROOT/third_party/src/ffmpeg-$FFMPEG_TAG"
 
-if [ -f "$PREFIX/export-v2-static" ]; then
+if [ -f "$PREFIX/export-v3-static" ]; then
   echo "FFmpeg already built in $PREFIX"
   exit 0
 fi
@@ -93,6 +93,6 @@ shopt -s nullglob
 archives=("$ENCODERS"/lib/*.a "$ENCODERS"/lib/*.lib)
 if [ "${#archives[@]}" = 0 ]; then echo "Missing static encoder archives" >&2; exit 1; fi
 cp "${archives[@]}" "$PREFIX/lib/"
-touch "$PREFIX/export-v2-static"
+touch "$PREFIX/export-v3-static"
 
 echo "FFmpeg $FFMPEG_TAG installed in $PREFIX"

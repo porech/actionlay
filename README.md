@@ -1,304 +1,117 @@
 # ActionLay
 
-[![ci](https://github.com/porech/actionlay/actions/workflows/ci.yml/badge.svg)](https://github.com/porech/actionlay/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/porech/actionlay)](https://github.com/porech/actionlay/releases/latest)
+[![CI](https://github.com/porech/actionlay/actions/workflows/ci.yml/badge.svg)](https://github.com/porech/actionlay/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
 
-**ActionLay** plays your action-camera videos with a live telemetry dashboard on
-top: speed, altitude, maps, heart rate and more. You can also design the
-dashboard visually and export the result. It is free, open source, and ships
-as a single executable for Windows, macOS and Linux.
+<img src="assets/icons/actionlay-256.png" width="128" alt="ActionLay gecko icon" align="right">
 
-> **Status: early prototype (milestones M1–M6 done).** ActionLay plays
-> GoPro footage with hardware decoding and a live telemetry dashboard, including
-> maps, charts, circular instruments and a G-meter. Upstream XML layouts can be
-> imported. The M4 visual editor can create and save portable layouts,
-> with or without an open video. M5 exports video or overlay-only tracks; see the
-> [roadmap](#roadmap). Expect rough edges.
-
-## What works today
-
-- Plays GoPro MP4 files (HEVC and H.264, including 4K, 10-bit and 100 fps
-  footage) with **hardware decoding**: VideoToolbox on macOS, Direct3D 11 on
-  Windows, VA-API on Linux. It falls back to software decoding automatically.
-- **Audio in sync with video**: the audio drives the playback clock. If the
-  audio device disappears (e.g. Bluetooth headphones), playback carries on.
-- Correct colours, including the full-range footage GoPro cameras record.
-- Frame-accurate seeking, frame-by-frame stepping, and playback speeds from
-  0.25x to 4x.
-- No installation and nothing else to download: FFmpeg is built into the
-  executable.
-- Reads GoPro telemetry (GPS, speed, altitude, accelerometer, gravity,
-  orientation, camera temperature) and computes the same derived metrics as
-  gopro-dashboard-overlay. `actionlay-telemetry dump VIDEO` prints them as
-  CSV or JSON; `actionlay-telemetry info VIDEO` shows where data is missing.
-  The tool ships in the same download as `actionlay`; run it from a terminal,
-  or from source with `cargo run -p actionlay-telemetry-cli -- dump VIDEO`.
-- **Live telemetry overlay**: open a GoPro video and a default dashboard
-  appears over it, following the video as you play, pause and seek. Press
-  `O` to show or hide it. Where the video has no GPS (or the signal is lost),
-  values dim and then show `—` instead of stale numbers.
-- **Buffered playback**: video, audio and GPMF share one progressive read.
-  A separate I/O thread reads 1 MiB blocks and keeps a 32 MiB cache across
-  seeks; compressed packets use a separate 32 MiB limit and read about
-  3 seconds ahead. Playback starts after about 2 seconds are ready (or
-  at EOF/the memory limit). During a source underrun both clocks wait and
-  the transport shows Buffering. A seek starts buffering from its target;
-  pause and opening another file cancel the pending playback action.
-  Telemetry appears as packets arrive, without scanning the whole video.
-  Unread ranges show empty values; the odometer waits for a complete prefix.
-  Maps default to north up with no route, so they do not trigger a metadata scan.
-  Selecting a completed or full route displays a loading notice in the editor.
-  GoPro route backfill seeks directly to missing metadata intervals, discards
-  video/audio payloads, and reuses the MP4 index across requests.
-- **Your own layout**: the dashboard is a JSON file. Drag a `.ovl.json` file
-  onto the window to use it; ActionLay remembers the last one. The default
-  layout is in `crates/layout/layouts/default.ovl.json`, and a JSON Schema for
-  editing it is in `crates/layout/schema`. The visual editor works with or without a video.
-- **Responsive telemetry presets**: Select Layout includes Default, Moto
-  (braking/acceleration bars) and Training (heart-rate/power zones), inspired
-  by the upstream dashboards. Widget sizes follow the video, and margins
-  use relative distances. Appearance controls change accent, panel opacity
-  and unit system across layouts and save immediately. Moto includes a needle
-  speedometer and a GPS course compass. Circular gauges also support arcs and
-  donuts, and compasses support rotating roses or simple arrows. Styling is
-  editable in layout JSON, including optional per-compass smoothing and thresholds.
-- **Maps, charts and G-meter**: Default includes a moving map; Moto adds a route
-  map and a friction circle; Training includes an elevation/gradient chart. Map
-  orientation, route visibility, completed/upcoming colors, line width and
-  position-dot size/color are configurable per widget. Route defaults are dark
-  green for completed portions and yellow for upcoming portions.
-  Providers, attribution, API keys and offline mode live in Settings → Maps….
-  Settings → Privacy zones… stores global circular zones which hide positions
-  and route segments in map overlays; it does not redact the video or other GPS
-  widgets. The interface explains how repeated starts/ends can identify a place.
-  Visible
-  tiles are loaded asynchronously and cached on disk; no route bulk download.
-  Data gaps dim the last reading for a configurable time, then show an empty state.
-  G-meter mounting calibration uses causal IMU/GPS correlation; without confident
-  calibration it displays a labelled GPS estimate. Its rotation can be corrected
-  per widget.
-- **XML layout import**: open or drop an upstream XML file, confirm its reference
-  resolution, and save a native layout in the local library. Conversion notes
-  report native equivalents and unsupported controls. The thirteen pinned
-  upstream layouts are embedded alongside the three ActionLay presets.
-- **File → Video sources…**: link a GPX/FIT activity, align by UTC, and adjust
-  its time offset or set video UTC manually. Linked activity values take priority
-  where present; camera values fill gaps. Link and alignment settings are saved
-  per video. The CLI supports `--activity`, `--offset`, and `--video-utc`, and can
-  inspect standalone GPX/FIT files.
-- **GoPro chapters**: contiguous GX/GH or GOPR/Gnnn chapters are discovered in
-  the same folder and played on one timeline without concatenating files.
-  Opening the first chapter loads the sequence; an intermediate chapter opens
-  alone and offers to load the sequence from the first chapter. The choice is
-  remembered per video. CLI options are `--single-file` and `--all-chapters`.
-- **Other camera telemetry**: an adapter uses telemetry-parser for normalized
-  accelerometer, quaternion orientation and available timestamped GPS data.
-  Native DJI Avata orientation and Insta360 ONE X2 accelerometer are validated
-  with public originals. Device/firmware support depends on the parser; these
-  samples contain no GPS. `.insv` files can be opened directly (raw video,
-  without 360 stitching/reframing).
-- **Settings → Audio…**: choose the system default or a specific output device.
-  The preference saves immediately; changing devices preserves playback position,
-  pause state, speed and loaded telemetry. A failed switch keeps the current
-  device and shows an error. On open, an unavailable output produces a visible
-  notice and silent playback; it never redirects an explicit selection.
-
-- **Visual layout editing**: select multiple layers with Ctrl/Command or Shift,
-  or select all with Ctrl/Command+A. Group, ungroup and move selections between
-  containers while preserving their positions. Optional snapping aligns edges
-  and centres to other widgets and the preview; hold Alt to bypass it. Anchor
-  updates on drop are optional. Undo/redo covers each complete drag gesture.
-- **Fonts and portable layouts**: choose installed or attached fonts and export
-  `.actionlay-layout` packages containing the layout and declared assets. Fonts
-  remain scoped to that layout and are never installed. Export can omit fonts;
-  only include fonts whose licence permits redistribution. Preview background
-  images are editor aids. See [the editor report](docs/m4-editor-report.md).
-
-- **Video export**: Export in the toolbar or File menu renders the selected range
-  at source resolution, with progress, ETA and cancellation. Choose video with
-  overlay, transparent overlay, or overlay on a solid colour (green by default).
-  H.264/H.265 MP4, ProRes 4444 MOV and PNG sequences are available. Video files
-  copy source audio; overlay-only and PNG output are silent. Hardware encoding
-  uses NVENC or VideoToolbox with software fallback. Export currently uses
-  eight-bit SDR decoding; see [the export report](docs/m5-export-report.md).
-
-## Roadmap
-
-| Milestone | What you get |
-|---|---|
-| **M0** ✅ | Video player with hardware decoding and synced audio |
-| **M1** ✅ | Telemetry from GoPro files (GPS, speed, altitude, accelerometer, …) |
-| **M2** ✅ | Dashboard overlay drawn live on the video |
-| **M3** ✅ | All dashboard widgets: gauges, charts, compasses, moving and journey maps, plus a G-meter. Every widget is deeply customisable, with good defaults and a polished look when data is missing. Layouts from gopro-dashboard-overlay can be imported |
-| **M4** ✅ | Visual layout editor: add, move, resize and style widgets, with anchors that adapt to any resolution or aspect ratio. It warns you when a widget can't work with the data in your video, and layouts can be shared as files |
-| **M5** ✅ | Export the final video, a transparent overlay (ProRes 4444 / PNG), or an overlay on a selectable solid background, green by default |
-| **M6** ✅ | GPX/FIT files from bike computers and watches, other cameras (DJI, Insta360, …), and GoPro chapters joined automatically |
-| M7 | Polished releases for Windows, macOS and Linux |
-
-The full design is in [docs/superpowers/specs](docs/superpowers/specs/).
+**ActionLay** adds telemetry dashboards to action-camera videos. Display speed,
+altitude, maps, heart rate and power; design your own layout and export the result
+or a separate overlay for your video editor. Free and open source.
 
 ## Download
 
-There are no official releases yet. Until there are, you can grab the latest
-development build:
+**[Download the latest stable release](https://github.com/porech/actionlay/releases/latest)** — no GitHub account required.
 
-1. Open the [latest successful CI run](https://github.com/porech/actionlay/actions/workflows/ci.yml?query=branch%3Amain+is%3Asuccess).
-2. Download the artifact for your system (you need to be signed in to GitHub):
-   - `actionlay-x86_64-pc-windows-msvc`: Windows 10/11, 64-bit
-   - `actionlay-aarch64-apple-darwin`: macOS on Apple Silicon
-   - `actionlay-x86_64-unknown-linux-gnu`: Linux, 64-bit
-3. Unzip it and run `actionlay`.
+| System | Download | Install |
+|---|---|---|
+| macOS 13+, Apple Silicon **and Intel** | [Universal DMG](https://github.com/porech/actionlay/releases/latest/download/actionlay-macos-universal.dmg) | Open the DMG and drag ActionLay to Applications |
+| Windows 10/11, 64-bit | [Windows ZIP](https://github.com/porech/actionlay/releases/latest/download/actionlay-windows-x64.zip) | Extract the ZIP and run `actionlay.exe` |
+| Linux, 64-bit | [Linux tar.gz](https://github.com/porech/actionlay/releases/latest/download/actionlay-linux-x64.tar.gz) | Extract the archive and run `./actionlay` |
 
-The builds are not code-signed yet:
+FFmpeg is included. Linux builds target Ubuntu 22.04 or newer and require ALSA,
+VA-API and a working graphics driver. `SHA256SUMS` is available in each release.
 
-- **macOS**: the first time, right-click the file and choose *Open*, or allow
-  it under *System Settings → Privacy & Security*. You may also need
-  `chmod +x actionlay`.
-- **Windows**: if SmartScreen warns about an unknown publisher, choose
-  *More info → Run anyway*.
+The builds are not signed by an identified publisher or Apple-notarized. On
+macOS, if opening is blocked, allow ActionLay in **System Settings → Privacy &
+Security**, then open it again. Windows may show SmartScreen's unknown-publisher
+prompt; choose **More info → Run anyway** if you want to run the downloaded build.
 
-## Usage
+For upcoming changes, use the **[development release](https://github.com/porech/actionlay/releases/tag/nightly)**,
+updated after successful builds of `main`. It may contain unfinished changes.
 
-Open a video by passing it on the command line:
+## What you can do
 
-```
-actionlay GX010123.MP4
-```
+- **View telemetry while watching footage.** GoPro GPS, speed, altitude,
+  acceleration, orientation and more appear in gauges, charts, maps and a G-meter.
+  Missing data is shown as unavailable.
+- **Use GPX/FIT activities** from a bike computer or watch. Link them to a video,
+  align their timestamps and adjust the offset. Supported DJI/Insta360 files can
+  also supply native camera telemetry; coverage depends on the camera and firmware.
+- **Play GoPro chapter sequences** on one timeline without concatenating files.
+  Open the first chapter to load the sequence. Opening an intermediate chapter
+  offers the choice of loading the whole recording.
+- **Build a dashboard visually.** Start from the included Default, Moto, Training
+  or imported dashboards. Move, resize and style widgets; select multiple layers,
+  snap, group and undo changes. Share `.actionlay-layout` packages with assets
+  and fonts, or import layouts from gopro-dashboard-overlay XML.
+- **Customize maps.** Choose north-up or direction-up, no route, the completed
+  route or the whole route, with separate colours and adjustable line/marker sizes.
+  Select providers and offline mode under **Settings → Maps…**.
+- **Export video or overlays.** Choose H.264/H.265 MP4, transparent ProRes 4444 MOV,
+  PNG sequences, or an overlay on a solid colour for chroma keying.
 
-or choose **File → Open Video…** (⌘O on macOS, Ctrl+O on Windows/Linux).
-When no video is open, clicking the welcome screen opens the system file
-picker too. Dragging a file into the window still works.
+## Getting started
 
-On macOS, File is in the system menu bar; on Windows/Linux it is at the top
-of the window. **File → Select Layout…** shows the included dashboards,
-recent layouts and an option to open a `.ovl.json` file.
-**File → Recent Videos** lists the last ten successfully opened videos;
-**Clear Recent Videos** clears that list. History is saved immediately after
-each action.
-**File → Close Video** returns to the welcome screen. The layout stays selected.
+Open or drag a video into ActionLay. Choose **File → Select Layout…** to switch
+dashboards, or open the visual editor to create your own. The editor also works
+without a video. Drag a GPX/FIT file onto an open video or use **File → Video
+sources…** to link an activity and adjust alignment.
 
-| Key | Action |
+Maps default to north-up with no route, which avoids loading the full GPS track.
+Enabling a route may need extra metadata reads, especially after seeking or on
+network storage. The editor explains the extra loading when you select a route.
+
+Use **Settings → Privacy zones…** to hide private locations and crossing route
+segments on maps. Repeated starts and finishes can reveal a home address even
+without a “home” label. These zones affect map overlays; they do not redact the
+video or coordinates shown by other widgets.
+
+| Shortcut | Action |
 |---|---|
 | ⌘O / Ctrl+O | Open video |
 | ⌘⇧O / Ctrl+Shift+O | Select layout |
 | ⌘W / Ctrl+W | Close video |
-| ⌘Q / Ctrl+Q | Quit |
 | Space | Play / pause |
 | → / ← | Next / previous frame |
-| O | Show / hide the telemetry overlay |
-
-The bar at the bottom also has the seek slider, the playback speed and some
-playback statistics: the decoder in use, the dropped frames, the
-audio/video offset and the time it takes to draw the overlay.
+| O | Show / hide the overlay |
 
 ### Export
 
-Choose **Export...** in the toolbar or **File → Export Video…**. Pick a mode,
-format and in/out range, then choose a new destination. For green screen, use
-**Overlay · solid background**; the colour picker allows any solid background.
-Transparent output uses ProRes 4444 or PNG. Cancel keeps completed frames in a
-valid partial output. Existing destinations are never overwritten.
+Choose **Export…** in the toolbar or **File → Export Video…**. Select the mode,
+format, time range and a new destination. Transparent overlays use ProRes 4444
+or PNG; solid overlays let you choose a background colour, green by default.
+Existing destinations are not overwritten. Cancellation keeps completed frames
+in a playable partial output.
 
-The same export pipeline is available from the command line:
+Export currently processes **one source file with embedded GoPro telemetry**.
+Linked activities, native-camera telemetry and joined chapter timelines are not
+included yet. Export uses eight-bit SDR decoding. Insta360 playback displays the
+raw camera stream, without 360 stitching or reframing.
 
-```text
-actionlay export --out ride.mp4 --start 5 --end 20 VIDEO.MP4
-actionlay export --mode solid --background 00FF00 --out overlay.mp4 VIDEO.MP4
-actionlay export --mode transparent --out overlay.mov VIDEO.MP4
-actionlay export --mode transparent --format png --out overlay-frames VIDEO.MP4
+### Command-line tools
+
+The download includes `actionlay-telemetry` for inspecting telemetry or dumping
+CSV/JSON. On macOS, both tools are in `ActionLay.app/Contents/MacOS/`.
+
+```sh
+actionlay GX010123.MP4
+actionlay-telemetry info GX010123.MP4
+actionlay-telemetry dump GX010123.MP4
+actionlay export --out ride.mp4 --start 5 --end 20 GX010123.MP4
+actionlay export --mode transparent --out overlay.mov GX010123.MP4
 ```
 
-Use `--layout FILE` for a specific layout or portable package and `--software`
-for software encoding. Otherwise the remembered layout and appearance are used.
+Run each tool with `--help` for options. See [building from source](docs/building.md)
+for development and [release packaging](docs/releasing.md) for maintainers.
 
-## Building from source
+## Credits and licence
 
-You need Rust (the version is pinned in `rust-toolchain.toml` and installed
-automatically by rustup), Git, Make, CMake, pkg-config, and the tools needed to build FFmpeg:
-`nasm` and a C compiler. On Linux you also need the `libva` and ALSA
-development headers.
+Inspired by [gopro-dashboard-overlay](https://github.com/time4tea/gopro-dashboard-overlay)
+and [Gyroflow](https://github.com/gyroflow/gyroflow). See [all credits](docs/credits.md).
+The gecko icon is illustrated from the project owner's photographs.
 
-```bash
-git clone https://github.com/porech/actionlay.git
-cd actionlay
-make run                           # builds FFmpeg if needed, then launches the app
-make run ARGS="path/to/video.mp4"   # optionally open a video on launch
-```
-
-The Makefile sets `FFMPEG_DIR` automatically for each command. `make build`
-builds the release binaries in `target/release/`; `make check` checks formatting
-and runs Clippy, and `make fmt` formats Rust code. Run `make help` for all commands.
-The first build also compiles pinned static x264/x265 encoder libraries and takes
-several minutes; subsequent calls reuse them. Windows uses a static C/C++ runtime.
-CMake must be on PATH; MSYS2 provides pkg-config through the `pkgconf` package.
-CI uses the same Makefile targets on all three platforms.
-
-To use Cargo directly, run `bash scripts/build-ffmpeg.sh`, then
-`source scripts/env.sh` in your terminal before running Cargo commands.
-
-On Windows, build FFmpeg from an MSYS2 shell that inherits the Visual Studio
-environment. The exact steps are in [.github/workflows/ci.yml](.github/workflows/ci.yml).
-
-To run the tests, first generate the synthetic sample videos. This needs an
-`ffmpeg` command with libx264 and libx265:
-
-```bash
-make samples                       # synthetic clips + public GoPro samples (~33 MB)
-make test
-
-# Limited playback/seek diagnostics using the UI's player and telemetry decoder:
-source scripts/env.sh
-cargo run --release -p actionlay-app --example playback-check -- /path/to/video.mp4 240
-```
-
-## Contributing
-
-Issues and pull requests are welcome. The project is young, so if you plan a
-larger change, please open an issue first so we can agree on the approach.
-Sample videos from cameras other than GoPro (with their telemetry) are
-especially useful. Share only footage you are happy to publish, as videos
-carry GPS positions.
-
-## Credits
-
-ActionLay stands on the shoulders of these open-source projects:
-
-- **[gopro-dashboard-overlay](https://github.com/time4tea/gopro-dashboard-overlay)**
-  by time4tea is the main inspiration for this project, and the source of its
-  know-how on GoPro telemetry, metrics and dashboard widgets. Its layouts will
-  be importable into ActionLay.
-- **[Gyroflow](https://github.com/gyroflow/gyroflow)** is the architectural
-  reference for a Rust desktop app that plays and processes action-camera
-  footage.
-- **[gpmf-parser](https://github.com/gopro/gpmf-parser)** by GoPro documents
-  the GPMF telemetry format; its sample videos (Apache-2.0) are ActionLay's
-  telemetry test files.
-- **[telemetry-parser](https://github.com/AdrianEddy/telemetry-parser)** by
-  AdrianEddy is the planned telemetry reader for DJI, Insta360 and other
-  cameras.
-- **[GeographicLib](https://geographiclib.sourceforge.io)** (Charles Karney),
-  through [geographiclib-rs](https://github.com/georust/geographiclib-rs),
-  computes distances and bearings exactly as gopro-dashboard-overlay does.
-- **[FFmpeg](https://ffmpeg.org)** does the decoding, through the
-  [ffmpeg-next](https://github.com/zmwangx/rust-ffmpeg) Rust bindings.
-- **[tiny-skia](https://github.com/linebender/tiny-skia)** draws the overlay
-  and **[cosmic-text](https://github.com/pop-os/cosmic-text)** shapes its text.
-- **[Roboto](https://github.com/googlefonts/roboto)** (Apache-2.0) is the
-  overlay font, and **[Tabler Icons](https://tabler.io/icons)** (MIT) provide
-  its icons.
-- **[egui / eframe](https://github.com/emilk/egui)** and
-  **[wgpu](https://github.com/gfx-rs/wgpu)** power the user interface and the
-  GPU rendering.
-- **[cpal](https://github.com/RustAudio/cpal)** and
-  **[ringbuf](https://github.com/agerasev/ringbuf)** handle audio output.
-- **[OpenStreetMap](https://www.openstreetmap.org/copyright)** contributors
-  will provide the map data for the map widgets.
-
-## License
-
-ActionLay is free software, released under the
-[GNU General Public License v3.0 or later](LICENSE).
-
-The binaries include FFmpeg, built with `--enable-gpl` and never with
-`--enable-nonfree`, under the GNU GPL v2.0 or later. The exact FFmpeg
-version and build options are in [scripts/](scripts/).
+ActionLay is [GPL-3.0-or-later](LICENSE). The binaries include GPL-enabled FFmpeg,
+x264 and x265. Source revisions and build scripts are included in the repository;
+licence notices and source links accompany the downloads.

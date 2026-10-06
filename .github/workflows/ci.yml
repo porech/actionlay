@@ -2,6 +2,14 @@ name: ci
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
 
 jobs:
   build-test:
@@ -11,16 +19,26 @@ jobs:
         include:
           - os: macos-14
             target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
           - os: windows-2022
             target: x86_64-pc-windows-msvc
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
     runs-on: ${{ matrix.os }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "13.0"
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@v7
+
+      - name: Verify stable tag matches the workspace version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)"
+          test "$GITHUB_REF_NAME" = "v$version"
 
       # Synthetic samples only change with their script; the ffmpeg CLI that
       # generates them is installed only on a cache miss.
@@ -208,6 +226,10 @@ jobs:
         shell: msys2 {0}
         run: make build
 
+      - name: Verify Windows executable icons and metadata
+        if: runner.os == 'Windows'
+        run: python scripts/verify-windows-resources.py target/release/actionlay.exe
+
       - name: Upload binaries
         uses: actions/upload-artifact@v7
         with:
@@ -220,3 +242,45 @@ jobs:
             target/release/actionlay-telemetry
             target/release/actionlay-telemetry.exe
           if-no-files-found: error
+
+  package:
+    needs: build-test
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: actionlay-*
+          path: binaries
+      - name: Package universal macOS application and DMG
+        run: bash scripts/package-macos.sh binaries/actionlay-aarch64-apple-darwin binaries/actionlay-x86_64-apple-darwin dist
+      - name: Package Windows and Linux
+        run: |
+          python3 scripts/package-release.py --target windows --binaries binaries/actionlay-x86_64-pc-windows-msvc --output dist
+          python3 scripts/package-release.py --target linux --binaries binaries/actionlay-x86_64-unknown-linux-gnu --output dist
+      - name: Checksums
+        run: |
+          cd dist
+          shasum -a 256 actionlay-* > SHA256SUMS
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-packages
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    needs: package
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-packages
+          path: dist
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/publish-release.sh

@@ -1767,7 +1767,13 @@ fn main() -> eframe::Result {
         eframe::NativeOptions {
             viewport: egui::ViewportBuilder::default()
                 .with_inner_size([1200.0, 800.0])
-                .with_min_inner_size([720.0, 480.0]),
+                .with_min_inner_size([720.0, 480.0])
+                .with_icon(
+                    eframe::icon_data::from_png_bytes(include_bytes!(
+                        "../../../assets/icons/actionlay-256.png"
+                    ))
+                    .expect("embedded app icon"),
+                ),
             ..Default::default()
         },
         Box::new(move |cc| {

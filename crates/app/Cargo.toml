@@ -1,5 +1,6 @@
 [package]
 name = "actionlay-app"
+description = "Action-camera telemetry dashboards and video export"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -38,3 +39,6 @@ muda = "0.19.3"
 [dev-dependencies]
 anyhow.workspace = true
 naga = { version = "30", features = ["wgsl-in"] }
+
+[build-dependencies]
+winresource = "0.1.31"
