@@ -1204,6 +1204,9 @@ impl Editor {
                     }
                     value = fresh;
                 }
+                if node.type_name() == "map" {
+                    map_properties(ui, &mut value);
+                }
                 property_object(ui, &mut value, &schema, &self.schema, 0);
                 self.properties_buffer = Some((path.clone(), value.clone()));
                 match serde_json::from_value::<Node>(value) {
@@ -1654,6 +1657,31 @@ fn resolved_schema<'a>(schema: &'a Value, root: &'a Value) -> &'a Value {
     }
     schema
 }
+fn map_properties(ui: &mut egui::Ui, value: &mut Value) {
+    ui.group(|ui| {
+        for (key,label,default,options) in [
+            ("orientation","Orientation","north_up",&[("north_up","North up"),("course_up","Direction of travel up")][..]),
+            ("route_mode","Route","none",&[("none","No route"),("past","Completed route only"),("full","Entire route from the start")][..]),
+        ] {
+            let mut selected=value[key].as_str().unwrap_or(default).to_owned();
+            let old=selected.clone();
+            egui::ComboBox::from_id_salt(key).selected_text(options.iter().find(|o|o.0==selected).map_or(selected.as_str(),|o|o.1))
+                .show_ui(ui,|ui| { for &(id,text) in options { ui.selectable_value(&mut selected,id.to_owned(),text); } });
+            ui.small(label);
+            if selected != old { value[key]=json!(selected); }
+            if value.get(key).is_some() && ui.small_button(format!("Reset {label}")).clicked() { value.as_object_mut().unwrap().remove(key); }
+        }
+        let mut split=value["split_route"].as_bool().unwrap_or(true);
+        if ui.checkbox(&mut split,"Different color for the upcoming route").changed() { value["split_route"]=json!(split); }
+        match value["route_mode"].as_str().unwrap_or("none") {
+            "past" => { ui.colored_label(egui::Color32::YELLOW, "After seeking, showing the completed route may require loading additional metadata from the video up to the selected time."); }
+            "full" => { ui.colored_label(egui::Color32::YELLOW, "Showing the entire route may require loading additional metadata from the whole video, even without seeking. The route appears as the data loads."); }
+            _ => {}
+        }
+        ui.small("Default: north up, no route. Route colors: dark green completed, yellow upcoming.");
+    });
+}
+
 fn property_object(
     ui: &mut egui::Ui,
     value: &mut Value,
@@ -1666,6 +1694,11 @@ fn property_object(
         return;
     };
     for (key, s) in properties {
+        if value["type"] == "map"
+            && matches!(key.as_str(), "orientation" | "route_mode" | "split_route")
+        {
+            continue;
+        }
         if matches!(key.as_str(), "type" | "children" | "id") {
             continue;
         }
@@ -1680,7 +1713,20 @@ fn property_object(
                 if !required {
                     ui.checkbox(&mut enabled, "");
                 }
-                ui.label(key.replace('_', " "))
+                let label = if value["type"] == "map" {
+                    match key.as_str() {
+                        "route" => "Completed route color".into(),
+                        "route_future" => "Upcoming route color".into(),
+                        "route_width" => "Route line width".into(),
+                        "marker" => "Position dot color".into(),
+                        "marker_radius" => "Position dot radius".into(),
+                        "show_marker" => "Show position dot".into(),
+                        _ => key.replace('_', " "),
+                    }
+                } else {
+                    key.replace('_', " ")
+                };
+                ui.label(label)
                     .on_hover_text(s["description"].as_str().unwrap_or(""));
                 if !required && existing.is_some() {
                     reset = ui.small_button("Reset").clicked();

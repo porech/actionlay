@@ -42,6 +42,7 @@ pub struct TelemetryInfo {
 
 pub fn probe(path: &Path) -> Result<MediaInfo, MediaError> {
     ffmpeg_info::init();
+    let _quiet = crate::gpmf::QuietLog::new();
     let input = ffmpeg::format::input(path)?;
     describe(&input)
 }

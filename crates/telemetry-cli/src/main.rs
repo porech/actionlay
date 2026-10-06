@@ -17,7 +17,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 #[command(
     name = "actionlay-telemetry",
     version,
-    about = "Reads the telemetry of a GoPro video"
+    about = "Reads camera telemetry and GPX/FIT activities"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -40,12 +40,16 @@ enum Cmd {
         points: bool,
         #[command(flatten)]
         lock: LockArgs,
+        #[command(flatten)]
+        sources: SourceArgs,
     },
     /// Summarise packets, time span and metric coverage
     Info {
         video: PathBuf,
         #[command(flatten)]
         lock: LockArgs,
+        #[command(flatten)]
+        sources: SourceArgs,
     },
 }
 
@@ -79,6 +83,31 @@ struct LockArgs {
     speed_max_kmh: Option<f64>,
 }
 
+#[derive(Args)]
+struct SourceArgs {
+    /// Link a GPX or FIT activity by UTC
+    #[arg(long)]
+    activity: Option<PathBuf>,
+    /// Positive seconds move activity data later in the video
+    #[arg(long, default_value_t = 0.0, allow_negative_numbers = true, value_parser = finite)]
+    offset: f64,
+    /// UTC of the first frame, e.g. 2026-09-27T12:15:30Z
+    #[arg(long)]
+    video_utc: Option<String>,
+    /// Open this file alone instead of joining GoPro chapters
+    #[arg(long)]
+    single_file: bool,
+    /// Load all GoPro chapters even when an intermediate file was selected
+    #[arg(long, conflicts_with = "single_file")]
+    all_chapters: bool,
+}
+fn finite(s: &str) -> Result<f64, String> {
+    s.parse::<f64>()
+        .ok()
+        .filter(|v| v.is_finite())
+        .ok_or_else(|| "must be finite seconds".into())
+}
+
 #[derive(Clone, Copy, ValueEnum)]
 enum Format {
     Csv,
@@ -94,7 +123,8 @@ fn main() -> ExitCode {
             format,
             points,
             lock,
-        } => load(video, lock).and_then(|tel| {
+            sources,
+        } => load(video, lock, sources).and_then(|tel| {
             let mut out = BufWriter::new(io::stdout().lock());
             let r = if *points {
                 dump_points(&tel, &mut out)
@@ -106,7 +136,11 @@ fn main() -> ExitCode {
             };
             r.and_then(|()| out.flush()).map_err(io_error)
         }),
-        Cmd::Info { video, lock } => load(video, lock).and_then(|tel| {
+        Cmd::Info {
+            video,
+            lock,
+            sources,
+        } => load(video, lock, sources).and_then(|tel| {
             let mut out = BufWriter::new(io::stdout().lock());
             info(video, &tel, &mut out)
                 .and_then(|()| out.flush())
@@ -132,30 +166,77 @@ fn io_error(e: io::Error) -> String {
     }
 }
 
-fn load(video: &Path, lock: &LockArgs) -> Result<Telemetry, String> {
-    let packets = read_gpmf_packets(video).map_err(|e| format!("{}: {e}", video.display()))?;
-    if packets.is_empty() {
-        return Err(format!(
-            "{}: no GoPro metadata (gpmd) stream",
-            video.display()
-        ));
+fn load(video: &Path, lock: &LockArgs, sources: &SourceArgs) -> Result<Telemetry, String> {
+    let ext = video
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if ext == "gpx" || ext == "fit" {
+        if sources.activity.is_some() {
+            return Err("--activity requires a video input".into());
+        }
+        return actionlay_telemetry::external::Activity::read(video)
+            .map(|a| a.standalone())
+            .map_err(|e| e.to_string());
     }
-    let raw: Vec<RawPacket> = packets
-        .into_iter()
-        .map(|p| RawPacket {
-            pts: p.pts,
-            duration: p.duration,
-            data: p.data,
-        })
-        .collect();
+    let join = !sources.single_file
+        && (sources.all_chapters || actionlay_media::chapters::is_first_chapter(video));
+    let timeline = actionlay_media::chapters::Timeline::open(video, join)
+        .map_err(|e| format!("{}: {e}", video.display()))?;
+    let mut raw = Vec::new();
+    for chapter in &timeline.chapters {
+        for p in read_gpmf_packets(&chapter.path).map_err(|e| e.to_string())? {
+            raw.push(RawPacket {
+                pts: p.pts + chapter.start,
+                duration: p.duration,
+                data: p.data,
+            });
+        }
+    }
     let opts = TelemetryOptions {
         lock: LockOptions {
             dop_max: lock.dop_max,
             speed_max: lock.speed_max_kmh.map(|k| k / 3.6),
         },
-        ..TelemetryOptions::default()
+        video_duration: (timeline.chapters.len() > 1).then_some(timeline.duration),
     };
-    let tel = Telemetry::from_gpmf_packets_with(&raw, &opts).map_err(|e| e.to_string())?;
+    let mut tel = if raw.is_empty() {
+        actionlay_telemetry::camera::read(
+            video,
+            timeline.duration,
+            std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        )
+        .unwrap_or_else(|_| Telemetry::empty(timeline.duration))
+    } else {
+        Telemetry::from_gpmf_packets_with(&raw, &opts).map_err(|e| e.to_string())?
+    };
+    if let Some(path) = &sources.activity {
+        let activity =
+            actionlay_telemetry::external::Activity::read(path).map_err(|e| e.to_string())?;
+        let origin = match &sources.video_utc {
+            Some(s) => Some(
+                DateTime::parse_from_rfc3339(s)
+                    .map_err(|e| e.to_string())?
+                    .with_timezone(&Utc),
+            ),
+            None => tel.start_utc(),
+        };
+        let external = activity
+            .align(origin, timeline.duration, sources.offset)
+            .map_err(|e| e.to_string())?;
+        tel = tel.merge_external(&external, timeline.duration);
+    } else if raw.is_empty()
+        && !Metric::ALL
+            .iter()
+            .any(|&m| tel.availability().is_available(m))
+    {
+        return Err(format!(
+            "{}: no usable camera metadata; link --activity GPX/FIT with --video-utc",
+            video.display()
+        ));
+    }
+
     for w in tel.warnings() {
         eprintln!("warning: {w}");
     }

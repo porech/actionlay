@@ -335,6 +335,9 @@ impl Validator {
                 if let Some(v) = m.route_width {
                     self.positive(&path, "route_width", v);
                 }
+                if let Some(v) = m.marker_radius {
+                    self.positive(&path, "marker_radius", v);
+                }
                 if let Some(v) = m.opacity_tiles {
                     self.unit_interval(&path, "opacity_tiles", v);
                 }

@@ -59,6 +59,10 @@
           "id": "moving-map",
           "type": "map",
           "mode": "moving",
+          "orientation": "north_up",
+          "route_mode": "none",
+          "route": "#166534",
+          "route_future": "#facc15",
           "size": [
             340,
             244

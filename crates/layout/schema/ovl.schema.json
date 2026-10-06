@@ -1788,6 +1788,14 @@
             }
           ]
         },
+        "marker_radius": {
+          "description": "Radius of the current-position dot, in design pixels; defaults to 5.",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "mode": {
           "anyOf": [
             {
@@ -1845,6 +1853,17 @@
             "null"
           ]
         },
+        "orientation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MapOrientation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "North-up (default) or rotate the map so the direction of travel points up."
+        },
         "radius": {
           "format": "float",
           "type": [
@@ -1862,10 +1881,38 @@
             }
           ]
         },
+        "route_future": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Upcoming route color; defaults to yellow. `route` colors the completed part."
+        },
+        "route_mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MapRoute"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "No route (default), completed route only, or the entire available route."
+        },
         "route_width": {
           "format": "float",
           "type": [
             "number",
+            "null"
+          ]
+        },
+        "show_marker": {
+          "type": [
+            "boolean",
             "null"
           ]
         },
@@ -1878,6 +1925,13 @@
           "minItems": 2,
           "type": [
             "array",
+            "null"
+          ]
+        },
+        "split_route": {
+          "description": "Use separate colors for the completed and upcoming route; defaults to true.",
+          "type": [
+            "boolean",
             "null"
           ]
         },
@@ -1916,6 +1970,21 @@
         }
       },
       "type": "object"
+    },
+    "MapOrientation": {
+      "enum": [
+        "north_up",
+        "course_up"
+      ],
+      "type": "string"
+    },
+    "MapRoute": {
+      "enum": [
+        "none",
+        "past",
+        "full"
+      ],
+      "type": "string"
     },
     "MetricNode": {
       "additionalProperties": true,

@@ -299,8 +299,11 @@
             256.0
           ],
           "mode": "moving",
+          "route_mode": "none",
+          "split_route": false,
           "zoom": 15,
-          "radius": 12.0
+          "radius": 12.0,
+          "route": "accent"
         }
       ]
     },
@@ -329,8 +332,11 @@
             256.0
           ],
           "mode": "moving_journey",
+          "route_mode": "full",
+          "split_route": false,
           "zoom": 14,
-          "radius": 12.0
+          "radius": 12.0,
+          "route": "accent"
         }
       ]
     },

@@ -133,7 +133,7 @@ fn video_without_metadata_fails_cleanly() {
     let out = run(&["dump"], &video);
     assert!(!out.status.success());
     let err = String::from_utf8_lossy(&out.stderr);
-    assert!(err.contains("no GoPro metadata (gpmd) stream"), "{err}");
+    assert!(err.contains("no usable camera metadata"), "{err}");
 }
 
 fn run_args(args: &[&str]) -> Output {

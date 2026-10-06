@@ -241,8 +241,11 @@
         256.0
       ],
       "mode": "circuit",
+      "route_mode": "full",
+      "split_route": false,
       "zoom": 15,
-      "radius": 12.0
+      "radius": 12.0,
+      "route": "accent"
     },
     {
       "type": "group",

@@ -27,6 +27,13 @@ fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
 }
 
 pub(crate) fn add(g: &[GpsPoint], series: &mut [Option<Series>]) -> Option<f64> {
+    add_with_breaks(g, series, &[])
+}
+pub(crate) fn add_with_breaks(
+    g: &[GpsPoint],
+    series: &mut [Option<Series>],
+    breaks: &[f64],
+) -> Option<f64> {
     if g.is_empty() {
         return None;
     }
@@ -41,7 +48,9 @@ pub(crate) fn add(g: &[GpsPoint], series: &mut [Option<Series>]) -> Option<f64> 
         if valid.is_none() {
             segment = i + 1;
             previous = None;
-        } else if i > 0 && p.t - g[i - 1].t > 2.0 {
+        } else if i > 0
+            && (p.t - g[i - 1].t > 2.0 || breaks.iter().any(|&b| b > g[i - 1].t && b <= p.t))
+        {
             segment = i;
             previous = None;
         }
@@ -61,7 +70,8 @@ pub(crate) fn add(g: &[GpsPoint], series: &mut [Option<Series>]) -> Option<f64> 
         };
         heading.push((p.t, p.end, value));
     }
-    series[Metric::Heading.index()] = Some(Series::new(Interp::Angle360, heading));
+    series[Metric::Heading.index()] =
+        Some(Series::new(Interp::Angle360, heading).with_breaks(breaks.to_vec()));
     let mut long = Vec::new();
     let mut lat = Vec::new();
     let mut calibrated: Option<([f64; 3], [f64; 3])> = None;
@@ -78,9 +88,14 @@ pub(crate) fn add(g: &[GpsPoint], series: &mut [Option<Series>]) -> Option<f64> 
     for p in g {
         let t = p.t;
         let before = t - 0.25;
-        let pair = present(series, Metric::Speed, t).zip(present(series, Metric::Speed, before));
+        let connected = !breaks.iter().any(|&b| b > before && b <= t);
+        let pair = connected
+            .then(|| present(series, Metric::Speed, t).zip(present(series, Metric::Speed, before)))
+            .flatten();
         let lon = pair.map(|(v, a)| (v - a) / 0.25);
-        let sideways = present(series, Metric::Heading, t)
+        let sideways = connected
+            .then(|| present(series, Metric::Heading, t))
+            .flatten()
             .zip(present(series, Metric::Heading, before))
             .zip(present(series, Metric::Speed, t))
             .map(|((a, b), v)| v * ((a - b + 180.0).rem_euclid(360.0) - 180.0).to_radians() / 0.25);
@@ -153,8 +168,10 @@ pub(crate) fn add(g: &[GpsPoint], series: &mut [Option<Series>]) -> Option<f64> 
             last_t = Some(t);
         }
     }
-    series[Metric::AccelLon.index()] = Some(Series::new(Interp::Linear, long));
-    series[Metric::AccelLat.index()] = Some(Series::new(Interp::Linear, lat));
+    series[Metric::AccelLon.index()] =
+        Some(Series::new(Interp::Linear, long).with_breaks(breaks.to_vec()));
+    series[Metric::AccelLat.index()] =
+        Some(Series::new(Interp::Linear, lat).with_breaks(breaks.to_vec()));
     calibrated_at
 }
 

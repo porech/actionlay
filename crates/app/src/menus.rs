@@ -13,6 +13,9 @@ pub enum Command {
     ExportVideo,
     ExitEditor,
     AudioSettings,
+    MapSettings,
+    PrivacySettings,
+    Sources,
     OpenLayoutFile,
     OpenRecentVideo(usize),
     ClearRecentVideos,
@@ -93,7 +96,11 @@ impl Menus {
             ],
         )?;
         let audio = MenuItem::with_id("audio-settings", "Audio…", true, None);
-        let settings = Submenu::with_items("Settings", true, &[&audio])?;
+        let maps = MenuItem::with_id("map-settings", "Maps…", true, None);
+        let sources = MenuItem::with_id("sources", "Video sources…", true, None);
+        file.append(&sources)?;
+        let privacy = MenuItem::with_id("privacy-settings", "Privacy zones…", true, None);
+        let settings = Submenu::with_items("Settings", true, &[&audio, &maps, &privacy])?;
         let new = MenuItem::with_id("new-layout", "New Layout…", true, key(Code::KeyN, false));
         let edit = MenuItem::with_id("edit-layout", "Edit Layout", true, key(Code::KeyE, false));
         let save = MenuItem::with_id("save-layout", "Save", false, key(Code::KeyS, false));
@@ -128,6 +135,9 @@ impl Menus {
                 "export-video" => Command::ExportVideo,
                 "exit-editor" => Command::ExitEditor,
                 "audio-settings" => Command::AudioSettings,
+                "map-settings" => Command::MapSettings,
+                "privacy-settings" => Command::PrivacySettings,
+                "sources" => Command::Sources,
                 "clear-recent-videos" => Command::ClearRecentVideos,
                 "close-video" => Command::CloseVideo,
                 "quit" => Command::Quit,
@@ -270,6 +280,7 @@ impl Menus {
                     });
                     for (label, action, enabled) in [
                         ("Open Video…    Ctrl+O", Command::OpenVideo, true),
+                        ("Video sources…", Command::Sources, has_video),
                         (
                             "Select Layout…    Ctrl+Shift+O",
                             Command::SelectLayout,
@@ -286,6 +297,14 @@ impl Menus {
                     }
                 });
                 ui.menu_button("Settings", |ui| {
+                    if ui.button("Privacy zones…").clicked() {
+                        command = Some(Command::PrivacySettings);
+                        ui.close();
+                    }
+                    if ui.button("Maps…").clicked() {
+                        command = Some(Command::MapSettings);
+                        ui.close();
+                    }
                     if ui.button("Audio…").clicked() {
                         command = Some(Command::AudioSettings);
                         ui.close();

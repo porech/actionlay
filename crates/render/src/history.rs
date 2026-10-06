@@ -4,7 +4,9 @@ use crate::shapes::{paint, rounded_rect};
 use crate::value;
 use actionlay_layout::color::Color;
 use actionlay_layout::geom::{Anchor, Rect, place};
-use actionlay_layout::model::{ChartNode, GMeterNode, HeadingFilter, MapMode, MapNode, WhenAbsent};
+use actionlay_layout::model::{
+    ChartNode, GMeterNode, HeadingFilter, MapMode, MapNode, MapOrientation, MapRoute, WhenAbsent,
+};
 use actionlay_layout::style::{TextKind, TextStyleOpt};
 use actionlay_telemetry::{Metric, Telemetry, Value};
 use std::collections::HashMap;
@@ -443,6 +445,16 @@ pub(crate) fn draw_map(p: &mut Painter, m: &MapNode, at: Placement, ctx: &Ctx) {
     let bg = m.background.map_or(ctx.theme.panel, |v| ctx.theme.color(v));
     pm.fill(tiny_skia::Color::from_rgba8(bg.r, bg.g, bg.b, bg.a));
     let mode = m.mode.unwrap_or_default();
+    let route_mode = m.route_mode.unwrap_or_default();
+    let angle = if m.orientation.unwrap_or_default() == MapOrientation::CourseUp {
+        held(ctx.snap.get(Metric::Heading), m.stale_secs)
+            .or_else(|| held(ctx.snap.get(Metric::Cog), m.stale_secs))
+            .unwrap_or(0.0)
+    } else {
+        0.0
+    };
+    let angle = (angle * 10.0).round() / 10.0;
+    let (sin, cos) = angle.to_radians().sin_cos();
     let track = ctx.telemetry.map_or(&[][..], Telemetry::track);
     let visible: Vec<_> = track
         .iter()
@@ -469,8 +481,14 @@ pub(crate) fn draw_map(p: &mut Painter, m: &MapNode, at: Placement, ctx: &Ctx) {
         center = Some([(min[0] + max[0]) / 2.0, (min[1] + max[1]) / 2.0]);
         zoom = 19;
         while zoom > 0
-            && ((max[0] - min[0]) * 256.0 * 2_f64.powi(zoom as i32) > size[0] as f64 * 0.78
-                || (max[1] - min[1]) * 256.0 * 2_f64.powi(zoom as i32) > size[1] as f64 * 0.7)
+            && (((max[0] - min[0]) * cos.abs() + (max[1] - min[1]) * sin.abs())
+                * 256.0
+                * 2_f64.powi(zoom as i32)
+                > size[0] as f64 * 0.78
+                || ((max[0] - min[0]) * sin.abs() + (max[1] - min[1]) * cos.abs())
+                    * 256.0
+                    * 2_f64.powi(zoom as i32)
+                    > size[1] as f64 * 0.7)
         {
             zoom -= 1;
         }
@@ -485,7 +503,7 @@ pub(crate) fn draw_map(p: &mut Painter, m: &MapNode, at: Placement, ctx: &Ctx) {
             (center[1] * world * s as f64).round() / (world * s as f64),
         ];
         let cache_key = format!(
-            "map:{m:?}:{center:?}:{zoom}:{s}:{:?}:{}:{}:{settings:?}",
+            "map:{m:?}:{center:?}:{zoom}:{angle}:{s}:{:?}:{}:{}:{settings:?}",
             ctx.theme,
             ctx.telemetry.map_or(0, Telemetry::identity),
             ctx.maps.revision()
@@ -493,28 +511,36 @@ pub(crate) fn draw_map(p: &mut Painter, m: &MapNode, at: Placement, ctx: &Ctx) {
         let cached = p.statics.get(&cache_key);
         let mut cacheable = true;
         let xy = |q: [f64; 2]| {
+            let x = actionlay_maps::wrap_delta(q[0] - center[0]) * world * s as f64;
+            let y = (q[1] - center[1]) * world * s as f64;
             [
-                (actionlay_maps::wrap_delta(q[0] - center[0]) * world) as f32 * s + ww / 2.0,
-                ((q[1] - center[1]) * world) as f32 * s + hh / 2.0,
+                (cos * x + sin * y) as f32 + ww / 2.0,
+                (-sin * x + cos * y) as f32 + hh / 2.0,
             ]
         };
         if let Some(cached) = cached {
             pm = cached;
         } else {
             if mode != MapMode::Circuit {
-                let left = center[0] * world - size[0] as f64 / 2.0;
-                let top = center[1] * world - size[1] as f64 / 2.0;
-                for y in tile_span(top, size[1]).take(13) {
-                    for x in tile_span(left, size[0]).take(13) {
+                let cover_w = (cos.abs() * size[0] as f64 + sin.abs() * size[1] as f64) as f32;
+                let cover_h = (sin.abs() * size[0] as f64 + cos.abs() * size[1] as f64) as f32;
+                let left = center[0] * world - f64::from(cover_w) / 2.0;
+                let top = center[1] * world - f64::from(cover_h) / 2.0;
+                for y in tile_span(top, cover_h).take(13) {
+                    for x in tile_span(left, cover_w).take(13) {
                         if let Some(key) = actionlay_maps::Tile::at(zoom, x, y) {
                             let Some(tile) = ctx.maps.get(key) else {
                                 cacheable &= !settings.online;
                                 continue;
                             };
-                            let tr = Transform::from_scale(s, s).post_translate(
-                                ((x as f64 * 256.0 - left) * s as f64) as f32,
-                                ((y as f64 * 256.0 - top) * s as f64) as f32,
-                            );
+                            let tr = Transform::from_scale(s, s)
+                                .post_translate(
+                                    ((x as f64 * 256.0 - center[0] * world) * s as f64) as f32
+                                        + ww / 2.0,
+                                    ((y as f64 * 256.0 - center[1] * world) * s as f64) as f32
+                                        + hh / 2.0,
+                                )
+                                .post_rotate_at(-angle as f32, ww / 2.0, hh / 2.0);
                             pm.draw_pixmap(
                                 0,
                                 0,
@@ -530,40 +556,61 @@ pub(crate) fn draw_map(p: &mut Painter, m: &MapNode, at: Placement, ctx: &Ctx) {
                     }
                 }
             }
-            if mode != MapMode::Moving {
-                let route = m.route.map_or(ctx.theme.accent, |v| ctx.theme.color(v));
-                let mut path = PathBuilder::new();
-                for points in track.windows(2) {
-                    let (a, b) = (points[0], points[1]);
-                    if b.t - a.t > 2.0
-                        || settings
-                            .privacy
-                            .iter()
-                            .any(|z| z.crosses((a.lat, a.lon), (b.lat, b.lon)))
-                    {
-                        continue;
-                    }
-                    let a = xy(actionlay_maps::project(a.lat, a.lon));
-                    let b = xy(actionlay_maps::project(b.lat, b.lon));
-                    if (a[0] - b[0]).abs() > ww * 4.0 || (a[1] - b[1]).abs() > hh * 4.0 {
-                        continue;
-                    }
-                    if (a[0] < 0.0 && b[0] < 0.0)
-                        || (a[0] > ww && b[0] > ww)
-                        || (a[1] < 0.0 && b[1] < 0.0)
-                        || (a[1] > hh && b[1] > hh)
-                    {
-                        continue;
-                    }
-                    path.move_to(a[0], a[1]);
-                    path.line_to(b[0], b[1]);
+            if cacheable {
+                p.statics.insert(cache_key, &pm);
+            }
+        }
+        if route_mode != MapRoute::None {
+            let past_color = m
+                .route
+                .map_or(Color::rgba(22, 101, 52, 255), |v| ctx.theme.color(v));
+            let future_color = if m.split_route.unwrap_or(true) {
+                m.route_future
+                    .map_or(Color::rgba(250, 204, 21, 255), |v| ctx.theme.color(v))
+            } else {
+                past_color
+            };
+            let mut past = PathBuilder::new();
+            let mut future = PathBuilder::new();
+            for pair in track.windows(2) {
+                let (a, b) = (pair[0], pair[1]);
+                if a.segment != b.segment
+                    || b.t - a.t > 2.0
+                    || settings
+                        .privacy
+                        .iter()
+                        .any(|z| z.crosses((a.lat, a.lon), (b.lat, b.lon)))
+                {
+                    continue;
                 }
+                let from = xy(actionlay_maps::project(a.lat, a.lon));
+                let to = xy(actionlay_maps::project(b.lat, b.lon));
+                if (from[0] - to[0]).abs() > ww * 4.0 || (from[1] - to[1]).abs() > hh * 4.0 {
+                    continue;
+                }
+                let part = ((ctx.snap.t - a.t) / (b.t - a.t).max(1e-9)).clamp(0.0, 1.0) as f32;
+                let split = [
+                    from[0] + (to[0] - from[0]) * part,
+                    from[1] + (to[1] - from[1]) * part,
+                ];
+                if part > 0.0 {
+                    past.move_to(from[0], from[1]);
+                    past.line_to(split[0], split[1]);
+                }
+                if route_mode == MapRoute::Full && part < 1.0 {
+                    future.move_to(split[0], split[1]);
+                    future.line_to(to[0], to[1]);
+                }
+            }
+            for (path, color) in [(future, future_color), (past, past_color)] {
                 if let Some(path) = path.finish() {
                     pm.stroke_path(
                         &path,
-                        &paint(route, 1.0),
+                        &paint(color, 1.0),
                         &Stroke {
                             width: m.route_width.unwrap_or(3.0) * s,
+                            line_cap: tiny_skia::LineCap::Round,
+                            line_join: tiny_skia::LineJoin::Round,
                             ..Default::default()
                         },
                         Transform::identity(),
@@ -571,13 +618,14 @@ pub(crate) fn draw_map(p: &mut Painter, m: &MapNode, at: Placement, ctx: &Ctx) {
                     );
                 }
             }
-            if cacheable {
-                p.statics.insert(cache_key, &pm);
-            }
         }
-        if let Some((lat, lon)) = pos {
+        if m.show_marker.unwrap_or(true)
+            && let Some((lat, lon)) = pos
+        {
             let q = xy(actionlay_maps::project(lat, lon));
-            if let Some(path) = PathBuilder::from_circle(q[0], q[1], 5.0 * s) {
+            if let Some(path) =
+                PathBuilder::from_circle(q[0], q[1], m.marker_radius.unwrap_or(5.0) * s)
+            {
                 pm.fill_path(
                     &path,
                     &paint(

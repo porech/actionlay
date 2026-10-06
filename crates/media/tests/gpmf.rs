@@ -102,3 +102,41 @@ fn truncated_faststart_file_returns_partial_packets() {
     let n = read_gpmf_packets(&cut).unwrap().len();
     assert!(n > 0 && n < full, "{n} packets of {full}");
 }
+
+#[test]
+fn indexed_metadata_seek_matches_full_read_and_stops_at_requested_time() {
+    use actionlay_media::gpmf::read_gpmf_range;
+    use std::sync::atomic::AtomicBool;
+    for name in [
+        "hero5.mp4",
+        "hero6.mp4",
+        "hero7.mp4",
+        "hero8.mp4",
+        "max-heromode.mp4",
+    ] {
+        let Some(path) = common::gopro_sample(name) else {
+            continue;
+        };
+        let all = read_gpmf_packets(&path).unwrap();
+        assert!(!all.is_empty());
+        let start = all[all.len() / 2].pts + 0.2;
+        let end = start + 2.0;
+        let part = read_gpmf_range(&path, start, end, &AtomicBool::new(false)).unwrap();
+        assert!(!part.is_empty(), "{name}");
+        assert!(
+            part[0].pts <= start,
+            "seek must include interpolation predecessor: {name}"
+        );
+        assert!(
+            part.iter().all(|p| p.pts <= end && all.contains(p)),
+            "{name}"
+        );
+        let expected: Vec<_> = all
+            .iter()
+            .filter(|p| p.pts >= part[0].pts && p.pts <= end)
+            .cloned()
+            .collect();
+        assert_eq!(part, expected, "{name}");
+        assert!(read_gpmf_range(&path, 0.0, end, &AtomicBool::new(true)).is_err());
+    }
+}

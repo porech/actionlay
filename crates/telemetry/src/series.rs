@@ -37,6 +37,9 @@ fn norm_deg180(a: f64) -> f64 {
 /// until `end[k]` and is valid when `v[k]` is Some.
 #[derive(Debug, Clone)]
 pub(crate) struct Series {
+    fallback: Option<Box<Series>>,
+    ranges: Option<Vec<(f64, f64)>>,
+    breaks: Vec<f64>,
     t: Vec<f64>,
     end: Vec<f64>,
     v: Vec<Option<f64>>,
@@ -49,6 +52,9 @@ impl Series {
     /// `samples` must be sorted by start time.
     pub fn new(interp: Interp, samples: impl IntoIterator<Item = (f64, f64, Option<f64>)>) -> Self {
         let mut s = Series {
+            fallback: None,
+            ranges: None,
+            breaks: Vec::new(),
             t: Vec::new(),
             end: Vec::new(),
             v: Vec::new(),
@@ -73,18 +79,65 @@ impl Series {
     }
 
     pub(crate) fn points(&self) -> impl Iterator<Item = (f64, Option<f64>)> + '_ {
-        self.t.iter().copied().zip(self.v.iter().copied())
+        let mut times = self.t.clone();
+        if let Some(s) = &self.fallback {
+            times.extend(s.points().map(|(t, _)| t));
+        }
+        times.sort_by(f64::total_cmp);
+        times.dedup();
+        times.into_iter().map(|t| (t, self.sample(t).present()))
+    }
+
+    pub(crate) fn with_fallback(mut self, fallback: Option<Series>) -> Self {
+        self.fallback = fallback.map(Box::new);
+        self
+    }
+
+    pub(crate) fn restrict(&mut self, ranges: Vec<(f64, f64)>) {
+        self.ranges = Some(ranges);
+    }
+    pub(crate) fn with_breaks(mut self, mut breaks: Vec<f64>) -> Self {
+        breaks.sort_by(f64::total_cmp);
+        breaks.dedup();
+        self.breaks = breaks;
+        self
     }
 
     /// True when valid samples k and k+1 are close enough to be joined.
     fn bridged(&self, k: usize) -> bool {
         k + 1 < self.t.len()
+            && self
+                .breaks
+                .get(self.breaks.partition_point(|&t| t <= self.t[k]))
+                .is_none_or(|&t| t > self.t[k + 1])
             && self.v[k].is_some()
             && self.v[k + 1].is_some()
             && self.t[k + 1] - self.t[k] <= MAX_BRIDGE
     }
 
     pub fn sample(&self, t: f64) -> Value {
+        let value = if self
+            .ranges
+            .as_ref()
+            .is_none_or(|rs| rs.iter().any(|&(a, b)| t >= a && t < b))
+        {
+            self.sample_own(t)
+        } else {
+            Value::Absent
+        };
+        if matches!(value, Value::Present(_)) {
+            return value;
+        }
+        if let Some(fallback) = &self.fallback {
+            let old = fallback.sample(t);
+            if !matches!(old, Value::Absent) {
+                return old;
+            }
+        }
+        value
+    }
+
+    fn sample_own(&self, t: f64) -> Value {
         // last sample starting at or before t
         let k = self.t.partition_point(|&s| s <= t);
         if k == 0 {
@@ -151,7 +204,30 @@ impl Series {
                 _ => out.push((self.t[k], end)),
             }
         }
-        out
+        if let Some(ranges) = &self.ranges {
+            out = out
+                .iter()
+                .flat_map(|&(a, b)| {
+                    ranges.iter().filter_map(move |&(c, d)| {
+                        let span = (a.max(c), b.min(d));
+                        (span.1 > span.0).then_some(span)
+                    })
+                })
+                .collect();
+        }
+        if let Some(s) = &self.fallback {
+            out.extend(s.covered());
+        }
+        out.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let mut merged: Vec<(f64, f64)> = Vec::new();
+        for span in out {
+            if let Some(last) = merged.last_mut().filter(|p| span.0 <= p.1) {
+                last.1 = last.1.max(span.1);
+            } else {
+                merged.push(span);
+            }
+        }
+        merged
     }
 }
 

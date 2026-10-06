@@ -27,10 +27,10 @@ const MAX_INVALID_IN_A_ROW: usize = 1000;
 /// overlapping guards may restore in the wrong order. ActionLay only changes
 /// the level here and in `ffmpeg_info::init`, so the worst case is a hidden
 /// warning or a briefly wrong level, never a crash.
-struct QuietLog(ffmpeg::util::log::Level);
+pub(crate) struct QuietLog(ffmpeg::util::log::Level);
 
 impl QuietLog {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         use ffmpeg::util::log;
         // get_level fails only for a level FFmpeg itself never sets.
         let previous = log::get_level().unwrap_or(log::Level::Warning);
@@ -53,9 +53,11 @@ impl Drop for QuietLog {
 /// a truncated recording) is logged and the packets read so far are returned
 /// instead of an error: partial telemetry is better than none.
 pub fn read_gpmf_packets(path: &Path) -> Result<Vec<GpmfPacket>, MediaError> {
-    read_gpmf_packets_with_cancel(
+    read_gpmf_range(
         path,
-        std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        0.0,
+        f64::INFINITY,
+        &std::sync::atomic::AtomicBool::new(false),
     )
 }
 
@@ -63,11 +65,90 @@ pub fn read_gpmf_packets_with_cancel(
     path: &Path,
     cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) -> Result<Vec<GpmfPacket>, MediaError> {
+    read_gpmf_range(path, 0.0, f64::INFINITY, &cancel)
+}
+
+/// Reads only the metadata stream in a time range. MP4's sample index lets the
+/// demuxer seek directly to metadata; video/audio streams are discarded.
+/// Includes the metadata packet before `start` for continuous interpolation.
+pub fn read_gpmf_range(
+    path: &Path,
+    start: f64,
+    end: f64,
+    cancelled: &std::sync::atomic::AtomicBool,
+) -> Result<Vec<GpmfPacket>, MediaError> {
+    read_gpmf_range_measured(path, start, end, cancelled).map(|(packets, _)| packets)
+}
+
+// AVIO's byte counter measures demux reads, including MP4 headers and buffering.
+fn read_gpmf_range_measured(
+    path: &Path,
+    start: f64,
+    end: f64,
+    cancelled: &std::sync::atomic::AtomicBool,
+) -> Result<(Vec<GpmfPacket>, i64), MediaError> {
+    let mut input = open_metadata(path, cancelled)?;
+    read_range_input(&mut input, start, end, cancelled)
+}
+
+fn open_metadata(
+    path: &Path,
+    cancelled: &std::sync::atomic::AtomicBool,
+) -> Result<ffmpeg::format::context::Input, MediaError> {
     ffmpeg_info::init();
     let _quiet = QuietLog::new();
-    let mut input = crate::input::open(path, cancel.clone())?;
+    // MP4 stores gpmd stream descriptors and its sample index in the header.
+    // Avoid find_stream_info: it probes media payloads we do not need here.
+    let name = std::ffi::CString::new(path.to_string_lossy().as_bytes())
+        .map_err(|e| MediaError::Io(e.to_string()))?;
+    unsafe extern "C" fn interrupt(opaque: *mut std::ffi::c_void) -> i32 {
+        // SAFETY: the borrowed AtomicBool outlives this synchronous input context.
+        unsafe {
+            (&*(opaque as *const std::sync::atomic::AtomicBool))
+                .load(std::sync::atomic::Ordering::Relaxed) as i32
+        }
+    }
+    // SAFETY: allocated context belongs to Input after opening successfully;
+    // avformat_open_input frees it on failure. Callback's borrow stays valid
+    // until Input drops, including while opening and seeking on slow storage.
+    let input = unsafe {
+        let mut raw = ffmpeg::ffi::avformat_alloc_context();
+        if raw.is_null() {
+            return Err(MediaError::Io("cannot allocate metadata input".into()));
+        }
+        (*raw).interrupt_callback = ffmpeg::ffi::AVIOInterruptCB {
+            callback: Some(interrupt),
+            opaque: cancelled as *const _ as *mut std::ffi::c_void,
+        };
+        let result = ffmpeg::ffi::avformat_open_input(
+            &mut raw,
+            name.as_ptr(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        );
+        if result < 0 {
+            return Err(ffmpeg::Error::from(result).into());
+        }
+        // Header parsing benefits from buffered reads. Afterwards metadata packets
+        // are small and scattered between large media chunks: direct AVIO reads
+        // avoid fetching a 32 KiB buffer for each ~4 KiB metadata packet.
+        let pb = (*raw).pb;
+        if !pb.is_null() {
+            (*pb).direct = 1;
+        }
+        ffmpeg::format::context::Input::wrap(raw)
+    };
+    Ok(input)
+}
+
+fn read_range_input(
+    input: &mut ffmpeg::format::context::Input,
+    start: f64,
+    end: f64,
+    cancelled: &std::sync::atomic::AtomicBool,
+) -> Result<(Vec<GpmfPacket>, i64), MediaError> {
     let Some(index) = input.streams().find(is_gpmd).map(|s| s.index()) else {
-        return Ok(Vec::new());
+        return Ok((Vec::new(), 0));
     };
     let time_base = f64::from(
         input
@@ -86,14 +167,28 @@ pub fn read_gpmf_packets_with_cancel(
             }
         }
     }
+    if start >= 0.0 && start.is_finite() {
+        // SAFETY: live input context, valid metadata stream index and stream timebase.
+        let result = unsafe {
+            ffmpeg::ffi::av_seek_frame(
+                input.as_mut_ptr(),
+                index as i32,
+                (start / time_base) as i64,
+                ffmpeg::ffi::AVSEEK_FLAG_BACKWARD,
+            )
+        };
+        if result < 0 {
+            return Err(ffmpeg::Error::from(result).into());
+        }
+    }
     let mut packets = Vec::new();
     let mut packet = ffmpeg::Packet::empty();
     let mut invalid_in_a_row = 0;
     loop {
-        if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+        if cancelled.load(std::sync::atomic::Ordering::Relaxed) {
             break;
         }
-        match packet.read(&mut input) {
+        match packet.read(input) {
             Ok(()) => invalid_in_a_row = 0,
             Err(ffmpeg::Error::Eof) => break,
             Err(ffmpeg::Error::InvalidData) => {
@@ -123,14 +218,84 @@ pub fn read_gpmf_packets_with_cancel(
             log::warn!("gpmd packet without timestamp or data skipped");
             continue;
         };
+        if ts as f64 * time_base > end {
+            break;
+        }
         packets.push(GpmfPacket {
             pts: ts as f64 * time_base,
             duration: packet.duration().max(0) as f64 * time_base,
             data: data.to_vec(),
         });
+        // The MP4 index tells us when the next metadata packet is beyond the
+        // requested range; avoid reading that extra payload just to detect it.
+        // SAFETY: metadata stream belongs to the live context; the index entry
+        // is only inspected while the demuxer is idle and remains unmodified.
+        if end.is_finite() {
+            let next_is_outside = unsafe {
+                let stream = *(*input.as_mut_ptr()).streams.add(index);
+                let next = ffmpeg::ffi::avformat_index_get_entry_from_timestamp(
+                    stream,
+                    packet.dts().unwrap_or(ts).saturating_add(1),
+                    ffmpeg::ffi::AVSEEK_FLAG_ANY,
+                );
+                !next.is_null() && (*next).timestamp as f64 * time_base > end
+            };
+            if next_is_outside {
+                break;
+            }
+        }
     }
     fill_missing_durations(&mut packets);
-    Ok(packets)
+    // SAFETY: the input and its AVIO context are still alive.
+    let bytes = unsafe {
+        let pb = (*input.as_ptr()).pb;
+        if pb.is_null() { 0 } else { (*pb).bytes_read }
+    };
+    Ok((packets, bytes))
+}
+
+/// Reuses the MP4 header and metadata sample index across route seeks.
+/// Kept on the metadata worker, separately from the playback decoder.
+pub struct GpmfReader {
+    // Drop Input before the Arc backing its interrupt callback.
+    input: ffmpeg::format::context::Input,
+    cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+impl GpmfReader {
+    pub fn open(
+        path: &Path,
+        cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ) -> Result<Self, MediaError> {
+        let input = open_metadata(path, &cancelled)?;
+        Ok(Self { input, cancelled })
+    }
+    /// Duration recorded in the container header, without probing media payloads.
+    pub fn duration(&self) -> f64 {
+        let container = self.input.duration().max(0) as f64 / f64::from(ffmpeg::ffi::AV_TIME_BASE);
+        self.input
+            .streams()
+            .map(|stream| stream.duration().max(0) as f64 * f64::from(stream.time_base()))
+            .filter(|duration| duration.is_finite())
+            .fold(container, f64::max)
+    }
+
+    /// Bytes fetched by FFmpeg's AVIO layer, including headers and buffering.
+    /// Filesystem/cloud-client read-ahead can transfer more bytes over the network.
+    pub fn bytes_read(&self) -> u64 {
+        // SAFETY: Input owns the live AVIO context.
+        unsafe {
+            let pb = (*self.input.as_ptr()).pb;
+            if pb.is_null() {
+                0
+            } else {
+                (*pb).bytes_read.max(0) as u64
+            }
+        }
+    }
+
+    pub fn read_range(&mut self, start: f64, end: f64) -> Result<Vec<GpmfPacket>, MediaError> {
+        read_range_input(&mut self.input, start, end, &self.cancelled).map(|(packets, _)| packets)
+    }
 }
 
 pub(crate) fn is_gpmd(stream: &ffmpeg::format::stream::Stream) -> bool {
@@ -187,5 +352,70 @@ mod tests {
     #[test]
     fn gpmd_tag_value() {
         assert_eq!(GPMD_TAG, 0x646d_7067);
+    }
+}
+
+#[cfg(test)]
+mod indexed_io_tests {
+    use super::*;
+    #[test]
+    fn metadata_seek_does_not_read_the_video_payload() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/gopro");
+        for name in [
+            "hero5.mp4",
+            "hero6.mp4",
+            "hero7.mp4",
+            "hero8.mp4",
+            "max-heromode.mp4",
+        ] {
+            let path = root.join(name);
+            if !path.exists() {
+                continue;
+            }
+            let size = std::fs::metadata(&path).unwrap().len();
+            let (full, all_bytes) = read_gpmf_range_measured(
+                &path,
+                0.0,
+                f64::INFINITY,
+                &std::sync::atomic::AtomicBool::new(false),
+            )
+            .unwrap();
+            let start = full[full.len() / 2].pts;
+            let (part, range_bytes) = read_gpmf_range_measured(
+                &path,
+                start,
+                start + 1.0,
+                &std::sync::atomic::AtomicBool::new(false),
+            )
+            .unwrap();
+            eprintln!("{name}: file {size}, metadata all {all_bytes}, range {range_bytes}");
+            assert!(
+                all_bytes > 0 && (all_bytes as u64) < size / 4,
+                "full metadata read must skip media payload: {name}"
+            );
+            assert!(range_bytes <= all_bytes && part.len() <= 3, "{name}");
+            let mut reader = GpmfReader::open(
+                &path,
+                std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            )
+            .unwrap();
+            assert!(reader.duration() > 0.0);
+            let header_bytes = reader.bytes_read();
+            let first = reader.read_range(start, start + 1.0).unwrap();
+            let payload = first
+                .iter()
+                .map(|packet| packet.data.len() as u64)
+                .sum::<u64>();
+            assert!(
+                reader.bytes_read() - header_bytes <= payload + 1024,
+                "metadata I/O amplification: {name}"
+            );
+            let before = reader.bytes_read();
+            assert_eq!(reader.read_range(start, start + 1.0).unwrap(), first);
+            assert!(
+                reader.bytes_read() - before <= payload + 1024,
+                "header must be retained across seeks: {name}"
+            );
+        }
     }
 }

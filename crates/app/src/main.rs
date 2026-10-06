@@ -21,7 +21,8 @@ use std::time::{Duration, Instant};
 
 use actionlay_layout::Layout;
 use actionlay_layout::geom::ScaleMode;
-use actionlay_media::player::{Player, PlayerOptions};
+use actionlay_media::chapters::ChapterPlayer as Player;
+use actionlay_media::player::PlayerOptions;
 use actionlay_telemetry::Telemetry;
 use eframe::egui;
 use overlay::{OverlayKey, OverlayRequest, OverlayWorker, Scheduler};
@@ -38,6 +39,16 @@ struct App {
     title_dirty: bool,
     select_layout: bool,
     select_audio: bool,
+    select_maps: bool,
+    select_privacy: bool,
+    select_sources: bool,
+    camera_telemetry: Option<Arc<Telemetry>>,
+    activity: Option<actionlay_telemetry::external::Activity>,
+    activity_rx:
+        Option<std::sync::mpsc::Receiver<Result<actionlay_telemetry::external::Activity, String>>>,
+    source_settings: prefs::SourceSettings,
+    source_notice: Option<String>,
+    chapter_offer: Option<usize>,
     audio_devices: Vec<String>,
     volume: f32,
     muted: bool,
@@ -68,6 +79,7 @@ struct App {
     telemetry_rev: u64,
     /// The only live telemetry load: the one of the current video.
     telemetry_rx: Option<telemetry_load::StreamLoad>,
+    route_requested_until: f64,
     loaded_telemetry: Option<Arc<Telemetry>>,
     /// pts of the current video's frame on screen (None before its first frame): the
     /// overlay is rendered for this time.
@@ -511,7 +523,7 @@ impl App {
     fn map_controls(&mut self, ui: &mut egui::Ui) {
         let mut maps = self.prefs.maps.clone().unwrap_or_default();
         let mut changed = false;
-        ui.collapsing("Maps and privacy",|ui| {
+        ui.collapsing("Map service",|ui| {
             changed|=ui.checkbox(&mut maps.online,"Download visible map tiles").changed();
             ui.small("Cached tiles remain available with downloads disabled.");
             ui.horizontal(|ui|{
@@ -526,18 +538,6 @@ impl App {
             ui.label("API key");changed|=ui.add(egui::TextEdit::singleline(&mut maps.api_key).password(true)).changed();
             ui.label("Attribution");changed|=ui.text_edit_singleline(&mut maps.attribution).changed();
             if !maps.valid(){ui.colored_label(egui::Color32::YELLOW,"Downloads wait for a valid URL and attribution.");}
-            ui.separator();ui.label("Privacy zones (hide map position and route)");
-            let mut remove=None;
-            for (i,zone) in maps.privacy.iter_mut().enumerate(){ui.horizontal(|ui|{
-                changed|=ui.add(egui::DragValue::new(&mut zone.lat).speed(0.0001).range(-85.0..=85.0).prefix("Lat ")).changed();
-                changed|=ui.add(egui::DragValue::new(&mut zone.lon).speed(0.0001).range(-180.0..=180.0).prefix("Lon ")).changed();
-                changed|=ui.add(egui::DragValue::new(&mut zone.radius_m).range(1.0..=100000.0).suffix(" m")).changed();
-                if ui.small_button("Remove").clicked(){remove=Some(i);}
-            });}
-            if let Some(i)=remove {maps.privacy.remove(i);changed=true;}
-            if ui.button("Add privacy zone at current position").clicked(){let snap=self.loaded_telemetry.as_ref().map(|t|t.sample(self.shown_t.unwrap_or(0.0)));
-                maps.privacy.push(actionlay_maps::PrivacyZone{lat:snap.as_ref().and_then(|s|s.get(actionlay_telemetry::Metric::Lat).last_known()).unwrap_or(0.0),lon:snap.as_ref().and_then(|s|s.get(actionlay_telemetry::Metric::Lon).last_known()).unwrap_or(0.0),radius_m:250.0});changed=true;
-            }
         });
         if changed {
             self.overlay.maps().configure(maps.clone());
@@ -659,6 +659,242 @@ impl App {
         }
     }
 
+    fn privacy_dialog(&mut self, ctx: &egui::Context) {
+        if !self.select_privacy {
+            return;
+        }
+        let mut visible = true;
+        let mut maps = self.prefs.maps.clone().unwrap_or_default();
+        let mut changed = false;
+        egui::Window::new("Privacy zones")
+            .open(&mut visible)
+            .default_width(600.0)
+            .show(ctx, |ui| {
+                ui.label("Hide private places, such as your home or workplace, on map overlays. Inside each zone, the position marker and route are hidden.");
+                ui.small("Your zones are saved in user configuration and apply to every video and layout.");
+                ui.separator();
+                ui.label("Set the center using latitude and longitude, then choose a radius in meters. You can also use the GPS position at the current video frame.");
+                ui.small("This affects map overlays only. The video image, original GPS data and telemetry shown by other widgets remain available.");
+                ui.separator();
+                let mut remove = None;
+                for (i, zone) in maps.privacy.iter_mut().enumerate() {
+                    ui.horizontal(|ui| {
+                        changed |= ui
+                            .add(
+                                egui::DragValue::new(&mut zone.lat)
+                                    .speed(0.0001)
+                                    .range(-85.0..=85.0)
+                                    .prefix("Lat "),
+                            )
+                            .changed();
+                        changed |= ui
+                            .add(
+                                egui::DragValue::new(&mut zone.lon)
+                                    .speed(0.0001)
+                                    .range(-180.0..=180.0)
+                                    .prefix("Lon "),
+                            )
+                            .changed();
+                        changed |= ui
+                            .add(
+                                egui::DragValue::new(&mut zone.radius_m)
+                                    .range(1.0..=100000.0)
+                                    .prefix("Radius ")
+                                    .suffix(" m"),
+                            )
+                            .changed();
+                        if ui.small_button("Remove").clicked() {
+                            remove = Some(i);
+                        }
+                    });
+                }
+                if let Some(i) = remove {
+                    maps.privacy.remove(i);
+                    changed = true;
+                }
+                if ui.button("Add zone").clicked() {
+                    maps.privacy.push(actionlay_maps::PrivacyZone {
+                        lat: 0.0,
+                        lon: 0.0,
+                        radius_m: 250.0,
+                    });
+                    changed = true;
+                }
+                let pos = self
+                    .loaded_telemetry
+                    .as_ref()
+                    .map(|t| t.sample(self.shown_t.unwrap_or(0.0)))
+                    .and_then(|s| {
+                        s.get(actionlay_telemetry::Metric::Lat)
+                            .present()
+                            .zip(s.get(actionlay_telemetry::Metric::Lon).present())
+                    });
+                if ui
+                    .add_enabled(
+                        pos.is_some(),
+                        egui::Button::new("Add zone at current position"),
+                    )
+                    .clicked()
+                    && let Some((lat, lon)) = pos
+                {
+                    maps.privacy.push(actionlay_maps::PrivacyZone {
+                        lat,
+                        lon,
+                        radius_m: 250.0,
+                    });
+                    changed = true;
+                }
+            });
+        self.select_privacy = visible;
+        if changed {
+            self.overlay.maps().configure(maps.clone());
+            self.prefs.maps = Some(maps);
+            self.save_prefs();
+        }
+    }
+
+    fn maps_dialog(&mut self, ctx: &egui::Context) {
+        if !self.select_maps {
+            return;
+        }
+        let mut visible = true;
+        egui::Window::new("Maps")
+            .open(&mut visible)
+            .default_width(580.0)
+            .show(ctx, |ui| {
+                ui.label("User preferences · apply to every video and layout");
+                self.map_controls(ui);
+            });
+        self.select_maps = visible;
+    }
+
+    fn save_sources(&mut self) {
+        if let Some(path) = &self.video_path {
+            self.prefs
+                .video_sources
+                .insert(prefs::video_identity(path), self.source_settings.clone());
+            self.save_prefs();
+        }
+    }
+    fn link_activity(&mut self, path: PathBuf) {
+        if self.player.is_none() {
+            self.error = Some("Open a video before linking an activity".into());
+            return;
+        }
+        self.activity = None;
+        self.refresh_sources();
+        let ctx = self.egui_ctx.clone();
+        self.activity_rx = Some(telemetry_load::spawn_activity(path.clone(), move || {
+            ctx.request_repaint()
+        }));
+        self.source_settings.activity = Some(path);
+        self.source_notice = Some("Reading activity…".into());
+    }
+    fn poll_activity(&mut self) {
+        let Some(rx) = &self.activity_rx else {
+            return;
+        };
+        let Ok(result) = rx.try_recv() else {
+            return;
+        };
+        self.activity_rx = None;
+        match result {
+            Ok(activity) => {
+                self.activity = Some(activity);
+                self.refresh_sources();
+                self.save_sources();
+            }
+            Err(e) => {
+                self.source_notice = Some(e);
+            }
+        }
+    }
+    fn refresh_sources(&mut self) {
+        let Some(player) = &self.player else {
+            return;
+        };
+        let duration = player.info().duration;
+        let mut tel = self
+            .camera_telemetry
+            .as_ref()
+            .map_or_else(|| Telemetry::empty(duration), |t| (**t).clone());
+        if let Some(activity) = &self.activity {
+            let origin = if self.source_settings.video_utc.trim().is_empty() {
+                tel.start_utc()
+            } else {
+                chrono::DateTime::parse_from_rfc3339(self.source_settings.video_utc.trim())
+                    .ok()
+                    .map(|u| u.with_timezone(&chrono::Utc))
+            };
+            match activity.align(origin, duration, self.source_settings.offset) {
+                Ok(external) => {
+                    tel = tel.merge_external(&external, duration);
+                    self.source_notice =
+                        Some(format!("{} activity samples linked", activity.points.len()));
+                }
+                Err(e) => self.source_notice = Some(e.to_string()),
+            }
+        }
+        let tel = Arc::new(tel);
+        self.loaded_telemetry = Some(tel.clone());
+        self.overlay.set_telemetry(Some(tel), self.scale_mode);
+        self.telemetry_rev += 1;
+    }
+    fn sources_dialog(&mut self, ctx: &egui::Context) {
+        if !self.select_sources {
+            return;
+        }
+        let mut visible = true;
+        let mut link = false;
+        let mut unlink = false;
+        let mut changed = false;
+        let mut mode_changed = false;
+        egui::Window::new("Video sources").open(&mut visible).default_width(550.0).show(ctx, |ui| {
+            let Some(player) = &self.player else { ui.label("Open a video to link sources."); return; };
+            ui.label(format!("{} video chapter(s)",player.timeline().chapters.len()));
+            mode_changed = ui.checkbox(&mut self.source_settings.open_alone,"Open this file alone (disable automatic chapters)").changed();
+            ui.add_enabled_ui(!self.source_settings.open_alone, |ui| {
+                mode_changed |= ui.checkbox(&mut self.source_settings.load_sequence,"Load the complete GoPro sequence from its first chapter").changed();
+            });
+            ui.separator();
+            if let Some(path) = &self.source_settings.activity { ui.label(path.display().to_string()); }
+            ui.horizontal(|ui| { link = ui.button("Link GPX/FIT…").clicked(); unlink = ui.add_enabled(self.source_settings.activity.is_some(),egui::Button::new("Unlink")).clicked(); });
+            changed |= ui.add(egui::DragValue::new(&mut self.source_settings.offset).speed(0.1).suffix(" s").prefix("Activity offset ")).changed();
+            ui.small("Positive offset moves activity data later in the video.");
+            ui.label("UTC of the first video frame (optional if the camera has GPS)");
+            changed |= ui.add(egui::TextEdit::singleline(&mut self.source_settings.video_utc).hint_text("2026-09-27T12:15:30Z")).changed();
+            if let Some(utc) = self.camera_telemetry.as_ref().and_then(|t|t.start_utc()) { ui.small(format!("Camera UTC: {utc}")); }
+            if let Some(notice) = &self.source_notice { ui.label(notice); }
+            ui.small("Links and offsets are remembered for this video. External data fills available metrics; camera data fills its gaps.");
+        });
+        self.select_sources = visible;
+        if link
+            && let Some(path) = rfd::FileDialog::new()
+                .set_title("Link activity")
+                .add_filter("Activity", &["gpx", "fit"])
+                .pick_file()
+        {
+            self.link_activity(path);
+        }
+        if unlink {
+            self.activity = None;
+            self.activity_rx = None;
+            self.source_settings.activity = None;
+            self.source_notice = None;
+            changed = true;
+        }
+        if changed {
+            self.refresh_sources();
+            self.save_sources();
+        }
+        if mode_changed {
+            self.save_sources();
+            if let Some(path) = self.video_path.clone() {
+                self.open(path);
+            }
+        }
+    }
+
     fn layout_chooser(&mut self, ctx: &egui::Context) {
         if !self.select_layout {
             return;
@@ -707,7 +943,6 @@ impl App {
                         });
                         ui.separator();
                         self.appearance_controls(ui);
-                        self.map_controls(ui);
                         ui.separator();
                         ui.collapsing("Imported layouts", |ui| {
                             if let Some(root) =
@@ -831,6 +1066,9 @@ impl App {
             menus::Command::ExportLayout => self.export_layout(),
             menus::Command::ExitEditor => self.request_edit_action(EditAction::Exit, ctx),
             menus::Command::SelectLayout => self.select_layout = true,
+            menus::Command::MapSettings => self.select_maps = true,
+            menus::Command::PrivacySettings => self.select_privacy = true,
+            menus::Command::Sources => self.select_sources = self.player.is_some(),
             menus::Command::AudioSettings => {
                 match actionlay_media::audio::AudioOutput::devices() {
                     Ok(names) => self.audio_devices = names,
@@ -862,7 +1100,9 @@ impl App {
                 } else {
                     rfd::FileDialog::new().set_title("Open Video").add_filter(
                         "Video",
-                        &["mp4", "mov", "m4v", "mkv", "avi", "webm", "mts", "m2ts"],
+                        &[
+                            "mp4", "mov", "m4v", "mkv", "avi", "webm", "mts", "m2ts", "insv", "lrv",
+                        ],
                     )
                 }
                 .add_filter("All files", &["*"]);
@@ -891,7 +1131,13 @@ impl App {
                 self.video_path = None;
                 self.title_dirty = true;
                 self.telemetry_rx = None;
+                self.route_requested_until = 0.0;
                 self.loaded_telemetry = None;
+                self.camera_telemetry = None;
+                self.activity = None;
+                self.activity_rx = None;
+                self.source_notice = None;
+                self.chapter_offer = None;
                 self.video_notice = None;
                 self.failure_notice = None;
                 self.error = None;
@@ -910,10 +1156,25 @@ impl App {
     }
 
     fn open(&mut self, path: PathBuf) {
-        match Player::open_with_audio_device(
+        let settings = self
+            .prefs
+            .video_sources
+            .get(&prefs::video_identity(&path))
+            .cloned()
+            .unwrap_or_default();
+        let first = actionlay_media::chapters::is_first_chapter(&path);
+        let join = !settings.open_alone && (first || settings.load_sequence);
+        let offer = if !first && !settings.open_alone && !settings.load_sequence {
+            let chapters = actionlay_media::chapters::discover(&path);
+            (chapters.len() > 1).then_some(chapters.len())
+        } else {
+            None
+        };
+        match Player::open_mode(
             &path,
             PlayerOptions::default(),
             self.prefs.audio_device.as_deref(),
+            join,
         ) {
             Ok(p) => {
                 let info = p.info();
@@ -940,7 +1201,12 @@ impl App {
                 // the previous video's telemetry, notices and overlay are gone for good:
                 // its loader's result (if any) is discarded with the receiver
                 self.telemetry_rx = None;
+                self.route_requested_until = 0.0;
                 self.loaded_telemetry = None;
+                self.camera_telemetry = None;
+                self.activity = None;
+                self.activity_rx = None;
+                self.source_notice = None;
                 self.video_notice = self.player.as_ref().and_then(|p| {
                     (p.info().audio.is_some() && !p.stats().audio_active).then(|| {
                         "Audio output unavailable; playback is silent. Select a device in Settings → Audio.".into()
@@ -953,6 +1219,8 @@ impl App {
                 self.overlay
                     .set_telemetry(Some(Arc::new(Telemetry::empty(duration))), self.scale_mode);
                 self.telemetry_rev += 1;
+                self.source_settings = settings;
+                self.chapter_offer = offer;
                 let ctx = self.egui_ctx.clone();
                 self.telemetry_rx = metadata.and_then(|meta| {
                     self.player.as_mut().unwrap().take_telemetry().map(|rx| {
@@ -961,6 +1229,17 @@ impl App {
                         })
                     })
                 });
+                if self.telemetry_rx.is_none() {
+                    let ctx = self.egui_ctx.clone();
+                    self.telemetry_rx = Some(telemetry_load::spawn_camera(
+                        path.clone(),
+                        duration,
+                        move || ctx.request_repaint(),
+                    ));
+                }
+                if let Some(activity) = self.source_settings.activity.clone() {
+                    self.link_activity(activity);
+                }
             }
             Err(e) => self.error = Some(format!("{}: {e}", path.display())),
         }
@@ -1033,6 +1312,75 @@ impl App {
         self.layout_rev += 1;
     }
 
+    fn request_route_metadata(&mut self) {
+        if self
+            .editor
+            .as_ref()
+            .map_or(!self.overlay_visible, |editor| !editor.video_background)
+        {
+            return;
+        }
+        use actionlay_layout::model::{MapRoute, Node, Widget};
+        fn route(nodes: &[Node]) -> MapRoute {
+            let mut result = MapRoute::None;
+            for node in nodes {
+                if let Node::Known(widget) = node {
+                    if widget.common().visible == Some(false) {
+                        continue;
+                    }
+                    let mode = match widget {
+                        Widget::Map(map) => map.route_mode.unwrap_or_default(),
+                        _ => route(widget.children()),
+                    };
+                    if mode == MapRoute::Full {
+                        return mode;
+                    }
+                    if mode == MapRoute::Past {
+                        result = mode;
+                    }
+                }
+            }
+            result
+        }
+        let (Some(player), Some(load)) = (&self.player, &self.telemetry_rx) else {
+            return;
+        };
+        let nodes = self
+            .editor
+            .as_ref()
+            .map_or(&self.layout.nodes, |editor| &editor.draft.nodes);
+        let end = match route(nodes) {
+            MapRoute::None => return,
+            MapRoute::Full => player.info().duration,
+            MapRoute::Past => self.shown_t.unwrap_or(0.0),
+        };
+        if end <= self.route_requested_until + 0.001 {
+            return;
+        }
+        // Already played packets form a contiguous prefix; only fill unread gaps.
+        if self
+            .camera_telemetry
+            .as_ref()
+            .is_some_and(|t| t.is_loaded_through(end))
+        {
+            return;
+        }
+        let Some(telemetry) = &self.camera_telemetry else {
+            return;
+        };
+        let ranges = telemetry
+            .unread_ranges(end)
+            .into_iter()
+            .filter_map(|(start, stop)| {
+                let start = start.max(self.route_requested_until);
+                (stop > start + 0.001).then_some((start, stop))
+            })
+            .collect::<Vec<_>>();
+        if !ranges.is_empty() && load.request_route(player.timeline().clone(), ranges) {
+            self.route_requested_until = end;
+        }
+    }
+
     fn poll_telemetry(&mut self) {
         let Some(rx) = &self.telemetry_rx else { return };
         let Some(loaded) = rx.take_update() else {
@@ -1043,9 +1391,8 @@ impl App {
             self.video_notice = Some(w);
         }
         let telemetry = Arc::new(loaded.telemetry);
-        self.loaded_telemetry = Some(telemetry.clone());
-        self.overlay.set_telemetry(Some(telemetry), self.scale_mode);
-        self.telemetry_rev += 1;
+        self.camera_telemetry = Some(telemetry);
+        self.refresh_sources();
     }
 
     fn poll_overlay(&mut self) {
@@ -1186,9 +1533,15 @@ impl eframe::App for App {
             match layouts::classify(path) {
                 layouts::Dropped::Layout(p) => self.open_layout(p),
                 layouts::Dropped::Video(p) => self.open(p),
+                layouts::Dropped::Activity(p) => {
+                    self.link_activity(p);
+                    self.select_sources = true;
+                }
             }
         }
+        self.request_route_metadata();
         self.poll_telemetry();
+        self.poll_activity();
         let map_revision = self.overlay.maps().revision();
         if map_revision != self.map_revision {
             self.map_revision = map_revision;
@@ -1210,6 +1563,9 @@ impl eframe::App for App {
             {
                 transport::handle_keys(ui.ctx(), p, &self.scrub);
             }
+            if let Some(e) = p.take_error() {
+                self.error = Some(e);
+            }
             if let Some(frame) = p.poll_frame() {
                 self.shown_t = Some(frame.pts);
                 let color = p.info().video.color;
@@ -1220,12 +1576,28 @@ impl eframe::App for App {
 
         let status = self.overlay_status();
         let notices = self.notices();
+        let mut load_sequence = false;
+        let mut dismiss_chapters = false;
         egui::Panel::bottom("transport").show(ui, |ui| {
             let enabled = self.pending_edit_action.is_none()
                 && self.editor.as_ref().is_none_or(|e| e.video_background);
             if let Some(p) = &mut self.player {
                 ui.add_enabled_ui(enabled, |ui| {
                     transport::show(ui, p, &mut self.scrub, &status)
+                });
+            }
+            if let Some(count) = self.chapter_offer {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(format!(
+                        "This is an intermediate GoPro chapter. {count} chapters are available."
+                    ));
+                    load_sequence = ui
+                        .add_enabled(
+                            enabled,
+                            egui::Button::new("Load sequence from first chapter"),
+                        )
+                        .clicked();
+                    dismiss_chapters = ui.button("Keep this file").clicked();
                 });
             }
             if let Some(e) = &self.error {
@@ -1235,7 +1607,21 @@ impl eframe::App for App {
                 ui.small(n);
             }
         });
+        if dismiss_chapters {
+            self.chapter_offer = None;
+        }
+        if load_sequence {
+            self.source_settings.load_sequence = true;
+            self.source_settings.open_alone = false;
+            self.save_sources();
+            if let Some(path) = self.video_path.clone() {
+                self.open(path);
+            }
+        }
         self.audio_dialog(ui.ctx());
+        self.maps_dialog(ui.ctx());
+        self.privacy_dialog(ui.ctx());
+        self.sources_dialog(ui.ctx());
         if let Some(mut editor) = self.editor.take() {
             editor.set_maps(self.overlay.maps().clone());
             let video_size = self
@@ -1415,6 +1801,15 @@ fn main() -> eframe::Result {
                 title_dirty: false,
                 select_layout: false,
                 select_audio: false,
+                select_maps: false,
+                select_privacy: false,
+                select_sources: false,
+                camera_telemetry: None,
+                activity: None,
+                activity_rx: None,
+                source_settings: Default::default(),
+                source_notice: None,
+                chapter_offer: None,
                 audio_devices: Vec::new(),
                 volume: 1.0,
                 muted: false,
@@ -1439,6 +1834,7 @@ fn main() -> eframe::Result {
                 layout_rev: 0,
                 telemetry_rev: 0,
                 telemetry_rx: None,
+                route_requested_until: 0.0,
                 loaded_telemetry: None,
                 egui_ctx: cc.egui_ctx.clone(),
                 shown_t: None,
@@ -1457,6 +1853,7 @@ fn main() -> eframe::Result {
                 match layouts::classify(path) {
                     layouts::Dropped::Layout(path) => app.open_layout(path),
                     layouts::Dropped::Video(path) => app.open(path),
+                    layouts::Dropped::Activity(path) => app.link_activity(path),
                 }
             }
             Ok(Box::new(app))

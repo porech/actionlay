@@ -15,3 +15,5 @@ pub mod probe;
 pub mod video;
 
 pub use error::MediaError;
+
+pub mod chapters;

@@ -16,6 +16,8 @@ pub struct Appearance {
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Prefs {
+    #[serde(default)]
+    pub video_sources: std::collections::BTreeMap<String, SourceSettings>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub export: Option<crate::export::Settings>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -198,4 +200,26 @@ mod tests {
         let lower = p.to_string_lossy().to_ascii_lowercase();
         assert!(lower.contains("actionlay"), "{}", p.display());
     }
+}
+
+/// Per-video links and synchronization; privacy zones remain global in `maps`.
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SourceSettings {
+    pub activity: Option<PathBuf>,
+    pub offset: f64,
+    pub video_utc: String,
+    pub open_alone: bool,
+    pub load_sequence: bool,
+}
+
+pub fn video_identity(path: &Path) -> String {
+    let path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let metadata = std::fs::metadata(&path).ok();
+    let size = metadata.as_ref().map_or(0, |m| m.len());
+    let modified = metadata
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0, |t| t.as_nanos());
+    format!("{}|{size}|{modified}", path.display())
 }

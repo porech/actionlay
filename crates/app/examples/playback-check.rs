@@ -1,5 +1,7 @@
 //! A limited playback/seek check using the same player and telemetry loader as UI.
 //! Usage: playback-check FILE [SEEK_SECONDS]
+// This diagnostic includes the loader but only exercises GoPro playback.
+#[allow(dead_code)]
 #[path = "../src/telemetry_load.rs"]
 mod telemetry_load;
 use actionlay_media::player::{Player, PlayerOptions};

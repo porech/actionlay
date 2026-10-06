@@ -497,16 +497,33 @@ pub struct MapNode {
     pub size: Option<[f32; 2]>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<MapMode>,
+    /// North-up (default) or rotate the map so the direction of travel points up.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub orientation: Option<MapOrientation>,
+    /// No route (default), completed route only, or the entire available route.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub route_mode: Option<MapRoute>,
+    /// Use separate colors for the completed and upcoming route; defaults to true.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub split_route: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub zoom: Option<u8>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub radius: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub route: Option<ColorRef>,
+    /// Upcoming route color; defaults to yellow. `route` colors the completed part.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub route_future: Option<ColorRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub route_width: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub marker: Option<ColorRef>,
+    /// Radius of the current-position dot, in design pixels; defaults to 5.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub marker_radius: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub show_marker: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background: Option<ColorRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -561,6 +578,23 @@ pub enum MapMode {
     Journey,
     MovingJourney,
     Circuit,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MapOrientation {
+    #[default]
+    NorthUp,
+    CourseUp,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MapRoute {
+    #[default]
+    None,
+    Past,
+    Full,
 }
 
 impl ChartNode {

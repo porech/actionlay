@@ -8,7 +8,7 @@ top: speed, altitude, maps, heart rate and more. You can also design the
 dashboard visually and export the result. It is free, open source, and ships
 as a single executable for Windows, macOS and Linux.
 
-> **Status: early prototype (milestones M1–M5 done).** ActionLay plays
+> **Status: early prototype (milestones M1–M6 done).** ActionLay plays
 > GoPro footage with hardware decoding and a live telemetry dashboard, including
 > maps, charts, circular instruments and a G-meter. Upstream XML layouts can be
 > imported. The M4 visual editor can create and save portable layouts,
@@ -46,6 +46,10 @@ as a single executable for Windows, macOS and Linux.
   pause and opening another file cancel the pending playback action.
   Telemetry appears as packets arrive, without scanning the whole video.
   Unread ranges show empty values; the odometer waits for a complete prefix.
+  Maps default to north up with no route, so they do not trigger a metadata scan.
+  Selecting a completed or full route displays a loading notice in the editor.
+  GoPro route backfill seeks directly to missing metadata intervals, discards
+  video/audio payloads, and reuses the MP4 index across requests.
 - **Your own layout**: the dashboard is a JSON file. Drag a `.ovl.json` file
   onto the window to use it; ActionLay remembers the last one. The default
   layout is in `crates/layout/layouts/default.ovl.json`, and a JSON Schema for
@@ -60,7 +64,14 @@ as a single executable for Windows, macOS and Linux.
   editable in layout JSON, including optional per-compass smoothing and thresholds.
 - **Maps, charts and G-meter**: Default includes a moving map; Moto adds a route
   map and a friction circle; Training includes an elevation/gradient chart. Map
-  providers, attribution, API keys and offline mode are configurable. Visible
+  orientation, route visibility, completed/upcoming colors, line width and
+  position-dot size/color are configurable per widget. Route defaults are dark
+  green for completed portions and yellow for upcoming portions.
+  Providers, attribution, API keys and offline mode live in Settings → Maps….
+  Settings → Privacy zones… stores global circular zones which hide positions
+  and route segments in map overlays; it does not redact the video or other GPS
+  widgets. The interface explains how repeated starts/ends can identify a place.
+  Visible
   tiles are loaded asynchronously and cached on disk; no route bulk download.
   Data gaps dim the last reading for a configurable time, then show an empty state.
   G-meter mounting calibration uses causal IMU/GPS correlation; without confident
@@ -70,6 +81,22 @@ as a single executable for Windows, macOS and Linux.
   resolution, and save a native layout in the local library. Conversion notes
   report native equivalents and unsupported controls. The thirteen pinned
   upstream layouts are embedded alongside the three ActionLay presets.
+- **File → Video sources…**: link a GPX/FIT activity, align by UTC, and adjust
+  its time offset or set video UTC manually. Linked activity values take priority
+  where present; camera values fill gaps. Link and alignment settings are saved
+  per video. The CLI supports `--activity`, `--offset`, and `--video-utc`, and can
+  inspect standalone GPX/FIT files.
+- **GoPro chapters**: contiguous GX/GH or GOPR/Gnnn chapters are discovered in
+  the same folder and played on one timeline without concatenating files.
+  Opening the first chapter loads the sequence; an intermediate chapter opens
+  alone and offers to load the sequence from the first chapter. The choice is
+  remembered per video. CLI options are `--single-file` and `--all-chapters`.
+- **Other camera telemetry**: an adapter uses telemetry-parser for normalized
+  accelerometer, quaternion orientation and available timestamped GPS data.
+  Native DJI Avata orientation and Insta360 ONE X2 accelerometer are validated
+  with public originals. Device/firmware support depends on the parser; these
+  samples contain no GPS. `.insv` files can be opened directly (raw video,
+  without 360 stitching/reframing).
 - **Settings → Audio…**: choose the system default or a specific output device.
   The preference saves immediately; changing devices preserves playback position,
   pause state, speed and loaded telemetry. A failed switch keeps the current
@@ -105,7 +132,7 @@ as a single executable for Windows, macOS and Linux.
 | **M3** ✅ | All dashboard widgets: gauges, charts, compasses, moving and journey maps, plus a G-meter. Every widget is deeply customisable, with good defaults and a polished look when data is missing. Layouts from gopro-dashboard-overlay can be imported |
 | **M4** ✅ | Visual layout editor: add, move, resize and style widgets, with anchors that adapt to any resolution or aspect ratio. It warns you when a widget can't work with the data in your video, and layouts can be shared as files |
 | **M5** ✅ | Export the final video, a transparent overlay (ProRes 4444 / PNG), or an overlay on a selectable solid background, green by default |
-| M6 | GPX/FIT files from bike computers and watches, other cameras (DJI, Insta360, …), and GoPro chapters joined automatically |
+| **M6** ✅ | GPX/FIT files from bike computers and watches, other cameras (DJI, Insta360, …), and GoPro chapters joined automatically |
 | M7 | Polished releases for Windows, macOS and Linux |
 
 The full design is in [docs/superpowers/specs](docs/superpowers/specs/).

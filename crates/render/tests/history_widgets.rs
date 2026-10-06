@@ -126,3 +126,84 @@ fn privacy_zone_prevents_requests_for_a_hidden_current_position() {
     std::thread::sleep(std::time::Duration::from_millis(100));
     assert!(matches!(listener.accept(),Err(e) if e.kind()==std::io::ErrorKind::WouldBlock));
 }
+
+#[test]
+fn map_route_modes_split_colors_rotation_and_marker_size() {
+    let tel = Telemetry::for_test(
+        3.0,
+        &[
+            (Metric::Lat, vec![(0.0, 45.0), (1.0, 45.0), (2.0, 45.0)]),
+            (Metric::Lon, vec![(0.0, 9.0), (1.0, 9.001), (2.0, 9.002)]),
+            (Metric::Cog, vec![(0.0, 90.0), (2.0, 90.0)]),
+        ],
+    );
+    let mut r = Renderer::new();
+    r.set_maps(TileStore::new(
+        Settings {
+            online: false,
+            ..Default::default()
+        },
+        None,
+        || {},
+    ));
+    let make = |options: &str| {
+        layout(&format!(
+            r##"[{{"type":"map","size":[400,300],"mode":"circuit","background":"#000000","show_marker":false,{options}}}]"##
+        ))
+    };
+    let count = |p: &Pixmap, rgb: (u8, u8, u8)| {
+        p.pixels()
+            .iter()
+            .filter(|c| (c.red(), c.green(), c.blue()) == rgb)
+            .count()
+    };
+    let green = (22, 101, 52);
+    let yellow = (250, 204, 21);
+    let full = make(r#""route_mode":"full","route_width":8"#);
+    let at_start = render(&mut r, &full, &tel, 0.0);
+    assert_eq!(count(&at_start, green), 0);
+    assert!(count(&at_start, yellow) > 100);
+    let middle = render(&mut r, &full, &tel, 1.0);
+    assert!(count(&middle, green) > 100 && count(&middle, yellow) > 100);
+    let end = render(&mut r, &full, &tel, 2.0);
+    assert!(count(&end, green) > 100);
+    assert_eq!(count(&end, yellow), 0);
+    assert_eq!(middle.data(), render(&mut r, &full, &tel, 1.0).data());
+    let none = render(&mut r, &make(r#""orientation":"north_up""#), &tel, 1.0);
+    assert_eq!(count(&none, green) + count(&none, yellow), 0);
+    let past = render(
+        &mut r,
+        &make(r#""route_mode":"past","route_width":8"#),
+        &tel,
+        1.0,
+    );
+    assert!(count(&past, green) > 100);
+    assert_eq!(count(&past, yellow), 0);
+    let rotated = render(
+        &mut r,
+        &make(r#""route_mode":"full","route_width":8,"orientation":"course_up""#),
+        &tel,
+        1.0,
+    );
+    let coords: Vec<_> = rotated
+        .pixels()
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| (c.red(), c.green(), c.blue()) == yellow)
+        .map(|(i, _)| (i % 960, i / 960))
+        .collect();
+    let width =
+        coords.iter().map(|c| c.0).max().unwrap() - coords.iter().map(|c| c.0).min().unwrap();
+    let height =
+        coords.iter().map(|c| c.1).max().unwrap() - coords.iter().map(|c| c.1).min().unwrap();
+    assert!(height > width * 3, "eastbound route must point up");
+    let dot = |radius| {
+        layout(&format!(
+            r##"[{{"type":"map","size":[400,300],"mode":"circuit","background":"#000000","marker":"#ff0000","marker_radius":{radius}}}]"##
+        ))
+    };
+    assert!(
+        count(&render(&mut r, &dot(12), &tel, 1.0), (255, 0, 0))
+            > count(&render(&mut r, &dot(3), &tel, 1.0), (255, 0, 0)) * 4
+    );
+}

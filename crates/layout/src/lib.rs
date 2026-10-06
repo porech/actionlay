@@ -181,7 +181,9 @@ pub fn default_layout() -> Layout {
 
 /// The published JSON Schema of the layout format.
 pub fn json_schema() -> serde_json::Value {
-    schemars::schema_for!(Layout).to_value()
+    let mut schema = schemars::schema_for!(Layout).to_value();
+    schema.sort_all_objects();
+    schema
 }
 
 #[cfg(test)]

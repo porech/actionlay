@@ -15,6 +15,7 @@ actionlay-layout = { path = "../layout" }
 actionlay-render = { path = "../render" }
 actionlay-telemetry = { path = "../telemetry" }
 actionlay-maps = { path = "../maps" }
+chrono.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 directories.workspace = true

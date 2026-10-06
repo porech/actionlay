@@ -239,7 +239,7 @@ impl Converter {
             }
             "moving_map" | "journey_map" | "moving_journey_map" | "cairo_circuit_map"
             | "cairo-circuit-map" | "circuit_map" => {
-                json!({"type":"map","mode":match kind{"moving_map"=>"moving","journey_map"=>"journey","moving_journey_map"=>"moving_journey",_=>"circuit"},"size":[diameter,diameter],"zoom":self.num(e,"zoom",15.0) as u8,"radius":self.num(e,"corner_radius",12.0)*self.scale})
+                json!({"type":"map","route_mode":if kind=="moving_map"{"none"}else{"full"},"split_route":false,"route":"accent","mode":match kind{"moving_map"=>"moving","journey_map"=>"journey","moving_journey_map"=>"moving_journey",_=>"circuit"},"size":[diameter,diameter],"zoom":self.num(e,"zoom",15.0) as u8,"radius":self.num(e,"corner_radius",12.0)*self.scale})
             }
             "compass" | "compass-arrow" => {
                 json!({"type":"compass","metric":"heading","diameter":diameter,"mode":if kind=="compass"{"rose"}else{"arrow"},"rotate_rose":kind=="compass","smoothing":{"seconds":0.5,"deadband":1.5,"max_rate":120.0,"min_speed":1.5}})

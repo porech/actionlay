@@ -1,5 +1,5 @@
 //! Transport bar: play/pause, scrubbing, frame step, speed, playback stats.
-use actionlay_media::player::Player;
+use actionlay_media::chapters::ChapterPlayer as Player;
 use eframe::egui;
 
 #[derive(Default)]

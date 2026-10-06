@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<gpx version="1.1" creator="ActionLay synthetic test" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
+<trk><trkseg>
+<trkpt lat="0" lon="0"><ele>100</ele><time>2025-01-01T00:00:00Z</time><extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>120</gpxtpx:hr><gpxtpx:cad>80</gpxtpx:cad><gpxtpx:atemp>21</gpxtpx:atemp></gpxtpx:TrackPointExtension><power>200</power></extensions></trkpt>
+<trkpt lat="0.00001" lon="0"><ele>100</ele><time>2025-01-01T01:00:01+01:00</time><extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>140</gpxtpx:hr></gpxtpx:TrackPointExtension></extensions></trkpt>
+<trkpt lat="0.00008" lon="0"><time>2025-01-01T00:00:08Z</time><extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>160</gpxtpx:hr></gpxtpx:TrackPointExtension></extensions></trkpt>
+</trkseg><trkseg>
+<trkpt lat="0.01" lon="0"><time>2025-01-01T00:00:09Z</time><extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>180</gpxtpx:hr></gpxtpx:TrackPointExtension></extensions></trkpt>
+</trkseg></trk></gpx>

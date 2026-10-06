@@ -10,6 +10,9 @@ chrono.workspace = true
 geographiclib-rs.workspace = true
 thiserror.workspace = true
 log.workspace = true
+fitparser = "0.11"
+quick-xml = "0.39"
+telemetry-parser = "0.2.6"
 
 [dev-dependencies]
 # Only the integration tests read real MP4 files; the library itself never

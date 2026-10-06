@@ -485,8 +485,11 @@
         274.2857
       ],
       "mode": "moving",
+      "route_mode": "none",
+      "split_route": false,
       "zoom": 17,
-      "radius": 25.0
+      "radius": 25.0,
+      "route": "accent"
     },
     {
       "type": "map",
@@ -500,8 +503,11 @@
         274.2857
       ],
       "mode": "journey",
+      "route_mode": "full",
+      "split_route": false,
       "zoom": 15,
-      "radius": 25.0
+      "radius": 25.0,
+      "route": "accent"
     }
   ]
 }

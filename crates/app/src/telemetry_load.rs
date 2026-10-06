@@ -75,12 +75,34 @@ pub fn load(path: &Path, duration: f64) -> Loaded {
 
 /// The latest snapshot only; a hidden window cannot accumulate heavy snapshots.
 /// Dropping the handle cancels its decoder, without blocking another video's load.
+type RouteRequest = (actionlay_media::chapters::Timeline, Vec<(f64, f64)>);
+
 pub struct StreamLoad {
     latest: Arc<Mutex<Option<Loaded>>>,
     cancelled: Arc<AtomicBool>,
+    route_busy: Arc<AtomicBool>,
+    route_requests: Option<mpsc::Sender<RouteRequest>>,
 }
 
 impl StreamLoad {
+    pub fn request_route(
+        &self,
+        timeline: actionlay_media::chapters::Timeline,
+        ranges: Vec<(f64, f64)>,
+    ) -> bool {
+        let Some(tx) = &self.route_requests else {
+            return false;
+        };
+        if self.route_busy.swap(true, Ordering::SeqCst) {
+            return false;
+        }
+        if tx.send((timeline, ranges)).is_err() {
+            self.route_busy.store(false, Ordering::SeqCst);
+            return false;
+        }
+        true
+    }
+
     pub fn take_update(&self) -> Option<Loaded> {
         self.latest.lock().unwrap().take()
     }
@@ -100,9 +122,67 @@ pub fn spawn(
 ) -> StreamLoad {
     let latest = Arc::new(Mutex::new(None));
     let cancelled = Arc::new(AtomicBool::new(false));
+    let (route_tx, route_rx) = mpsc::channel::<RouteRequest>();
+    let (extra_tx, extra_rx) = mpsc::channel();
+    let route_cancelled = cancelled.clone();
+    let route_busy = Arc::new(AtomicBool::new(false));
+    let reader_busy = route_busy.clone();
+    std::thread::spawn(move || {
+        let mut readers = BTreeMap::new();
+        while let Ok((timeline, ranges)) = route_rx.recv() {
+            if route_cancelled.load(Ordering::SeqCst) {
+                return;
+            }
+            for (start, end) in ranges {
+                for chapter in &timeline.chapters {
+                    if chapter.start > end || chapter.start + chapter.info.duration < start {
+                        continue;
+                    }
+                    let reader = match readers.entry(chapter.path.clone()) {
+                        std::collections::btree_map::Entry::Occupied(e) => e.into_mut(),
+                        std::collections::btree_map::Entry::Vacant(e) => {
+                            match actionlay_media::gpmf::GpmfReader::open(
+                                &chapter.path,
+                                route_cancelled.clone(),
+                            ) {
+                                Ok(reader) => e.insert(reader),
+                                Err(e) => {
+                                    let _ = extra_tx.send(Err(format!(
+                                        "Route metadata could not be opened: {e}"
+                                    )));
+                                    continue;
+                                }
+                            }
+                        }
+                    };
+                    match reader.read_range((start - chapter.start).max(0.0), end - chapter.start) {
+                        Ok(packets) => {
+                            for mut packet in packets {
+                                packet.pts += chapter.start;
+                                let timestamp = (packet.pts * 1_000_000.0).round() as i64;
+                                if extra_tx
+                                    .send(Ok(TelemetryEvent::Packet { timestamp, packet }))
+                                    .is_err()
+                                {
+                                    return;
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            let _ = extra_tx
+                                .send(Err(format!("Route metadata could not be read: {e}")));
+                        }
+                    }
+                }
+            }
+            reader_busy.store(false, Ordering::SeqCst);
+        }
+    });
     let load = StreamLoad {
         latest: latest.clone(),
         cancelled: cancelled.clone(),
+        route_busy,
+        route_requests: Some(route_tx),
     };
     std::thread::Builder::new()
         .name("telemetry".into())
@@ -112,10 +192,25 @@ pub fn spawn(
             let mut complete = false;
             let mut published = false;
             let mut last = Instant::now();
+            let mut route_warning = None;
             loop {
                 if cancelled.load(Ordering::SeqCst) {
                     return;
                 }
+                for event in extra_rx.try_iter() {
+                    if let Err(warning) = &event {
+                        route_warning = Some(warning.clone());
+                        dirty = true;
+                    }
+                    if let Ok(TelemetryEvent::Packet { timestamp, packet }) = event
+                        && let std::collections::btree_map::Entry::Vacant(e) =
+                            packets.entry(timestamp)
+                    {
+                        e.insert(packet);
+                        dirty = true;
+                    }
+                }
+                complete |= expected.is_some_and(|n| packets.len() >= n);
                 let event = input.recv_timeout(Duration::from_millis(50));
                 let disconnected = matches!(event, Err(mpsc::RecvTimeoutError::Disconnected));
                 match event {
@@ -162,7 +257,7 @@ pub fn spawn(
                     let update = match telemetry {
                         Ok(telemetry) => Loaded {
                             telemetry,
-                            warning: None,
+                            warning: route_warning.take(),
                         },
                         Err(e) => Loaded {
                             telemetry: Telemetry::empty(duration),
@@ -346,5 +441,117 @@ mod tests {
         assert!(tel.duration() < duration, "{} {duration}", tel.duration());
         let last = tel.sample(duration - 0.01).get(speed());
         assert!(matches!(last, Value::Present(_)), "{last:?}");
+    }
+}
+
+/// Other cameras have metadata outside GoPro's demux stream. Read it off the UI thread.
+pub fn spawn_camera(
+    path: std::path::PathBuf,
+    duration: f64,
+    wake: impl Fn() + Send + 'static,
+) -> StreamLoad {
+    let latest = Arc::new(Mutex::new(None));
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let load = StreamLoad {
+        latest: latest.clone(),
+        cancelled: cancelled.clone(),
+        route_busy: Arc::new(AtomicBool::new(false)),
+        route_requests: None,
+    };
+    std::thread::spawn(move || {
+        let result = actionlay_telemetry::camera::read(&path, duration, cancelled.clone());
+        if cancelled.load(Ordering::SeqCst) {
+            return;
+        }
+        let update = match result {
+            Ok(telemetry) => Loaded {
+                telemetry,
+                warning: None,
+            },
+            Err(e) => Loaded {
+                telemetry: Telemetry::empty(duration),
+                warning: Some(format!(
+                    "No usable camera telemetry: {e}. You can link a GPX/FIT file."
+                )),
+            },
+        };
+        *latest.lock().unwrap() = Some(update);
+        wake();
+    });
+    load
+}
+
+pub fn spawn_activity(
+    path: std::path::PathBuf,
+    wake: impl Fn() + Send + 'static,
+) -> mpsc::Receiver<Result<actionlay_telemetry::external::Activity, String>> {
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let result =
+            actionlay_telemetry::external::Activity::read(&path).map_err(|e| e.to_string());
+        if tx.send(result).is_ok() {
+            wake();
+        }
+    });
+    rx
+}
+
+#[cfg(test)]
+mod route_tests {
+    use super::*;
+    #[test]
+    fn indexed_backfill_merges_with_playback_packets_without_loading_the_future() {
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/gopro/hero5.mp4");
+        if !path.exists() {
+            return;
+        }
+        let all = read_gpmf_packets(&path).unwrap();
+        let timeline = actionlay_media::chapters::Timeline::open(&path, false).unwrap();
+        let (tx, rx) = mpsc::channel();
+        let load = spawn(rx, timeline.duration, Some(all.len()), || {});
+        for packet in all.iter().take(2).chain(all.iter().skip(20).take(2)) {
+            tx.send(TelemetryEvent::Packet {
+                timestamp: (packet.pts * 1e6).round() as i64,
+                packet: packet.clone(),
+            })
+            .unwrap();
+        }
+        assert!(load.request_route(timeline.clone(), vec![(0.0, 5.0)]));
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(update) = load.take_update() {
+                assert!(update.warning.is_none());
+                if update.telemetry.is_loaded_through(5.0) {
+                    assert!(!update.telemetry.is_loaded_at(10.0));
+                    let reference = load_reference(&all, timeline.duration);
+                    assert_eq!(
+                        update
+                            .telemetry
+                            .sample(3.0)
+                            .get(actionlay_telemetry::Metric::Lat),
+                        reference.sample(3.0).get(actionlay_telemetry::Metric::Lat)
+                    );
+                    break;
+                }
+            }
+            assert!(Instant::now() < deadline, "route backfill timed out");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(load.request_route(timeline.clone(), vec![(5.0, timeline.duration)]));
+        loop {
+            if let Some(update) = load.take_update()
+                && update.telemetry.is_loaded_through(timeline.duration)
+            {
+                let reference = load_reference(&all, timeline.duration);
+                assert_eq!(update.telemetry.track(), reference.track());
+                break;
+            }
+            assert!(Instant::now() < deadline, "full route timed out");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+    fn load_reference(packets: &[GpmfPacket], duration: f64) -> Telemetry {
+        Telemetry::from_gpmf_packets_with(&to_raw(packets.to_vec()), &options(duration)).unwrap()
     }
 }

@@ -10,6 +10,7 @@ use crate::prefs::Prefs;
 pub enum Dropped {
     Layout(PathBuf),
     Video(PathBuf),
+    Activity(PathBuf),
 }
 
 /// A dropped `*.ovl.json` (any case) is a layout; anything else is opened as a video.
@@ -20,6 +21,8 @@ pub fn classify(path: PathBuf) -> Dropped {
         || actionlay_layout::package::is_package(&path)
     {
         Dropped::Layout(path)
+    } else if name.ends_with(".gpx") || name.ends_with(".fit") {
+        Dropped::Activity(path)
     } else {
         Dropped::Video(path)
     }

@@ -35,6 +35,8 @@ pub struct TelemetryOptions {
 /// A locked GPS point as displayed (smoothed position), for maps.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TrackPoint {
+    /// Route segments are never joined across a recording boundary.
+    pub segment: usize,
     pub t: f64,
     pub lat: f64,
     pub lon: f64,
@@ -149,6 +151,324 @@ fn next_id() -> u64 {
     ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 impl Telemetry {
+    /// Maps an activity onto file time; preserves gaps and track boundaries.
+    pub(crate) fn from_activity(
+        activity: &crate::external::Activity,
+        origin: DateTime<Utc>,
+        duration: f64,
+        offset: f64,
+    ) -> Result<Self, crate::external::ExternalError> {
+        use geographiclib_rs::{Geodesic, InverseGeodesic};
+        let mut tel = Self::empty(duration);
+        tel.start_utc = Some(origin);
+        tel.warnings = activity.warnings.clone();
+        let mut records = Vec::new();
+        let mut breaks = Vec::new();
+        let mut previous = None::<(f64, usize, f64, f64, Option<f64>)>;
+        let mut total = 0.0;
+        for p in &activity.points {
+            let t = (p.utc - origin).as_seconds_f64() + offset;
+            let mut values = p.values.clone();
+            if let Some((lat, lon)) = values
+                .get(&Metric::Lat)
+                .copied()
+                .zip(values.get(&Metric::Lon).copied())
+            {
+                let alt = values.get(&Metric::Alt).copied();
+                let mut derived = crate::Derived {
+                    lat: Some(lat),
+                    lon: Some(lon),
+                    alt,
+                    ..Default::default()
+                };
+                if let Some((a, segment, x, y, z)) = previous {
+                    let dt = t - a;
+                    if p.segment == segment && dt > 0.0 && dt <= MAX_BRIDGE {
+                        let (distance, azi, _, _): (f64, f64, f64, f64) =
+                            Geodesic::wgs84().inverse(x, y, lat, lon);
+                        total += distance;
+                        derived.dist = Some(distance);
+                        derived.cspeed = Some(distance / dt);
+                        derived.azi = Some(azi);
+                        derived.cog = Some(azi.rem_euclid(360.0));
+                        if distance > 1.0
+                            && let Some((z, alt)) = z.zip(alt)
+                        {
+                            let gradient = 100.0 * (alt - z) / distance;
+                            if gradient.abs() < 45.0 {
+                                derived.cgrad = Some(gradient);
+                            }
+                        }
+                    } else {
+                        breaks.push(t);
+                    }
+                }
+                derived.codo = Some(total);
+                derived.speed = values.get(&Metric::Speed).copied().or(derived.cspeed);
+                for (m, v) in [
+                    (Metric::Speed, derived.speed),
+                    (Metric::CSpeed, derived.cspeed),
+                    (Metric::COdo, derived.codo),
+                    (Metric::Odo, derived.codo),
+                    (Metric::Dist, derived.dist),
+                    (Metric::Cog, derived.cog),
+                    (Metric::Azi, derived.azi),
+                    (Metric::Gradient, derived.cgrad),
+                    (Metric::CGrad, derived.cgrad),
+                ] {
+                    if let Some(v) = v {
+                        values.entry(m).or_insert(v);
+                    }
+                }
+                values.insert(Metric::GpsLock, if alt.is_some() { 3.0 } else { 2.0 });
+                tel.gps.push(GpsPoint {
+                    packet: p.segment,
+                    index: tel.gps.len(),
+                    t,
+                    end: t + 1.0,
+                    utc: add_seconds(origin, t),
+                    lat,
+                    lon,
+                    alt: alt.unwrap_or(f64::NAN),
+                    speed2d: derived.speed.unwrap_or(f64::NAN),
+                    speed3d: derived.speed.unwrap_or(f64::NAN),
+                    fix: if alt.is_some() { 3 } else { 2 },
+                    dop: values.get(&Metric::GpsDop).copied().unwrap_or(f64::NAN),
+                    lock: if alt.is_some() {
+                        GpsLock::Lock3d
+                    } else {
+                        GpsLock::Lock2d
+                    },
+                    derived,
+                });
+                previous = Some((t, p.segment, lat, lon, alt));
+            } else {
+                previous = None;
+                breaks.push(t);
+            }
+            records.push((t, p.segment, values));
+        }
+        for i in 1..records.len() {
+            if records[i].1 != records[i - 1].1 {
+                breaks.push(records[i].0);
+            }
+        }
+        for m in Metric::ALL {
+            if !records.iter().any(|r| r.2.contains_key(&m)) {
+                continue;
+            }
+            let samples = records.iter().enumerate().map(|(i, (t, _, v))| {
+                let end = records.get(i + 1).map_or(t + 1.0, |r| r.0.min(t + 1.0));
+                (*t, end, v.get(&m).copied())
+            });
+            let interp = match m {
+                Metric::Cog | Metric::Heading => Interp::Angle360,
+                Metric::Lon | Metric::Azi => Interp::Angle180,
+                Metric::GearFront | Metric::GearRear | Metric::GpsLock => Interp::Step,
+                _ => Interp::Linear,
+            };
+            let mut s = Series::new(interp, samples).with_breaks(breaks.clone());
+            s.restrict(vec![(0.0, duration)]);
+            tel.series[m.index()] = Some(s);
+        }
+        for p in &mut tel.gps {
+            let next = records.partition_point(|r| r.0 <= p.t);
+            p.end = records
+                .get(next)
+                .map_or(p.end, |r| p.end.min(r.0))
+                .min(duration);
+        }
+        tel.imu_acceleration = crate::vehicle::add_with_breaks(&tel.gps, &mut tel.series, &breaks);
+        // Vehicle derivation can create a series: restrict these too.
+        for s in tel.series.iter_mut().flatten() {
+            s.restrict(vec![(0.0, duration)]);
+        }
+        tel.track = tel
+            .gps
+            .iter()
+            .filter(|p| p.t >= 0.0 && p.t < duration)
+            .map(|p| TrackPoint {
+                segment: p.packet,
+                t: p.t,
+                lat: p.lat,
+                lon: p.lon,
+                alt: p.derived.alt.unwrap_or(0.0),
+            })
+            .collect();
+        tel.availability = availability(&tel.series, duration);
+        if !Metric::ALL
+            .iter()
+            .any(|&m| tel.availability.is_available(m))
+        {
+            return Err(crate::external::ExternalError::NoOverlap);
+        }
+        Ok(tel)
+    }
+
+    pub(crate) fn from_camera_imu(imu: &[telemetry_parser::util::IMUData], duration: f64) -> Self {
+        let mut tel = Self::empty(duration);
+        let mut samples: Vec<_> = imu
+            .iter()
+            .filter(|s| s.timestamp_ms.is_finite() && s.accl.is_some())
+            .map(|s| (s.timestamp_ms / 1000.0, s.accl.unwrap()))
+            .collect();
+        samples.sort_by(|a, b| a.0.total_cmp(&b.0));
+        samples.dedup_by(|a, b| a.0 == b.0);
+        for (axis, m) in [Metric::AcclX, Metric::AcclY, Metric::AcclZ]
+            .into_iter()
+            .enumerate()
+        {
+            let mut s = Series::new(
+                Interp::Linear,
+                samples.iter().enumerate().map(|(i, (t, v))| {
+                    (
+                        *t,
+                        samples.get(i + 1).map_or(t + 0.01, |s| s.0.min(t + 0.1)),
+                        Some(v[axis]),
+                    )
+                }),
+            );
+            s.restrict(vec![(0.0, duration)]);
+            tel.series[m.index()] = Some(s);
+        }
+        tel.availability = availability(&tel.series, duration);
+        tel
+    }
+
+    /// Orientation from telemetry-parser's normalized quaternion basis.
+    /// Native sources use conventional ZYX Euler pitch/roll/yaw in degrees;
+    /// GoPro keeps its existing reference-compatible CORI conversion separately.
+    pub(crate) fn add_camera_orientation(
+        &mut self,
+        samples: &[telemetry_parser::tags_impl::TimeQuaternion<f64>],
+        duration: f64,
+    ) {
+        let mut values: Vec<_> = samples
+            .iter()
+            .filter_map(|sample| {
+                let q = &sample.v;
+                let norm = (q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z).sqrt();
+                if !sample.t.is_finite() || !norm.is_finite() || norm <= 1e-12 {
+                    return None;
+                }
+                let (w, x, y, z) = (q.w / norm, q.x / norm, q.y / norm, q.z / norm);
+                let roll = (2.0 * (w * x + y * z))
+                    .atan2(1.0 - 2.0 * (x * x + y * y))
+                    .to_degrees();
+                let pitch = (2.0 * (w * y - z * x)).clamp(-1.0, 1.0).asin().to_degrees();
+                let yaw = (2.0 * (w * z + x * y))
+                    .atan2(1.0 - 2.0 * (y * y + z * z))
+                    .to_degrees();
+                Some((sample.t / 1000.0, [pitch, roll, yaw]))
+            })
+            .collect();
+        values.sort_by(|a, b| a.0.total_cmp(&b.0));
+        values.dedup_by(|a, b| a.0 == b.0);
+        for (axis, metric) in [Metric::OriPitch, Metric::OriRoll, Metric::OriYaw]
+            .into_iter()
+            .enumerate()
+        {
+            if values.is_empty() {
+                continue;
+            }
+            let mut series = Series::new(
+                if metric == Metric::OriPitch {
+                    Interp::Linear
+                } else {
+                    Interp::Angle180
+                },
+                values.iter().enumerate().map(|(i, (t, v))| {
+                    (
+                        *t,
+                        values
+                            .get(i + 1)
+                            .map_or(t + 0.01, |next| next.0.min(t + 0.1)),
+                        Some(v[axis]),
+                    )
+                }),
+            );
+            series.restrict(vec![(0.0, duration)]);
+            self.series[metric.index()] = Some(series);
+        }
+        self.availability = availability(&self.series, duration);
+    }
+
+    /// External values win where present; camera data fills their gaps. Call on
+    /// the original camera telemetry when changing offsets, never on an old merge.
+    pub fn merge_external(&self, external: &Self, duration: f64) -> Self {
+        let mut tel = self.clone();
+        tel.id = next_id();
+        tel.duration = duration;
+        tel.start_utc = external.start_utc.or(self.start_utc);
+        for (i, s) in tel.series.iter_mut().enumerate() {
+            if let Some(ranges) = &self.loaded_ranges
+                && let Some(s) = s
+            {
+                s.restrict(ranges.clone());
+            }
+            if matches!(Metric::ALL[i], Metric::Odo | Metric::COdo)
+                && let Some(until) = self.cumulative_until
+                && let Some(s) = s
+            {
+                s.restrict(vec![(0.0, until)]);
+            }
+            if let Some(ext) = &external.series[i] {
+                *s = Some(ext.clone().with_fallback(s.take()));
+            }
+        }
+        tel.loaded_ranges = None;
+        tel.cumulative_until = None;
+        if !external.gps.is_empty() {
+            let mut gps: Vec<_> = self
+                .gps
+                .iter()
+                .filter(|p| external.sample_metric(Metric::Lat, p.t).present().is_none())
+                .cloned()
+                .map(|p| (p, 0usize, 0usize))
+                .collect();
+            gps.extend(
+                external
+                    .gps
+                    .iter()
+                    .filter(|p| p.t >= 0.0 && p.t < duration)
+                    .cloned()
+                    .map(|p| {
+                        let segment = p.packet;
+                        (p, 1, segment)
+                    }),
+            );
+            gps.sort_by(|a, b| a.0.t.total_cmp(&b.0.t));
+            let mut segment = 0;
+            let mut last = None;
+            let mut breaks = Vec::new();
+            tel.track.clear();
+            for (p, source, part) in &gps {
+                if last
+                    .is_some_and(|(old, prev)| old != (*source, *part) || p.t - prev > MAX_BRIDGE)
+                {
+                    segment += 1;
+                    breaks.push(p.t);
+                }
+                last = Some(((*source, *part), p.t));
+                if let Some((lat, lon)) = p.derived.lat.zip(p.derived.lon) {
+                    tel.track.push(TrackPoint {
+                        segment,
+                        t: p.t,
+                        lat,
+                        lon,
+                        alt: p.derived.alt.unwrap_or(0.0),
+                    });
+                }
+            }
+            tel.gps = gps.into_iter().map(|p| p.0).collect();
+            tel.imu_acceleration =
+                crate::vehicle::add_with_breaks(&tel.gps, &mut tel.series, &breaks);
+        }
+        tel.warnings.extend(external.warnings.clone());
+        tel.availability = availability(&tel.series, duration);
+        tel
+    }
+
     /// Clearly labelled demonstration data for editing without a video. This is
     /// independent of real files; callers must keep its map tile requests offline.
     pub fn preview() -> Self {
@@ -190,6 +510,7 @@ impl Telemetry {
             .map(|i| {
                 let t = i as f64;
                 TrackPoint {
+                    segment: 0,
                     t,
                     lat: out.sample_metric(Metric::Lat, t).last_known().unwrap(),
                     lon: out.sample_metric(Metric::Lon, t).last_known().unwrap(),
@@ -233,6 +554,7 @@ impl Telemetry {
                 .iter()
                 .filter_map(|(x, lat)| {
                     Some(TrackPoint {
+                        segment: 0,
                         t: *x,
                         lat: *lat,
                         lon: t.sample_metric(Metric::Lon, *x).last_known()?,
@@ -283,6 +605,35 @@ impl Telemetry {
         };
         tel.loaded_ranges = Some(ranges);
         Ok(tel)
+    }
+
+    /// Unread metadata intervals in [0, end], for indexed route backfill.
+    pub fn unread_ranges(&self, end: f64) -> Vec<(f64, f64)> {
+        let Some(ranges) = &self.loaded_ranges else {
+            return Vec::new();
+        };
+        let mut missing = Vec::new();
+        let mut cursor: f64 = 0.0;
+        for &(start, stop) in ranges {
+            if start > cursor && cursor < end {
+                missing.push((cursor, start.min(end)));
+            }
+            cursor = cursor.max(stop);
+            if cursor >= end {
+                break;
+            }
+        }
+        if cursor < end {
+            missing.push((cursor, end));
+        }
+        missing
+    }
+
+    /// Whether metadata has been loaded continuously from the start through `t`.
+    pub fn is_loaded_through(&self, t: f64) -> bool {
+        self.loaded_ranges
+            .as_ref()
+            .is_none_or(|ranges| ranges.first().is_some_and(|r| r.0 <= 0.001 && r.1 >= t))
     }
 
     pub fn is_loaded_at(&self, t: f64) -> bool {
@@ -393,6 +744,7 @@ impl Telemetry {
             .iter()
             .filter_map(|p| {
                 Some(TrackPoint {
+                    segment: 0,
                     t: p.t,
                     lat: p.derived.lat?,
                     lon: p.derived.lon?,
@@ -595,6 +947,26 @@ mod tests {
             assert_eq!(complete.sample(t), reference.sample(t));
         }
         assert!(!complete.is_loaded_at(9.0));
+    }
+
+    #[test]
+    fn linking_external_sensors_does_not_make_unread_camera_ranges_valid() {
+        let packets = gps_packets(&[3; 8]);
+        let camera = Telemetry::from_gpmf_packets_progressive(&[
+            packets[0].clone(),
+            packets[6].clone(),
+            packets[7].clone(),
+        ])
+        .unwrap();
+        let activity = crate::external::Activity::from_gpx(std::io::Cursor::new(
+            "<gpx><trk><trkseg><trkpt><time>2024-05-01T10:00:03Z</time><extensions><hr>150</hr></extensions></trkpt></trkseg></trk></gpx>"
+        )).unwrap();
+        let external = activity.align(camera.start_utc(), 8.0, 0.0).unwrap();
+        let merged = camera.merge_external(&external, 8.0);
+        assert_eq!(merged.sample(3.0).get(Metric::Hr), Value::Present(150.0));
+        assert_eq!(merged.sample(3.0).get(Metric::Lat), Value::Absent);
+        assert_eq!(merged.sample(6.5).get(Metric::Odo), Value::Absent);
+        assert!(merged.sample(6.5).get(Metric::Lat).present().is_some());
     }
 
     #[test]
@@ -957,5 +1329,54 @@ mod tests {
         let mid = tel.sample(0.5);
         assert!(mid.get(Metric::Azi).present().unwrap().abs() < 1e-9);
         assert!(mid.get(Metric::Cog).present().unwrap().abs() < 1e-9);
+    }
+}
+
+#[cfg(test)]
+mod native_orientation_tests {
+    use super::*;
+    use telemetry_parser::tags_impl::{Quaternion, TimeQuaternion};
+    #[test]
+    fn native_quaternions_normalize_and_map_zyx_angles_without_inventing_gps() {
+        let angle = 30_f64.to_radians() / 2.0;
+        for (axis, metric) in [
+            (0, Metric::OriRoll),
+            (1, Metric::OriPitch),
+            (2, Metric::OriYaw),
+        ] {
+            let mut xyz = [0.0; 3];
+            xyz[axis] = angle.sin() * 2.0;
+            let q = Quaternion {
+                w: angle.cos() * 2.0,
+                x: xyz[0],
+                y: xyz[1],
+                z: xyz[2],
+            };
+            let mut tel = Telemetry::empty(1.0);
+            tel.add_camera_orientation(
+                &[
+                    TimeQuaternion {
+                        t: 0.0,
+                        v: q.clone(),
+                    },
+                    TimeQuaternion { t: 10.0, v: q },
+                    TimeQuaternion {
+                        t: 20.0,
+                        v: Quaternion::default(),
+                    },
+                    TimeQuaternion {
+                        t: f64::NAN,
+                        v: Quaternion {
+                            w: 1.0,
+                            ..Default::default()
+                        },
+                    },
+                ],
+                1.0,
+            );
+            assert!((tel.sample(0.005).get(metric).present().unwrap() - 30.0).abs() < 1e-8);
+            assert_eq!(tel.sample(0.005).get(Metric::Lat), Value::Absent);
+            assert!(tel.sample(0.5).get(metric).present().is_none());
+        }
     }
 }
