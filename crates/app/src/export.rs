@@ -92,7 +92,9 @@ pub struct Job {
     pub progress: Arc<Mutex<Progress>>,
 }
 impl Job {
-    pub fn spawn(request: Request, wake: impl Fn() + Send + 'static) -> Self {
+    pub fn spawn(mut request: Request, wake: impl Fn() + Send + 'static) -> Self {
+        request.layout =
+            capture_export_units(&request.layout, actionlay_render::regional::current());
         let started = Instant::now();
         let cancel = Arc::new(AtomicBool::new(false));
         let progress = Arc::new(Mutex::new(Progress::default()));
@@ -163,6 +165,23 @@ pub fn validate(request: &Request, duration: f64) -> Result<f64> {
     Ok(end)
 }
 
+/// An export keeps the units chosen at launch even if settings change meanwhile.
+fn capture_export_units(
+    layout: &Arc<Layout>,
+    system: actionlay_telemetry::units::UnitSystem,
+) -> Arc<Layout> {
+    use actionlay_layout::model::Units;
+    if layout.units.unwrap_or_default() != Units::Default {
+        return layout.clone();
+    }
+    let mut captured = (**layout).clone();
+    captured.units = Some(match system {
+        actionlay_telemetry::units::UnitSystem::Metric => Units::Metric,
+        actionlay_telemetry::units::UnitSystem::Imperial => Units::Imperial,
+    });
+    Arc::new(captured)
+}
+
 fn route_data_required(nodes: &[actionlay_layout::model::Node]) -> bool {
     use actionlay_layout::model::{MapRoute, Node, Widget};
     nodes.iter().any(|node| match node {
@@ -175,10 +194,11 @@ fn route_data_required(nodes: &[actionlay_layout::model::Node]) -> bool {
 }
 
 pub fn run(
-    request: Request,
+    mut request: Request,
     cancel: Arc<AtomicBool>,
     mut notify: impl FnMut(Progress),
 ) -> Result<()> {
+    request.layout = capture_export_units(&request.layout, actionlay_render::regional::current());
     let started = Instant::now();
     let info = actionlay_media::probe::probe(&request.source)?;
     let end = validate(&request, info.duration)?;
@@ -194,15 +214,19 @@ pub fn run(
         ..Default::default()
     });
     let route_required = route_data_required(&request.layout.nodes);
-    let packets = if route_required {
-        actionlay_media::gpmf::read_gpmf_packets_complete(&request.source, &cancel).map_err(
-            |error| {
-                log::warn!("complete export route metadata: {error}");
-                anyhow::anyhow!("Route data could not be fully loaded. Export was not started.")
-            },
-        )?
+    let read = if route_required {
+        actionlay_media::gpmf::read_gpmf_packets_complete(&request.source, &cancel)
     } else {
-        actionlay_media::gpmf::read_gpmf_packets_with_cancel(&request.source, cancel.clone())?
+        actionlay_media::gpmf::read_gpmf_packets_with_cancel(&request.source, cancel.clone())
+    };
+    let packets = match read {
+        Ok(packets) => packets,
+        Err(_) if cancel.load(Ordering::Relaxed) => Vec::new(),
+        Err(error) if route_required => {
+            log::warn!("complete export route metadata: {error}");
+            bail!("Route data could not be fully loaded. Export was not started.");
+        }
+        Err(error) => return Err(error.into()),
     };
     if cancel.load(Ordering::Relaxed) {
         notify(Progress {
@@ -549,6 +573,40 @@ mod tests {
             actual.as_raw(),
             &composite(pixels.data(), None, &settings),
             "a partial preview track cannot determine export zoom"
+        );
+    }
+
+    #[test]
+    fn cancellation_while_loading_a_route_is_not_an_export_failure() {
+        let dir = tempfile::tempdir().unwrap();
+        let output = dir.path().join("cancelled.mp4");
+        let mut req = request(output.clone());
+        req.layout = Arc::new(
+            Layout::from_json(r#"{"version":1,"nodes":[{"type":"map","route_mode":"full"}]}"#)
+                .unwrap()
+                .layout,
+        );
+        let mut progress = Progress::default();
+        run(req, Arc::new(AtomicBool::new(true)), |update| {
+            progress = update
+        })
+        .unwrap();
+        assert!(progress.done && progress.cancelled);
+        assert!(progress.error.is_none());
+        assert!(!output.exists());
+    }
+
+    #[test]
+    fn export_units_are_captured_without_changing_the_open_layout() {
+        use actionlay_layout::model::Units;
+        use actionlay_telemetry::units::UnitSystem;
+        let original = Arc::new(crate::editor::Editor::blank());
+        let captured = capture_export_units(&original, UnitSystem::Imperial);
+        assert_eq!(original.units, None);
+        assert_eq!(captured.units, Some(Units::Imperial));
+        assert_eq!(
+            capture_export_units(&captured, UnitSystem::Metric).units,
+            Some(Units::Imperial)
         );
     }
 
