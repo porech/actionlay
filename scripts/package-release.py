@@ -15,6 +15,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 def notices(destination):
     destination.mkdir(parents=True, exist_ok=True)
     shutil.copy2(ROOT / 'LICENSE', destination / 'LICENSE.txt')
+    shutil.copy2(ROOT / 'assets/icons/LICENSE-CC-BY-SA-4.0.txt', destination / 'Artwork-CC-BY-SA-4.0.txt')
     shutil.copy2(ROOT / 'crates/render/assets/fonts/LICENSE', destination / 'Roboto-LICENSE.txt')
     shutil.copy2(ROOT / 'crates/render/assets/icons/LICENSE', destination / 'Tabler-LICENSE.txt')
     sha = os.environ.get('GITHUB_SHA') or subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
@@ -24,6 +25,9 @@ def notices(destination):
         f'Complete ActionLay source and build scripts:\nhttps://github.com/porech/actionlay/tree/{sha}\n'
         f'https://github.com/porech/actionlay/archive/{sha}.tar.gz\n\n'
         'ActionLay is GPL-3.0-or-later. FFmpeg is built with GPL enabled, never nonfree.\n'
+        'ActionLay gecko photograph and artwork — Alessandro Rinaldi.\n'
+        'Artwork is available under CC BY-SA 4.0 or GPL-3.0-or-later, at your option.\n'
+        f'Artwork source and provenance: https://github.com/porech/actionlay/tree/{sha}/assets/icons\n'
         'The release includes third-party-sources.tar.gz with the exact FFmpeg/x264/x265 sources.\n'
         'Their source revisions and download locations\n'
         'are in scripts/ffmpeg-version.env, scripts/build-ffmpeg.sh and scripts/build-encoders.sh.\n'
