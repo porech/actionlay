@@ -1737,6 +1737,7 @@ mod tests {
         let deadline = Instant::now() + Duration::from_secs(30);
         let mut late_buffers = 0;
         let mut was_buffering = false;
+        let mut report_at = Instant::now();
         while !p.at_end() && Instant::now() < deadline {
             p.poll_frame();
             let decoded = f64::from_bits(p.shared.decoded_pts.load(Ordering::Relaxed));
@@ -1746,6 +1747,28 @@ mod tests {
                 && p.position - decoded > 0.45
             {
                 late_buffers += 1;
+            }
+            if report_at.elapsed() >= Duration::from_secs(1) || p.buffering != was_buffering {
+                let audio = p.audio.as_ref().map(|audio| {
+                    let audio = audio.lock().unwrap();
+                    (
+                        audio.clock(),
+                        audio.frames_played(),
+                        audio.sample_rate(),
+                        audio.queued_frames(),
+                        audio.diagnostics(),
+                    )
+                });
+                eprintln!(
+                    "output recovery: pos={:.3} video={:.3} decoded={decoded:.3} buffering={} lost={} dead={} skipped={} audio={audio:?}",
+                    p.position,
+                    p.last_frame_pts,
+                    p.buffering,
+                    p.audio_lost,
+                    p.audio_dead,
+                    p.shared.skipped_video_outputs.load(Ordering::Relaxed)
+                );
+                report_at = Instant::now();
             }
             was_buffering = p.buffering;
             std::thread::sleep(POLL);
