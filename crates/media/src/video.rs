@@ -20,6 +20,7 @@ pub struct VideoDecoder {
     late_frame: Option<(frame::Video, f64)>,
     decoded_frames: u64,
     skipped_frames: u64,
+    output_seconds: f64,
     #[cfg(test)]
     pub(crate) output_delay_ms: u64,
 }
@@ -50,6 +51,7 @@ impl VideoDecoder {
                         late_frame: None,
                         decoded_frames: 0,
                         skipped_frames: 0,
+                        output_seconds: 0.0,
                         #[cfg(test)]
                         output_delay_ms: 0,
                     });
@@ -73,6 +75,7 @@ impl VideoDecoder {
             late_frame: None,
             decoded_frames: 0,
             skipped_frames: 0,
+            output_seconds: 0.0,
             #[cfg(test)]
             output_delay_ms: 0,
         })
@@ -154,9 +157,11 @@ impl VideoDecoder {
     }
 
     fn materialize(&mut self, decoded: frame::Video, pts: f64) -> Result<Nv12Frame, MediaError> {
+        let output_started = Instant::now();
         #[cfg(test)]
         if self.output_delay_ms > 0 {
             std::thread::sleep(std::time::Duration::from_millis(self.output_delay_ms));
+            self.timings_us[2] += output_started.elapsed().as_micros() as u64;
         }
         let sw = if hw::is_hw_frame(&decoded) {
             self.backend = self.hw.map(HwKind::name).unwrap_or("unknown");
@@ -180,7 +185,22 @@ impl VideoDecoder {
         let start = Instant::now();
         let result = self.convert_to_nv12(&sw, pts);
         self.timings_us[2] += start.elapsed().as_micros() as u64;
+        // Only successful materialization predicts the next output cost.
+        // Retain recent expensive copies, then decay as the backend recovers.
+        if result.is_ok() {
+            self.output_seconds = output_started
+                .elapsed()
+                .as_secs_f64()
+                .max(self.output_seconds * 0.9);
+        }
         result
+    }
+
+    /// The clock continues while output is downloaded and converted. Budget
+    /// that cost before starting a copy rather than accepting a frame which
+    /// will already be overdue when the copy completes.
+    pub(crate) fn playback_cutoff(&self, clock: f64, allowed_lag: f64) -> f64 {
+        clock + self.output_seconds - allowed_lag
     }
 
     pub(crate) fn frame_counts(&self) -> (u64, u64) {

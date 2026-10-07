@@ -1258,7 +1258,9 @@ impl Worker {
                         self.shared.video_output_delay_ms.load(Ordering::Relaxed);
                 }
                 let earliest = if p.generation.started {
-                    audio_now.map_or(f64::NEG_INFINITY, |now| now - 4.0 * half_frame)
+                    audio_now.map_or(f64::NEG_INFINITY, |now| {
+                        video.playback_cutoff(now, 4.0 * half_frame)
+                    })
                 } else {
                     // Precise-seek preroll is kept until its first frame aligns
                     // the audio; it must not use the previous audio clock.
@@ -1726,6 +1728,7 @@ mod tests {
         )
         .unwrap();
         if !p.stats().audio_active {
+            eprintln!("audio output unavailable; slow-output recovery was not exercised");
             return;
         }
         // The fixture has ten frames per second. Make output conversion slower
@@ -1738,15 +1741,28 @@ mod tests {
         let deadline = started + Duration::from_secs(30);
         let mut late_buffers = 0;
         let mut was_buffering = false;
+        let mut playback_started = false;
+        let mut first_frame = None;
         let mut report_at = Instant::now();
         while !p.at_end() && Instant::now() < deadline {
-            p.poll_frame();
+            if let Some(frame) = p.poll_frame() {
+                first_frame.get_or_insert(frame.pts);
+            }
+            // A drained audio track legitimately hands the final video tail
+            // to the system clock. Detect starvation while samples remain.
+            if playback_started && !p.shared.audio_finished.load(Ordering::SeqCst) {
+                assert!(
+                    !p.audio_lost && !p.audio_dead,
+                    "audio clock was abandoned before EOF"
+                );
+                assert_eq!(
+                    p.audio.as_ref().unwrap().lock().unwrap().diagnostics().2,
+                    0,
+                    "audio output starved before EOF"
+                );
+            }
             let decoded = f64::from_bits(p.shared.decoded_pts.load(Ordering::Relaxed));
-            if p.buffering
-                && !was_buffering
-                && !p.awaiting_seek_frame
-                && p.position - decoded > 0.45
-            {
+            if p.buffering && !was_buffering && playback_started {
                 late_buffers += 1;
             }
             if report_at.elapsed() >= Duration::from_secs(1) || p.buffering != was_buffering {
@@ -1760,22 +1776,43 @@ mod tests {
                         audio.diagnostics(),
                     )
                 });
+                let buffer = *p.shared.buffer.lock().unwrap();
+                let timings = p
+                    .shared
+                    .video_timings_us
+                    .each_ref()
+                    .map(|v| v.load(Ordering::Relaxed));
                 eprintln!(
-                    "output recovery: mono={:.3} pos={:.3} video={:.3} decoded={decoded:.3} buffering={} lost={} dead={} skipped={} audio={audio:?}",
+                    "output recovery: mono={:.3} pos={:.3} video={:.3} decoded={decoded:.3} buffering={} lost={} dead={} skipped={} audio={audio:?} queue={} channel={} packets={} source_until={:.3} full={} eof={} video_us={timings:?}",
                     started.elapsed().as_secs_f64(),
                     p.position,
                     p.last_frame_pts,
                     p.buffering,
                     p.audio_lost,
                     p.audio_dead,
-                    p.shared.skipped_video_outputs.load(Ordering::Relaxed)
+                    p.shared.skipped_video_outputs.load(Ordering::Relaxed),
+                    p.queue.len(),
+                    p.msgs.len(),
+                    p.shared.video_pending_packets.load(Ordering::Relaxed),
+                    buffer.until,
+                    buffer.full,
+                    buffer.eof
                 );
                 report_at = Instant::now();
             }
+            playback_started |= !p.buffering && !p.awaiting_seek_frame;
             was_buffering = p.buffering;
             std::thread::sleep(POLL);
         }
         assert!(p.at_end(), "slow output did not reach EOF");
+        assert!((first_frame.unwrap() - 0.2).abs() < 0.01, "inaccurate seek");
+        assert!(!p.audio_dead, "audio device stopped consuming");
+        let audio = p.audio.as_ref().unwrap().lock().unwrap();
+        assert!(
+            audio.frames_played() > u64::from(audio.sample_rate()),
+            "audio did not consume samples"
+        );
+        drop(audio);
         assert!(
             late_buffers <= 1,
             "output copies repeatedly stalled the video clock ({late_buffers} buffers)"
@@ -1783,6 +1820,9 @@ mod tests {
         eprintln!("late buffers: {late_buffers}");
         // One buffering cycle can legitimately absorb a scheduling stall; it
         // must not recur throughout this short clip because of output copies.
+        // Count every new buffering entry after initial seek recovery. The
+        // decoded PTS can be ahead of the newest presentable frame, so filtering
+        // on position - decoded hid repeated stalls on some audio devices.
         // Assert observable recovery rather than a minimum number of skips:
         // device callback pacing can allow this short clip to finish without
         // skips. Decoder tests exercise skipping deterministically.
