@@ -524,5 +524,7 @@
   "Exit full screen": "Έξοδος από πλήρη οθόνη",
   "F11 · Esc to exit": "F11 · Esc για έξοδο",
   "Use software video decoding": "Χρήση αποκωδικοποίησης βίντεο μέσω λογισμικού",
-  "Applies the next time a video is opened.": "Εφαρμόζεται την επόμενη φορά που ανοίγει ένα βίντεο."
+  "Applies the next time a video is opened.": "Εφαρμόζεται την επόμενη φορά που ανοίγει ένα βίντεο.",
+  "Loading metadata before export…": "Φόρτωση μεταδεδομένων πριν από την εξαγωγή…",
+  "Preparing telemetry…": "Προετοιμασία τηλεμετρίας…"
 }

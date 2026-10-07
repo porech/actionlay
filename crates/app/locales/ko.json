@@ -524,5 +524,7 @@
   "Exit full screen": "전체 화면 종료",
   "F11 · Esc to exit": "F11 · Esc로 종료",
   "Use software video decoding": "소프트웨어 동영상 디코딩 사용",
-  "Applies the next time a video is opened.": "다음에 동영상을 열 때 적용됩니다."
+  "Applies the next time a video is opened.": "다음에 동영상을 열 때 적용됩니다.",
+  "Loading metadata before export…": "내보내기 전에 메타데이터를 불러오는 중…",
+  "Preparing telemetry…": "텔레메트리 준비 중…"
 }

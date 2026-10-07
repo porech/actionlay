@@ -524,5 +524,7 @@
   "Exit full screen": "Ukončiť celú obrazovku",
   "F11 · Esc to exit": "F11 · Esc na ukončenie",
   "Use software video decoding": "Použiť softvérové dekódovanie videa",
-  "Applies the next time a video is opened.": "Použije sa pri ďalšom otvorení videa."
+  "Applies the next time a video is opened.": "Použije sa pri ďalšom otvorení videa.",
+  "Loading metadata before export…": "Načítavanie metadát pred exportom…",
+  "Preparing telemetry…": "Príprava telemetrie…"
 }

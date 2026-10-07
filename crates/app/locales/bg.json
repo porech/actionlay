@@ -524,5 +524,7 @@
   "Exit full screen": "Изход от цял екран",
   "F11 · Esc to exit": "F11 · Esc за изход",
   "Use software video decoding": "Използване на софтуерно декодиране на видео",
-  "Applies the next time a video is opened.": "Прилага се при следващото отваряне на видео."
+  "Applies the next time a video is opened.": "Прилага се при следващото отваряне на видео.",
+  "Loading metadata before export…": "Зареждане на метаданни преди експортиране…",
+  "Preparing telemetry…": "Подготовка на телеметрията…"
 }

@@ -524,5 +524,7 @@
   "Exit full screen": "יציאה ממסך מלא",
   "F11 · Esc to exit": "F11 · Esc ליציאה",
   "Use software video decoding": "שימוש בפענוח וידאו באמצעות תוכנה",
-  "Applies the next time a video is opened.": "יחול בפעם הבאה שייפתח סרטון."
+  "Applies the next time a video is opened.": "יחול בפעם הבאה שייפתח סרטון.",
+  "Loading metadata before export…": "טוען מטא־נתונים לפני הייצוא…",
+  "Preparing telemetry…": "מכין נתוני טלמטריה…"
 }

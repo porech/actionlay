@@ -13,6 +13,40 @@ pub struct GpmfPacket {
     pub data: Vec<u8>,
 }
 
+/// Metadata packets read, measured against the existing MP4 sample index.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct ReadProgress {
+    pub packets: usize,
+    pub total: Option<usize>,
+}
+impl ReadProgress {
+    pub fn fraction(self) -> Option<f32> {
+        self.total
+            .filter(|n| *n > 0)
+            .map(|n| (self.packets as f32 / n as f32).min(1.0))
+    }
+}
+
+/// Reports header/index discovery and packet reads without reading media payloads.
+pub fn read_gpmf_packets_with_progress(
+    path: &Path,
+    cancelled: &std::sync::atomic::AtomicBool,
+    require_complete: bool,
+    mut progress: impl FnMut(ReadProgress),
+) -> Result<Vec<GpmfPacket>, MediaError> {
+    progress(ReadProgress::default());
+    let mut input = open_metadata(path, cancelled)?;
+    read_range_input_progress(
+        &mut input,
+        0.0,
+        f64::INFINITY,
+        cancelled,
+        require_complete,
+        &mut progress,
+    )
+    .map(|(packets, _)| packets)
+}
+
 const GPMD_TAG: u32 = u32::from_le_bytes(*b"gpmd");
 
 /// Consecutive unreadable packets after which the read gives up.
@@ -167,6 +201,17 @@ fn read_range_input_policy(
     cancelled: &std::sync::atomic::AtomicBool,
     require_complete: bool,
 ) -> Result<(Vec<GpmfPacket>, i64), MediaError> {
+    read_range_input_progress(input, start, end, cancelled, require_complete, &mut |_| {})
+}
+
+fn read_range_input_progress(
+    input: &mut ffmpeg::format::context::Input,
+    start: f64,
+    end: f64,
+    cancelled: &std::sync::atomic::AtomicBool,
+    require_complete: bool,
+    progress: &mut dyn FnMut(ReadProgress),
+) -> Result<(Vec<GpmfPacket>, i64), MediaError> {
     let Some(index) = input.streams().find(is_gpmd).map(|s| s.index()) else {
         return Ok((Vec::new(), 0));
     };
@@ -201,6 +246,33 @@ fn read_range_input_policy(
             return Err(ffmpeg::Error::from(result).into());
         }
     }
+    // Only inspect the already loaded index. Include the preceding seek packet,
+    // matching the metadata range reader's interpolation semantics.
+    let total = unsafe {
+        let stream = *(*input.as_mut_ptr()).streams.add(index);
+        let count = ffmpeg::ffi::avformat_index_get_entries_count(stream);
+        let first = ffmpeg::ffi::avformat_index_get_entry_from_timestamp(
+            stream,
+            (start / time_base) as i64,
+            ffmpeg::ffi::AVSEEK_FLAG_BACKWARD,
+        );
+        let first_ts = if first.is_null() {
+            i64::MIN
+        } else {
+            (*first).timestamp
+        };
+        (count > 0).then(|| {
+            (0..count)
+                .filter(|i| {
+                    let entry = ffmpeg::ffi::avformat_index_get_entry(stream, *i);
+                    !entry.is_null()
+                        && (*entry).timestamp >= first_ts
+                        && (*entry).timestamp as f64 * time_base <= end
+                })
+                .count()
+        })
+    };
+    progress(ReadProgress { packets: 0, total });
     let mut packets = Vec::new();
     let mut packet = ffmpeg::Packet::empty();
     let mut invalid_in_a_row = 0;
@@ -256,6 +328,10 @@ fn read_range_input_policy(
             pts: ts as f64 * time_base,
             duration: packet.duration().max(0) as f64 * time_base,
             data: data.to_vec(),
+        });
+        progress(ReadProgress {
+            packets: packets.len(),
+            total,
         });
         // The MP4 index tells us when the next metadata packet is beyond the
         // requested range; avoid reading that extra payload just to detect it.
@@ -331,6 +407,24 @@ impl GpmfReader {
                 (*pb).bytes_read.max(0) as u64
             }
         }
+    }
+
+    pub fn read_with_progress(
+        &mut self,
+        start: f64,
+        end: f64,
+        require_complete: bool,
+        mut progress: impl FnMut(ReadProgress),
+    ) -> Result<Vec<GpmfPacket>, MediaError> {
+        read_range_input_progress(
+            &mut self.input,
+            start,
+            end,
+            &self.cancelled,
+            require_complete,
+            &mut progress,
+        )
+        .map(|(packets, _)| packets)
     }
 
     pub fn read_range(&mut self, start: f64, end: f64) -> Result<Vec<GpmfPacket>, MediaError> {
@@ -457,13 +551,32 @@ mod indexed_io_tests {
                 "metadata I/O amplification: {name}"
             );
             let before = reader.bytes_read();
-            assert_eq!(reader.read_range(start, start + 1.0).unwrap(), first);
+            let mut progress = Vec::new();
+            assert_eq!(
+                reader
+                    .read_with_progress(start, start + 1.0, false, |p| progress.push(p))
+                    .unwrap(),
+                first
+            );
+            assert_eq!(progress.last().unwrap().total, Some(first.len()));
+            assert_eq!(progress.last().unwrap().fraction(), Some(1.0));
             assert!(
                 reader.bytes_read() - before <= payload + 1024,
                 "header must be retained across seeks: {name}"
             );
             let before = reader.bytes_read();
-            assert_eq!(reader.read_complete().unwrap(), full);
+            let mut progress = Vec::new();
+            assert_eq!(
+                reader
+                    .read_with_progress(0.0, f64::INFINITY, true, |p| progress.push(p))
+                    .unwrap(),
+                full
+            );
+            assert_eq!(progress.first().unwrap().packets, 0);
+            assert_eq!(progress.last().unwrap().packets, full.len());
+            assert_eq!(progress.last().unwrap().total, Some(full.len()));
+            assert_eq!(progress.last().unwrap().fraction(), Some(1.0));
+            assert!(progress.windows(2).all(|p| p[0].packets <= p[1].packets));
             assert!(
                 reader.bytes_read() - before < size / 4,
                 "validated full-route read must skip video/audio payload: {name}"

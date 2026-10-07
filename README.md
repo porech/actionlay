@@ -76,9 +76,10 @@ dashboards, or open the visual editor to create your own. The editor also works
 without a video. Drag a GPX/FIT file onto an open video or use **File → Video
 sources…** to link an activity and adjust alignment.
 
-Maps default to north-up with no route, which avoids loading the full GPS track.
-Enabling a route may need extra metadata reads, especially after seeking or on
-network storage. The editor explains the extra loading when you select a route.
+Maps show a loading indicator while recovering the telemetry needed for a route
+or fitted zoom, including after seeking. A percentage appears when the metadata
+index provides a packet count. These indicators only appear in the interface;
+export shows metadata preparation separately before rendering frames.
 
 Use **Settings → Privacy zones…** to hide private locations and crossing route
 segments on maps. Repeated starts and finishes can reveal a home address even

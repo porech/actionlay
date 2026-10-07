@@ -75,12 +75,27 @@ pub fn load(path: &Path, duration: f64) -> Loaded {
 
 /// The latest snapshot only; a hidden window cannot accumulate heavy snapshots.
 /// Dropping the handle cancels its decoder, without blocking another video's load.
-type RouteRequest = (actionlay_media::chapters::Timeline, Vec<(f64, f64)>);
+type RouteRequest = (actionlay_media::chapters::Timeline, Vec<(f64, f64)>, u64);
+
+enum RouteEvent {
+    Data(Result<TelemetryEvent, String>),
+    Finished(u64),
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RouteProgress {
+    pub fraction: Option<f32>,
+    pub request: u64,
+    pub decoded: bool,
+    pub finished: bool,
+    pub failed: bool,
+}
 
 pub struct StreamLoad {
     latest: Arc<Mutex<Option<Loaded>>>,
     cancelled: Arc<AtomicBool>,
     route_busy: Arc<AtomicBool>,
+    route_progress: Arc<Mutex<Option<RouteProgress>>>,
     route_requests: Option<mpsc::Sender<RouteRequest>>,
 }
 
@@ -96,11 +111,27 @@ impl StreamLoad {
         if self.route_busy.swap(true, Ordering::SeqCst) {
             return false;
         }
-        if tx.send((timeline, ranges)).is_err() {
+        let request = {
+            let mut progress = self.route_progress.lock().unwrap();
+            let request = progress.map_or(1, |p| p.request + 1);
+            *progress = Some(RouteProgress {
+                request,
+                ..Default::default()
+            });
+            request
+        };
+        if tx.send((timeline, ranges, request)).is_err() {
+            if let Some(progress) = self.route_progress.lock().unwrap().as_mut() {
+                progress.failed = true;
+            }
             self.route_busy.store(false, Ordering::SeqCst);
             return false;
         }
         true
+    }
+
+    pub fn route_progress(&self) -> Option<RouteProgress> {
+        *self.route_progress.lock().unwrap()
     }
 
     pub fn take_update(&self) -> Option<Loaded> {
@@ -118,7 +149,7 @@ pub fn spawn(
     input: mpsc::Receiver<TelemetryEvent>,
     duration: f64,
     expected: Option<usize>,
-    wake: impl Fn() + Send + 'static,
+    wake: impl Fn() + Send + Sync + 'static,
 ) -> StreamLoad {
     let latest = Arc::new(Mutex::new(None));
     let cancelled = Arc::new(AtomicBool::new(false));
@@ -127,9 +158,13 @@ pub fn spawn(
     let route_cancelled = cancelled.clone();
     let route_busy = Arc::new(AtomicBool::new(false));
     let reader_busy = route_busy.clone();
+    let route_progress = Arc::new(Mutex::new(None));
+    let reader_progress = route_progress.clone();
+    let wake = Arc::new(wake);
+    let reader_wake = wake.clone();
     std::thread::spawn(move || {
         let mut readers = BTreeMap::new();
-        while let Ok((timeline, ranges)) = route_rx.recv() {
+        while let Ok((timeline, ranges, request)) = route_rx.recv() {
             if route_cancelled.load(Ordering::SeqCst) {
                 return;
             }
@@ -143,6 +178,17 @@ pub fn spawn(
             } else {
                 ranges
             };
+            let total_work: f64 = ranges
+                .iter()
+                .flat_map(|(start, end)| {
+                    timeline.chapters.iter().map(move |chapter| {
+                        (end.min(chapter.start + chapter.info.duration) - start.max(chapter.start))
+                            .max(0.0)
+                    })
+                })
+                .sum();
+            let mut completed_work = 0.0;
+            let mut last_wake = Instant::now();
             let mut failed = false;
             for (start, end) in ranges {
                 for chapter in &timeline.chapters {
@@ -158,27 +204,58 @@ pub fn spawn(
                             ) {
                                 Ok(reader) => e.insert(reader),
                                 Err(e) => {
-                                    let _ = extra_tx.send(Err(format!(
+                                    let _ = extra_tx.send(RouteEvent::Data(Err(format!(
                                         "Route metadata could not be opened: {e}"
-                                    )));
+                                    ))));
                                     failed = true;
                                     continue;
                                 }
                             }
                         }
                     };
-                    let result = if full {
-                        reader.read_complete()
-                    } else {
-                        reader.read_range((start - chapter.start).max(0.0), end - chapter.start)
-                    };
+                    let work = (end.min(chapter.start + chapter.info.duration)
+                        - start.max(chapter.start))
+                    .max(0.0);
+                    let result = reader.read_with_progress(
+                        if full {
+                            0.0
+                        } else {
+                            (start - chapter.start).max(0.0)
+                        },
+                        if full {
+                            f64::INFINITY
+                        } else {
+                            end - chapter.start
+                        },
+                        full,
+                        |progress| {
+                            let fraction = progress.fraction().map(|fraction| {
+                                ((completed_work + work * f64::from(fraction))
+                                    / total_work.max(f64::MIN_POSITIVE))
+                                .min(1.0) as f32
+                            });
+                            *reader_progress.lock().unwrap() = Some(RouteProgress {
+                                fraction,
+                                request,
+                                ..Default::default()
+                            });
+                            if last_wake.elapsed() >= Duration::from_millis(100) {
+                                reader_wake();
+                                last_wake = Instant::now();
+                            }
+                        },
+                    );
+                    completed_work += work;
                     match result {
                         Ok(packets) => {
                             for mut packet in packets {
                                 packet.pts += chapter.start;
                                 let timestamp = (packet.pts * 1_000_000.0).round() as i64;
                                 if extra_tx
-                                    .send(Ok(TelemetryEvent::Packet { timestamp, packet }))
+                                    .send(RouteEvent::Data(Ok(TelemetryEvent::Packet {
+                                        timestamp,
+                                        packet,
+                                    })))
                                     .is_err()
                                 {
                                     return;
@@ -187,22 +264,36 @@ pub fn spawn(
                         }
                         Err(e) => {
                             failed = true;
-                            let _ = extra_tx
-                                .send(Err(format!("Route metadata could not be read: {e}")));
+                            let _ = extra_tx.send(RouteEvent::Data(Err(format!(
+                                "Route metadata could not be read: {e}"
+                            ))));
                         }
                     }
                 }
             }
             if full && !failed && !route_cancelled.load(Ordering::SeqCst) {
-                let _ = extra_tx.send(Ok(TelemetryEvent::End { from_start: true }));
+                let _ = extra_tx.send(RouteEvent::Data(Ok(TelemetryEvent::End {
+                    from_start: true,
+                })));
             }
+            *reader_progress.lock().unwrap() = Some(RouteProgress {
+                fraction: (!failed).then_some(1.0),
+                request,
+                decoded: false,
+                finished: true,
+                failed,
+            });
+            let _ = extra_tx.send(RouteEvent::Finished(request));
             reader_busy.store(false, Ordering::SeqCst);
+            reader_wake();
         }
     });
+    let decoder_progress = route_progress.clone();
     let load = StreamLoad {
         latest: latest.clone(),
         cancelled: cancelled.clone(),
         route_busy,
+        route_progress,
         route_requests: Some(route_tx),
     };
     std::thread::Builder::new()
@@ -214,11 +305,20 @@ pub fn spawn(
             let mut published = false;
             let mut last = Instant::now();
             let mut route_warning = None;
+            let mut finished_request = None;
             loop {
                 if cancelled.load(Ordering::SeqCst) {
                     return;
                 }
                 for event in extra_rx.try_iter() {
+                    let event = match event {
+                        RouteEvent::Finished(request) => {
+                            finished_request = Some(request);
+                            dirty = true;
+                            continue;
+                        }
+                        RouteEvent::Data(event) => event,
+                    };
                     if let Err(warning) = &event {
                         route_warning = Some(warning.clone());
                         dirty = true;
@@ -293,6 +393,14 @@ pub fn spawn(
                         return;
                     }
                     *latest.lock().unwrap() = Some(update);
+                    if let Some(request) = finished_request.take() {
+                        let mut progress = decoder_progress.lock().unwrap();
+                        if let Some(progress) = progress.as_mut()
+                            && progress.request == request
+                        {
+                            progress.decoded = true;
+                        }
+                    }
                     wake();
                     dirty = false;
                     published = true;
@@ -481,6 +589,7 @@ pub fn spawn_camera(
         latest: latest.clone(),
         cancelled: cancelled.clone(),
         route_busy: Arc::new(AtomicBool::new(false)),
+        route_progress: Arc::new(Mutex::new(None)),
         route_requests: None,
     };
     std::thread::spawn(move || {
@@ -553,6 +662,9 @@ mod route_tests {
             assert!(Instant::now() < deadline, "full route stays on fixed zoom");
             std::thread::sleep(Duration::from_millis(10));
         }
+        let progress = completed_progress(&loader);
+        assert_eq!(progress.fraction, Some(1.0));
+        assert!(!progress.failed);
         // Keep playback's sender alive: completion comes from metadata backfill.
         drop(tx);
     }
@@ -605,6 +717,38 @@ mod route_tests {
                 break;
             }
             assert!(Instant::now() < deadline, "full route timed out");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+    #[test]
+    fn failed_route_recovery_finishes_without_leaving_a_loading_indicator() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/gopro/hero5.mp4");
+        if !path.exists() {
+            return;
+        }
+        let mut timeline = actionlay_media::chapters::Timeline::open(&path, false).unwrap();
+        timeline.chapters[0].path = path.with_extension("missing-route-test");
+        let (_tx, rx) = mpsc::channel();
+        let loader = spawn(rx, timeline.duration, None, || {});
+        assert!(loader.request_route(timeline.clone(), vec![(0.0, timeline.duration)]));
+        let progress = completed_progress(&loader);
+        assert!(progress.failed);
+        assert_eq!(progress.fraction, None);
+        assert!(loader.take_update().unwrap().warning.is_some());
+    }
+    fn completed_progress(loader: &StreamLoad) -> RouteProgress {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(progress) = loader.route_progress()
+                && progress.finished
+                && progress.decoded
+            {
+                return progress;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "route recovery did not finish decoding"
+            );
             std::thread::sleep(Duration::from_millis(10));
         }
     }

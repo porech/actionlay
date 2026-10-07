@@ -524,5 +524,7 @@
   "Exit full screen": "Tam ekrandan çık",
   "F11 · Esc to exit": "F11 · Çıkmak için Esc",
   "Use software video decoding": "Yazılımla video çözmeyi kullan",
-  "Applies the next time a video is opened.": "Bir sonraki video açılışında uygulanır."
+  "Applies the next time a video is opened.": "Bir sonraki video açılışında uygulanır.",
+  "Loading metadata before export…": "Dışa aktarmadan önce meta veriler yükleniyor…",
+  "Preparing telemetry…": "Telemetri hazırlanıyor…"
 }

@@ -524,5 +524,7 @@
   "Exit full screen": "全画面表示を終了",
   "F11 · Esc to exit": "F11 · Escで終了",
   "Use software video decoding": "ソフトウェアで動画をデコードする",
-  "Applies the next time a video is opened.": "次に動画を開いたときに適用されます。"
+  "Applies the next time a video is opened.": "次に動画を開いたときに適用されます。",
+  "Loading metadata before export…": "エクスポート前にメタデータを読み込み中…",
+  "Preparing telemetry…": "テレメトリーを準備中…"
 }

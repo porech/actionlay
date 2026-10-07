@@ -524,5 +524,7 @@
   "Exit full screen": "Thoát toàn màn hình",
   "F11 · Esc to exit": "F11 · Esc để thoát",
   "Use software video decoding": "Sử dụng giải mã video bằng phần mềm",
-  "Applies the next time a video is opened.": "Áp dụng khi mở video lần tiếp theo."
+  "Applies the next time a video is opened.": "Áp dụng khi mở video lần tiếp theo.",
+  "Loading metadata before export…": "Đang tải siêu dữ liệu trước khi xuất…",
+  "Preparing telemetry…": "Đang chuẩn bị dữ liệu đo…"
 }

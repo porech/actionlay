@@ -524,5 +524,7 @@
   "Exit full screen": "Quitter le plein écran",
   "F11 · Esc to exit": "F11 · Échap pour quitter",
   "Use software video decoding": "Utiliser le décodage vidéo logiciel",
-  "Applies the next time a video is opened.": "S’applique à la prochaine ouverture d’une vidéo."
+  "Applies the next time a video is opened.": "S’applique à la prochaine ouverture d’une vidéo.",
+  "Loading metadata before export…": "Chargement des métadonnées avant l’exportation…",
+  "Preparing telemetry…": "Préparation de la télémétrie…"
 }

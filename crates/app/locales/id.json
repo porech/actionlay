@@ -524,5 +524,7 @@
   "Exit full screen": "Keluar dari layar penuh",
   "F11 · Esc to exit": "F11 · Esc untuk keluar",
   "Use software video decoding": "Gunakan dekode video perangkat lunak",
-  "Applies the next time a video is opened.": "Berlaku saat video dibuka berikutnya."
+  "Applies the next time a video is opened.": "Berlaku saat video dibuka berikutnya.",
+  "Loading metadata before export…": "Memuat metadata sebelum ekspor…",
+  "Preparing telemetry…": "Menyiapkan telemetri…"
 }

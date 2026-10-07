@@ -524,5 +524,7 @@
   "Exit full screen": "Afslut fuld skærm",
   "F11 · Esc to exit": "F11 · Esc for at afslutte",
   "Use software video decoding": "Brug softwarebaseret videodekodning",
-  "Applies the next time a video is opened.": "Gælder næste gang en video åbnes."
+  "Applies the next time a video is opened.": "Gælder næste gang en video åbnes.",
+  "Loading metadata before export…": "Indlæser metadata før eksport…",
+  "Preparing telemetry…": "Forbereder telemetri…"
 }

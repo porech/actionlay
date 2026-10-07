@@ -524,5 +524,7 @@
   "Exit full screen": "Poistu koko näytöstä",
   "F11 · Esc to exit": "F11 · Esc poistuu",
   "Use software video decoding": "Käytä ohjelmistopohjaista videon dekoodausta",
-  "Applies the next time a video is opened.": "Tulee voimaan, kun video avataan seuraavan kerran."
+  "Applies the next time a video is opened.": "Tulee voimaan, kun video avataan seuraavan kerran.",
+  "Loading metadata before export…": "Ladataan metatietoja ennen vientiä…",
+  "Preparing telemetry…": "Valmistellaan telemetriaa…"
 }

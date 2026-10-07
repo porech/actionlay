@@ -524,5 +524,7 @@
   "Exit full screen": "Zapusti celozaslonski način",
   "F11 · Esc to exit": "F11 · Esc za izhod",
   "Use software video decoding": "Uporabi programsko dekodiranje videa",
-  "Applies the next time a video is opened.": "Velja ob naslednjem odprtju videa."
+  "Applies the next time a video is opened.": "Velja ob naslednjem odprtju videa.",
+  "Loading metadata before export…": "Nalaganje metapodatkov pred izvozom…",
+  "Preparing telemetry…": "Priprava telemetrije…"
 }

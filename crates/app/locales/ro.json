@@ -524,5 +524,7 @@
   "Exit full screen": "Ieșire din ecran complet",
   "F11 · Esc to exit": "F11 · Esc pentru ieșire",
   "Use software video decoding": "Folosește decodarea video prin software",
-  "Applies the next time a video is opened.": "Se aplică la următoarea deschidere a unui videoclip."
+  "Applies the next time a video is opened.": "Se aplică la următoarea deschidere a unui videoclip.",
+  "Loading metadata before export…": "Se încarcă metadatele înainte de export…",
+  "Preparing telemetry…": "Se pregătește telemetria…"
 }

@@ -11,6 +11,7 @@ mod export_ui;
 mod i18n;
 mod integration;
 mod layouts;
+mod map_loading;
 mod menus;
 mod overlay;
 mod prefs;
@@ -1848,6 +1849,10 @@ impl eframe::App for App {
         }
         if let Some(mut editor) = self.editor.take() {
             editor.set_maps(self.overlay.maps().clone());
+            editor.map_progress = self
+                .telemetry_rx
+                .as_ref()
+                .map(|load| load.route_progress().unwrap_or_default());
             let video_size = self
                 .player
                 .as_ref()
@@ -1947,6 +1952,19 @@ impl eframe::App for App {
                 }
                 self.view
                     .show(ui, rect, video, self.overlay_visible && self.overlay_ready);
+                if self.overlay_visible
+                    && let (Some(video), Some(load)) = (video, &self.telemetry_rx)
+                {
+                    map_loading::show(
+                        ui,
+                        &self.layout,
+                        video,
+                        self.scale_mode,
+                        self.loaded_telemetry.as_deref(),
+                        self.shown_t.unwrap_or(0.0),
+                        load.route_progress(),
+                    );
+                }
             });
             if open_clicked {
                 self.command(menus::Command::OpenVideo, ui.ctx());

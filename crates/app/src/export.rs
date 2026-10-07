@@ -77,6 +77,8 @@ pub struct Request {
 }
 #[derive(Debug, Default, Clone)]
 pub struct Progress {
+    pub preparing_metadata: bool,
+    pub metadata_fraction: Option<f32>,
     pub fraction: f32,
     pub frames: usize,
     pub elapsed: f64,
@@ -97,7 +99,11 @@ impl Job {
             capture_export_units(&request.layout, actionlay_render::regional::current());
         let started = Instant::now();
         let cancel = Arc::new(AtomicBool::new(false));
-        let progress = Arc::new(Mutex::new(Progress::default()));
+        let progress = Arc::new(Mutex::new(Progress {
+            preparing_metadata: true,
+            status: "Loading metadata before export…".into(),
+            ..Default::default()
+        }));
         let c = cancel.clone();
         let p = progress.clone();
         std::thread::spawn(move || {
@@ -210,15 +216,31 @@ pub fn run(
         bail!("export needs even source dimensions and a valid frame rate");
     }
     notify(Progress {
-        status: "Reading telemetry…".into(),
+        preparing_metadata: true,
+        status: "Loading metadata before export…".into(),
         ..Default::default()
     });
     let route_required = route_data_required(&request.layout.nodes);
-    let read = if route_required {
-        actionlay_media::gpmf::read_gpmf_packets_complete(&request.source, &cancel)
-    } else {
-        actionlay_media::gpmf::read_gpmf_packets_with_cancel(&request.source, cancel.clone())
-    };
+    let mut last_update = Instant::now();
+    let read = actionlay_media::gpmf::read_gpmf_packets_with_progress(
+        &request.source,
+        &cancel,
+        route_required,
+        |progress| {
+            if progress.packets == 0
+                || last_update.elapsed() >= std::time::Duration::from_millis(100)
+            {
+                notify(Progress {
+                    preparing_metadata: true,
+                    metadata_fraction: progress.fraction(),
+                    status: "Loading metadata before export…".into(),
+                    elapsed: started.elapsed().as_secs_f64(),
+                    ..Default::default()
+                });
+                last_update = Instant::now();
+            }
+        },
+    );
     let packets = match read {
         Ok(packets) => packets,
         Err(_) if cancel.load(Ordering::Relaxed) => Vec::new(),
@@ -238,6 +260,13 @@ pub fn run(
         });
         return Ok(());
     }
+    notify(Progress {
+        preparing_metadata: true,
+        metadata_fraction: Some(1.0),
+        status: "Preparing telemetry…".into(),
+        elapsed: started.elapsed().as_secs_f64(),
+        ..Default::default()
+    });
     let raw: Vec<_> = packets
         .into_iter()
         .map(|p| RawPacket {
@@ -268,6 +297,11 @@ pub fn run(
         }
     };
     let telemetry = Arc::new(telemetry);
+    notify(Progress {
+        status: "Exporting · …".into(),
+        elapsed: started.elapsed().as_secs_f64(),
+        ..Default::default()
+    });
     let rendering_started = Instant::now();
     let parent = request
         .output
@@ -556,7 +590,23 @@ mod tests {
         )
         .unwrap();
         assert!(complete.is_complete());
-        run(req, Arc::new(AtomicBool::new(false)), |_| {}).unwrap();
+        let mut updates = Vec::new();
+        run(req, Arc::new(AtomicBool::new(false)), |p| updates.push(p)).unwrap();
+        let first_frame = updates.iter().position(|p| p.frames > 0).unwrap();
+        let last_metadata = updates.iter().rposition(|p| p.preparing_metadata).unwrap();
+        assert!(last_metadata < first_frame);
+        assert!(
+            updates
+                .iter()
+                .filter(|p| p.preparing_metadata)
+                .all(|p| p.frames == 0)
+        );
+        assert!(
+            updates[..first_frame]
+                .iter()
+                .any(|p| p.metadata_fraction == Some(1.0))
+        );
+        assert!(!updates[first_frame].preparing_metadata);
         let manifest: serde_json::Value =
             serde_json::from_slice(&std::fs::read(output.join("sequence.json")).unwrap()).unwrap();
         let first_t = manifest["source_start"].as_f64().unwrap();

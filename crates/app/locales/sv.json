@@ -524,5 +524,7 @@
   "Exit full screen": "Lämna helskärm",
   "F11 · Esc to exit": "F11 · Esc för att lämna",
   "Use software video decoding": "Använd programvarubaserad videoavkodning",
-  "Applies the next time a video is opened.": "Gäller nästa gång en video öppnas."
+  "Applies the next time a video is opened.": "Gäller nästa gång en video öppnas.",
+  "Loading metadata before export…": "Läser in metadata före export…",
+  "Preparing telemetry…": "Förbereder telemetri…"
 }

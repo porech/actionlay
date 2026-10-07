@@ -524,5 +524,7 @@
   "Exit full screen": "退出全屏",
   "F11 · Esc to exit": "F11 · 按 Esc 退出",
   "Use software video decoding": "使用软件视频解码",
-  "Applies the next time a video is opened.": "下次打开视频时生效。"
+  "Applies the next time a video is opened.": "下次打开视频时生效。",
+  "Loading metadata before export…": "正在加载导出所需的元数据…",
+  "Preparing telemetry…": "正在准备遥测数据…"
 }

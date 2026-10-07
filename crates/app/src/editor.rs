@@ -49,6 +49,7 @@ pub struct Editor {
     clipboard: Vec<Node>,
     drag: Option<Drag>,
     pub video_background: bool,
+    pub map_progress: Option<crate::telemetry_load::RouteProgress>,
     pub dimensions: [u32; 2],
     snap: bool,
     automatic_anchor: bool,
@@ -93,6 +94,7 @@ impl Editor {
             dimensions: video_size.unwrap_or([1920, 1080]),
             snap: true,
             automatic_anchor: false,
+            map_progress: None,
             renderer: Renderer::new(),
             offline_maps: actionlay_maps::TileStore::offline(),
             maps: actionlay_maps::TileStore::offline(),
@@ -908,6 +910,19 @@ impl Editor {
                     canvas,
                     egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
                     egui::Color32::WHITE,
+                );
+            }
+            if self.video_background
+                && let Some(progress) = self.map_progress
+            {
+                crate::map_loading::show(
+                    ui,
+                    &self.draft,
+                    canvas,
+                    mode,
+                    telemetry,
+                    time,
+                    Some(progress),
                 );
             }
             for hit in self.renderer.hit_boxes() {

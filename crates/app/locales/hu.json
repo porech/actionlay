@@ -524,5 +524,7 @@
   "Exit full screen": "Kilépés a teljes képernyőből",
   "F11 · Esc to exit": "F11 · Esc a kilépéshez",
   "Use software video decoding": "Szoftveres videodekódolás használata",
-  "Applies the next time a video is opened.": "A következő videó megnyitásakor lép érvénybe."
+  "Applies the next time a video is opened.": "A következő videó megnyitásakor lép érvénybe.",
+  "Loading metadata before export…": "Metaadatok betöltése az exportálás előtt…",
+  "Preparing telemetry…": "Telemetria előkészítése…"
 }

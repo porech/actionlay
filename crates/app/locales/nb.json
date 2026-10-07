@@ -524,5 +524,7 @@
   "Exit full screen": "Avslutt fullskjerm",
   "F11 · Esc to exit": "F11 · Esc for å avslutte",
   "Use software video decoding": "Bruk programvarebasert videodekoding",
-  "Applies the next time a video is opened.": "Gjelder neste gang en video åpnes."
+  "Applies the next time a video is opened.": "Gjelder neste gang en video åpnes.",
+  "Loading metadata before export…": "Laster metadata før eksport…",
+  "Preparing telemetry…": "Klargjør telemetri…"
 }

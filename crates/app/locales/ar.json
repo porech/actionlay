@@ -524,5 +524,7 @@
   "Exit full screen": "الخروج من ملء الشاشة",
   "F11 · Esc to exit": "F11 · Esc للخروج",
   "Use software video decoding": "استخدام فك ترميز الفيديو برمجيًا",
-  "Applies the next time a video is opened.": "يسري عند فتح فيديو في المرة القادمة."
+  "Applies the next time a video is opened.": "يسري عند فتح فيديو في المرة القادمة.",
+  "Loading metadata before export…": "جارٍ تحميل البيانات الوصفية قبل التصدير…",
+  "Preparing telemetry…": "جارٍ تجهيز بيانات القياس…"
 }

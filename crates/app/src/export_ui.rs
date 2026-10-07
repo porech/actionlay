@@ -127,13 +127,24 @@ impl crate::App {
                 .resizable(false)
                 .show(ctx, |ui| {
                     ui.label(crate::i18n::ui_text(ui, &state.status));
-                    if state.cancelled {
+                    if state.cancelled && state.frames > 0 {
                         ui.label(crate::i18n::ui_text(
                             ui,
                             "The export contains the completed frames only.",
                         ));
                     }
-                    ui.add(egui::ProgressBar::new(state.fraction).show_percentage());
+                    if state.preparing_metadata {
+                        match state.metadata_fraction {
+                            Some(fraction) => {
+                                ui.add(egui::ProgressBar::new(fraction).show_percentage());
+                            }
+                            None => {
+                                ui.add(egui::ProgressBar::new(0.0).animate(!state.done));
+                            }
+                        }
+                    } else {
+                        ui.add(egui::ProgressBar::new(state.fraction).show_percentage());
+                    }
                     ui.label(crate::i18n::ui_text(
                         ui,
                         format!(
@@ -247,12 +258,19 @@ pub fn cli() -> anyhow::Result<()> {
     let mut last = std::time::Instant::now() - std::time::Duration::from_secs(1);
     export::run(request, cancel, |state| {
         if state.done || last.elapsed().as_secs_f64() > 0.5 {
-            eprintln!(
-                "{} · {:.1}% · {} frames",
-                state.status,
-                state.fraction * 100.0,
-                state.frames
-            );
+            if state.preparing_metadata {
+                let percent = state
+                    .metadata_fraction
+                    .map_or_else(|| "…".into(), |f| format!("{:.1}%", f * 100.0));
+                eprintln!("{} · {percent}", state.status);
+            } else {
+                eprintln!(
+                    "{} · {:.1}% · {} frames",
+                    state.status,
+                    state.fraction * 100.0,
+                    state.frames
+                );
+            }
             last = std::time::Instant::now();
         }
     })
