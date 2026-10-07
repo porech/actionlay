@@ -56,6 +56,13 @@ device latency in microseconds, cumulative underrun callback count, and cumulati
 silence frames inserted because samples were missing. Silence caused by user
 volume zero or internal suspension during buffering is not counted as starvation.
 Slow cache-miss reads (at least 100 ms) and buffering transitions are also logged.
+`video_us` contains cumulative microseconds spent in codec calls, hardware-frame
+download, and NV12 conversion respectively; compare successive snapshots with
+`decoded` to estimate their cost per frame. `skipped_outputs` counts decoded
+frames omitted before download/conversion because they already trail the audio
+clock. This preserves codec reference frames and does not discard compressed
+packets. It is separate from the presentation queue's `dropped` count; rejected
+packets and codec errors produce explicit warnings.
 No logging occurs in the audio data callback. A negative A/V diagnostic means the
 last presented video PTS trails the audio clock; it alone does not establish
 audible-content synchronization. Compare a captured output with the source audio

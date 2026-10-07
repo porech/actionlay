@@ -44,7 +44,7 @@ use crate::{
     gpmf::GpmfPacket,
     present::select_frame,
     probe::MediaInfo,
-    video::VideoDecoder,
+    video::{PlaybackFrame, VideoDecoder},
 };
 
 /// Decoded frames in flight on the channel.
@@ -184,12 +184,16 @@ struct Shared {
     backend: Mutex<&'static str>,
     decoded_pts: AtomicU64,
     decoded_frames: AtomicU64,
+    skipped_video_outputs: AtomicU64,
+    video_timings_us: [AtomicU64; 3],
     audio_pending_frames: AtomicUsize,
     video_pending_packets: AtomicUsize,
     audio_decoded_end: AtomicU64,
     audio_finished: AtomicBool,
     #[cfg(test)]
     decode_delay_ms: AtomicU64,
+    #[cfg(test)]
+    video_output_delay_ms: AtomicU64,
 }
 
 pub struct Player {
@@ -294,12 +298,16 @@ impl Player {
             backend: Mutex::new("unknown"),
             decoded_pts: AtomicU64::new(f64::NAN.to_bits()),
             decoded_frames: AtomicU64::new(0),
+            skipped_video_outputs: AtomicU64::new(0),
+            video_timings_us: std::array::from_fn(|_| AtomicU64::new(0)),
             audio_pending_frames: AtomicUsize::new(0),
             video_pending_packets: AtomicUsize::new(0),
             audio_decoded_end: AtomicU64::new(f64::NAN.to_bits()),
             audio_finished: AtomicBool::new(false),
             #[cfg(test)]
             decode_delay_ms: AtomicU64::new(0),
+            #[cfg(test)]
+            video_output_delay_ms: AtomicU64::new(0),
         });
 
         let worker = Worker {
@@ -780,7 +788,7 @@ impl Player {
         });
         let buffer = *self.shared.buffer.lock().unwrap();
         log::debug!(
-            "playback: mono={:.3} wall_ms={} gen={} pos={:.3} system={:.3} presented_pts={:.3} decoded_pts={:.3} audio={:?} paused={} buffering={} driven={} lost={} dead={} awaiting={} eof={}/{} buffer_until={:.3} full={} bytes={} queue={} channel={} video_packets={} pending_audio={} audio_end={:.3} decoded={} presented={} dropped={} backend={}",
+            "playback: mono={:.3} wall_ms={} gen={} pos={:.3} system={:.3} presented_pts={:.3} decoded_pts={:.3} audio={:?} paused={} buffering={} driven={} lost={} dead={} awaiting={} eof={}/{} buffer_until={:.3} full={} bytes={} queue={} channel={} video_packets={} pending_audio={} audio_end={:.3} decoded={} presented={} dropped={} backend={} video_us={:?} skipped_outputs={}",
             self.diagnostic_start.elapsed().as_secs_f64(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -811,7 +819,12 @@ impl Player {
             self.shared.decoded_frames.load(Ordering::Relaxed),
             self.presented,
             self.dropped,
-            *self.shared.backend.lock().unwrap()
+            *self.shared.backend.lock().unwrap(),
+            self.shared
+                .video_timings_us
+                .each_ref()
+                .map(|t| t.load(Ordering::Relaxed)),
+            self.shared.skipped_video_outputs.load(Ordering::Relaxed),
         );
     }
 
@@ -1239,15 +1252,40 @@ impl Worker {
 
             // 4. Decode the next video frame when there is room for it.
             if p.outbox.is_none() && !p.end_sent {
-                let decoded = video.receive().unwrap_or_else(|e| {
+                #[cfg(test)]
+                {
+                    video.output_delay_ms =
+                        self.shared.video_output_delay_ms.load(Ordering::Relaxed);
+                }
+                let earliest = if p.generation.started {
+                    audio_now.map_or(f64::NEG_INFINITY, |now| now - 4.0 * half_frame)
+                } else {
+                    // Precise-seek preroll is kept until its first frame aligns
+                    // the audio; it must not use the previous audio clock.
+                    f64::NEG_INFINITY
+                };
+                let decoded = video.receive_playback(earliest).unwrap_or_else(|e| {
                     log::warn!("video decoding error: {e}");
                     None
                 });
+                for (dest, value) in self.shared.video_timings_us.iter().zip(video.timings_us()) {
+                    dest.store(value, Ordering::Relaxed);
+                }
+                let (decoded_count, skipped_count) = video.frame_counts();
+                self.shared
+                    .decoded_frames
+                    .store(decoded_count, Ordering::Relaxed);
+                self.shared
+                    .skipped_video_outputs
+                    .store(skipped_count, Ordering::Relaxed);
                 if let Some(frame) = decoded {
+                    let pts = match &frame {
+                        PlaybackFrame::Frame(frame) => frame.pts,
+                        PlaybackFrame::Skipped(pts) => *pts,
+                    };
                     self.shared
                         .decoded_pts
-                        .store(frame.pts.to_bits(), Ordering::Relaxed);
-                    self.shared.decoded_frames.fetch_add(1, Ordering::Relaxed);
+                        .store(pts.to_bits(), Ordering::Relaxed);
                     #[cfg(test)]
                     if let delay = self.shared.decode_delay_ms.load(Ordering::Relaxed)
                         && delay > 0
@@ -1256,7 +1294,9 @@ impl Worker {
                     }
                     progressed = true;
                     *self.shared.backend.lock().unwrap() = video.active_backend();
-                    if let Some(frame) = self.accept(&mut p, frame, audio_dec.as_ref().map(|a| a.2))
+                    if let PlaybackFrame::Frame(frame) = frame
+                        && let Some(frame) =
+                            self.accept(&mut p, frame, audio_dec.as_ref().map(|a| a.2))
                     {
                         p.outbox = Some(Msg::Frame {
                             generation: p.generation.id,
@@ -1675,6 +1715,47 @@ mod tests {
     }
 
     #[test]
+    fn slow_video_output_recovers_without_repeated_late_buffering() {
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../app/tests/fixtures/export-source.mp4");
+        let mut p = Player::open(
+            &path,
+            PlayerOptions {
+                prefer_hw: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        if !p.stats().audio_active {
+            return;
+        }
+        // The fixture has ten frames per second. Make output conversion slower
+        // than real time while reference decoding stays fast, as with costly
+        // hardware downloads. A seek removes any already-converted head start.
+        p.shared.video_output_delay_ms.store(150, Ordering::Relaxed);
+        p.seek(0.2, true);
+        p.play();
+        let deadline = Instant::now() + Duration::from_secs(20);
+        let mut late_buffering = false;
+        while !p.at_end() && Instant::now() < deadline {
+            p.poll_frame();
+            let decoded = f64::from_bits(p.shared.decoded_pts.load(Ordering::Relaxed));
+            late_buffering |= p.buffering && !p.awaiting_seek_frame && p.position - decoded > 0.45;
+            std::thread::sleep(POLL);
+        }
+        assert!(p.at_end(), "slow output did not reach EOF");
+        assert!(
+            !late_buffering,
+            "output copies repeatedly stalled the video clock"
+        );
+        assert!(p.shared.skipped_video_outputs.load(Ordering::Relaxed) > 0);
+        assert!(
+            (p.last_frame_pts - 2.9).abs() < 0.01,
+            "final frame was lost"
+        );
+    }
+
+    #[test]
     fn active_presentation_keeps_receiving_frames_when_decode_falls_behind_audio() {
         let path = std::env::var_os("ACTIONLAY_SAMPLES")
             .map(std::path::PathBuf::from)
@@ -1707,16 +1788,19 @@ mod tests {
         // the UI keeps polling and the audio device consumes buffered samples.
         p.shared.decode_delay_ms.store(20, Ordering::Relaxed);
         let started = Instant::now();
-        let mut late_frames = 0;
+        let mut received_frames = 0;
+        let mut saw_decoder_lag = false;
         let mut last_report = Instant::now();
         // Software decoding and audio callbacks can both be slow on hosted
-        // macOS runners. Wait for enough late frames, bounded by a deadline,
+        // macOS runners. Wait for enough output frames, bounded by a deadline,
         // rather than assuming the lag will develop within three seconds.
-        while late_frames < 10 && started.elapsed() < Duration::from_secs(10) {
-            if let Some(frame) = p.poll_frame()
-                && p.current_time() - frame.pts > 0.25
-            {
-                late_frames += 1;
+        while received_frames < 10 && started.elapsed() < Duration::from_secs(20) {
+            let received = p.poll_frame().is_some();
+            saw_decoder_lag |= p.current_time()
+                - f64::from_bits(p.shared.decoded_pts.load(Ordering::Relaxed))
+                > 0.25;
+            if received && saw_decoder_lag {
+                received_frames += 1;
             }
             if last_report.elapsed() >= Duration::from_millis(500) {
                 eprintln!(
@@ -1731,13 +1815,10 @@ mod tests {
             std::thread::sleep(Duration::from_millis(4));
         }
         assert!(p.stats().audio_active, "audio did not remain active");
+        assert!(saw_decoder_lag, "test did not create decoder lag");
         assert!(
-            p.current_time() - p.last_frame_pts > 0.25,
-            "test did not create decoder lag"
-        );
-        assert!(
-            late_frames >= 10,
-            "active UI received only {late_frames} late frames: video froze while audio advanced"
+            received_frames >= 10,
+            "active UI received only {received_frames} frames: video froze while audio advanced"
         );
     }
 
