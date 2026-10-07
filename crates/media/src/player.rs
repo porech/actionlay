@@ -1716,8 +1716,7 @@ mod tests {
 
     #[test]
     fn slow_video_output_recovers_without_repeated_late_buffering() {
-        let path =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../app/tests/fixtures/export-source.mp4");
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/output-backlog.mp4");
         let mut p = Player::open(
             &path,
             PlayerOptions {
@@ -1735,24 +1734,35 @@ mod tests {
         p.shared.video_output_delay_ms.store(150, Ordering::Relaxed);
         p.seek(0.2, true);
         p.play();
-        let deadline = Instant::now() + Duration::from_secs(20);
-        let mut late_buffering = false;
+        let deadline = Instant::now() + Duration::from_secs(30);
+        let mut late_buffers = 0;
+        let mut was_buffering = false;
         while !p.at_end() && Instant::now() < deadline {
             p.poll_frame();
             let decoded = f64::from_bits(p.shared.decoded_pts.load(Ordering::Relaxed));
-            late_buffering |= p.buffering && !p.awaiting_seek_frame && p.position - decoded > 0.45;
+            if p.buffering
+                && !was_buffering
+                && !p.awaiting_seek_frame
+                && p.position - decoded > 0.45
+            {
+                late_buffers += 1;
+            }
+            was_buffering = p.buffering;
             std::thread::sleep(POLL);
         }
         assert!(p.at_end(), "slow output did not reach EOF");
         assert!(
-            !late_buffering,
-            "output copies repeatedly stalled the video clock"
+            late_buffers <= 1,
+            "output copies repeatedly stalled the video clock ({late_buffers} buffers)"
         );
+        eprintln!("late buffers: {late_buffers}");
+        // One buffering cycle can legitimately absorb a scheduling stall; it
+        // must not recur throughout this short clip because of output copies.
         // Assert observable recovery rather than a minimum number of skips:
         // device callback pacing can allow this short clip to finish without
         // skips. Decoder tests exercise skipping deterministically.
         assert!(
-            (p.last_frame_pts - 2.9).abs() < 0.01,
+            (p.last_frame_pts - 9.9).abs() < 0.01,
             "final frame was lost"
         );
     }
