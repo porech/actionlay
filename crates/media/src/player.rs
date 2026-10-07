@@ -1734,7 +1734,8 @@ mod tests {
         p.shared.video_output_delay_ms.store(150, Ordering::Relaxed);
         p.seek(0.2, true);
         p.play();
-        let deadline = Instant::now() + Duration::from_secs(30);
+        let started = Instant::now();
+        let deadline = started + Duration::from_secs(30);
         let mut late_buffers = 0;
         let mut was_buffering = false;
         let mut report_at = Instant::now();
@@ -1760,7 +1761,8 @@ mod tests {
                     )
                 });
                 eprintln!(
-                    "output recovery: pos={:.3} video={:.3} decoded={decoded:.3} buffering={} lost={} dead={} skipped={} audio={audio:?}",
+                    "output recovery: mono={:.3} pos={:.3} video={:.3} decoded={decoded:.3} buffering={} lost={} dead={} skipped={} audio={audio:?}",
+                    started.elapsed().as_secs_f64(),
                     p.position,
                     p.last_frame_pts,
                     p.buffering,
