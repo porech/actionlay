@@ -1,5 +1,5 @@
 //! A limited playback/seek check using the same player and telemetry loader as UI.
-//! Usage: playback-check FILE [SEEK_SECONDS]
+//! Usage: playback-check FILE [SEEK_SECONDS] [POLL_MS]
 // This diagnostic includes the loader but only exercises GoPro playback.
 #[allow(dead_code)]
 #[path = "../src/telemetry_load.rs"]
@@ -8,10 +8,17 @@ use actionlay_media::player::{Player, PlayerOptions};
 use actionlay_telemetry::{Metric, Value};
 use std::time::{Duration, Instant};
 fn main() -> anyhow::Result<()> {
+    env_logger::init();
     let path = std::env::args()
         .nth(1)
         .ok_or_else(|| anyhow::anyhow!("usage: playback-check FILE [SEEK_SECONDS]"))?;
     let seek = std::env::args().nth(2).and_then(|s| s.parse::<f64>().ok());
+    // A slow UI must skip decoded frames rather than slow the audio timeline.
+    let poll_ms = std::env::args()
+        .nth(3)
+        .map(|s| s.parse::<u64>())
+        .transpose()?
+        .unwrap_or(4);
     let start = Instant::now();
     let mut p = Player::open(path.as_ref(), PlayerOptions::default())?;
     let meta = p.info().telemetry.clone();
@@ -76,7 +83,7 @@ fn main() -> anyhow::Result<()> {
                 last = Instant::now();
             }
             polls += 1;
-            std::thread::sleep(Duration::from_millis(4));
+            std::thread::sleep(Duration::from_millis(poll_ms));
             if p.is_buffering() {
                 buffered += tick.elapsed();
             }

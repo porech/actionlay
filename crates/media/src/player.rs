@@ -616,10 +616,7 @@ impl Player {
         if self.buffering {
             // A frozen clock must still drain overdue video. Otherwise bounded
             // presentation queues can block the worker before it reaches audio.
-            let (frame, dropped) = select_frame(&mut self.queue, self.position);
-            self.dropped += dropped as u64;
-            catch_up_frame = frame;
-            self.receive();
+            catch_up_frame = self.select_due_frame(self.position);
             let compressed_ready = self.buffered_seconds()
                 >= self.shared.buffering.lock().unwrap().start_buffer_seconds * self.speed()
                 || buffer.full
@@ -677,12 +674,23 @@ impl Player {
         }
         self.watch_audio();
         let now = self.current_time();
+        // Drain overdue frames from the channel as well as the small local
+        // queue. A 100 fps input otherwise needs 25 UI updates per second just
+        // to consume four frames per poll, even when decoding is fast enough.
+        let frame = if presentation_suspended {
+            None
+        } else {
+            self.select_due_frame(now)
+        };
         if self.audio_driven() {
             let audio_low = self.audio.as_ref().is_some_and(|a| {
                 let a = a.lock().unwrap();
                 a.queued_frames() as f64 / f64::from(a.sample_rate()) < AUDIO_LOW_WATER
             });
-            let newest_video = self.queue.back().map_or(self.last_frame_pts, |f| f.pts);
+            let newest_video = self.queue.back().map_or_else(
+                || frame.as_ref().map_or(self.last_frame_pts, |f| f.pts),
+                |f| f.pts,
+            );
             let decoder_late =
                 !presentation_suspended && !self.end_seen && now - newest_video > MAX_VIDEO_LAG;
             if (audio_low && !self.shared.audio_finished.load(Ordering::SeqCst)) || decoder_late {
@@ -690,7 +698,7 @@ impl Player {
                     "decoded data low water: position={now:.3} audio_low={audio_low} video_late={decoder_late}"
                 );
                 self.prebuffer();
-                return catch_up_frame.map(|f| self.present(f));
+                return frame.or(catch_up_frame).map(|f| self.present(f));
             }
         }
         self.shared.read_until.store(
@@ -716,8 +724,11 @@ impl Player {
             self.seek(now, true);
             return None;
         }
-        let (frame, dropped) = select_frame(&mut self.queue, now);
-        self.dropped += dropped as u64;
+        let frame = if presentation_suspended {
+            self.select_due_frame(now)
+        } else {
+            frame
+        };
         self.position = now.min(self.info.duration);
         if frame.is_none() && self.queue.is_empty() && self.buffered_seconds() < 0.05 && !buffer.eof
         {
@@ -728,6 +739,26 @@ impl Player {
             self.pause();
         }
         frame
+    }
+
+    fn select_due_frame(&mut self, now: f64) -> Option<Nv12Frame> {
+        let mut chosen = None;
+        // Bound work even if the producer keeps refilling the channel. Keep
+        // future frames queued and preserve receive's generation/EOF handling.
+        for _ in 0..=CHANNEL_CAP / QUEUE_CAP {
+            let (frame, dropped) = select_frame(&mut self.queue, now);
+            self.dropped += dropped as u64;
+            if let Some(frame) = frame
+                && chosen.replace(frame).is_some()
+            {
+                self.dropped += 1;
+            }
+            self.receive();
+            if self.queue.front().is_none_or(|f| f.pts > now) {
+                break;
+            }
+        }
+        chosen
     }
 
     fn report_diagnostics(&mut self) {
@@ -1579,6 +1610,70 @@ mod tests {
             p.buffered_seconds()
         );
     }
+    #[test]
+    fn presentation_drains_due_channel_frames_and_keeps_future_frames() {
+        let path = std::env::var_os("ACTIONLAY_SAMPLES")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/synthetic")
+            })
+            .join("h264-1080p30-44k.mp4");
+        if !path.exists() {
+            return;
+        }
+        let mut p = Player::open(
+            &path,
+            PlayerOptions {
+                audio: false,
+                prefer_hw: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let (tx, rx) = crossbeam_channel::bounded(CHANNEL_CAP);
+        p.msgs = rx;
+        let frame = |i: usize| Nv12Frame {
+            width: 2,
+            height: 2,
+            y: vec![0; 4],
+            uv: vec![0; 2],
+            pts: i as f64 / 100.0,
+        };
+        p.queue = (0..4).map(frame).collect();
+        for i in 4..12 {
+            tx.send(Msg::Frame {
+                generation: p.generation,
+                frame: frame(i),
+                ready: Instant::now(),
+            })
+            .unwrap();
+        }
+        p.awaiting_seek_frame = false;
+        p.buffering = false;
+        p.clock.set_paused(false, Instant::now());
+        // Keep this queue regression independent of CI scheduling delays.
+        let fixed_tick = Instant::now() + Duration::from_secs(60);
+        p.clock.seek(0.095, fixed_tick);
+        let shown = p.poll_frame().unwrap();
+        assert_eq!(
+            shown.pts, 0.09,
+            "presentation must reach frames beyond the first four"
+        );
+        assert_eq!(p.dropped, 9);
+        assert_eq!(
+            p.queue.iter().map(|f| f.pts).collect::<Vec<_>>(),
+            [0.10, 0.11]
+        );
+        assert!(!p.is_buffering());
+        tx.send(Msg::End {
+            generation: p.generation,
+        })
+        .unwrap();
+        p.clock.seek(0.12, fixed_tick);
+        assert_eq!(p.poll_frame().unwrap().pts, 0.11);
+        assert!(p.end_seen);
+    }
+
     #[test]
     fn active_presentation_keeps_receiving_frames_when_decode_falls_behind_audio() {
         let path = std::env::var_os("ACTIONLAY_SAMPLES")

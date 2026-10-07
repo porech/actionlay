@@ -36,6 +36,8 @@ make test
 # Limited playback/seek diagnostics using the UI's player and telemetry decoder:
 source scripts/env.sh
 cargo run --release -p actionlay-app --example playback-check -- /path/to/video.mp4 240
+# Optional third argument: milliseconds between polls, to simulate a slow UI.
+cargo run --release -p actionlay-app --example playback-check -- /path/to/video.mp4 240 45
 ```
 
 
