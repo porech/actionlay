@@ -69,10 +69,13 @@ create duplicate per-user integration. Package install/remove refreshes MIME and
 desktop databases. The glibc 2.35 baseline supports Ubuntu 22.04+, Mint 21+,
 Debian 12+ and recent Fedora-compatible systems; it does not support musl Alpine.
 
-`repositories.yml` runs after successful CI publication and reconstructs both
+The `Linux package repositories` job in `ci.yml` runs after the release publication
+job succeeds and reconstructs both
 stable and nightly APT/DNF repositories from release assets. It verifies and signs
 metadata with the dedicated `GPG_PRIVATE_KEY` secret, signs RPM packages, then
-deploys GitHub Pages at <https://porech.github.io/actionlay/>. A release without
+deploys GitHub Pages at <https://porech.github.io/actionlay/>. Repository deployment
+failures therefore fail the same CI run. The signing key and Pages permissions
+are scoped to this job; pull requests and non-release branches skip it. A release without
 native packages is not advertised as an available channel. The public key is
 committed at `packaging/linux/repository-key.asc`; private keys must stay outside
 the checkout. The current keyring and exports are in `~/.actionlay-release-signing`
