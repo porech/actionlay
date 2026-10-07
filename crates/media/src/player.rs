@@ -1891,10 +1891,13 @@ mod tests {
         let generation = p.generation;
         let initial_underruns = p.audio.as_ref().unwrap().lock().unwrap().diagnostics().1;
         p.shared.decode_delay_ms.store(20, Ordering::Relaxed);
-        let deadline = Instant::now() + Duration::from_secs(6);
+        // Device startup latency and debug decoder throughput vary by host.
+        // Require two completed recoveries rather than assuming six wall seconds
+        // always contain them (notably on virtual CoreAudio CI outputs).
+        let deadline = Instant::now() + Duration::from_secs(20);
         let mut resumes = 0;
         let mut was_buffering = false;
-        while Instant::now() < deadline {
+        while resumes < 2 && Instant::now() < deadline {
             p.poll_frame();
             if was_buffering && !p.is_buffering() {
                 resumes += 1;
@@ -1905,12 +1908,23 @@ mod tests {
             }
             std::thread::sleep(POLL);
         }
-        assert!(resumes >= 2, "test did not exercise repeated recovery");
+        assert!(
+            resumes >= 2,
+            "only {resumes} recoveries: position={} buffering={} stats={:?}",
+            p.position(),
+            p.is_buffering(),
+            p.stats()
+        );
         assert_eq!(p.generation, generation);
         p.shared.decode_delay_ms.store(0, Ordering::Relaxed);
+        let recovered_position = p.position();
         pump(
             &mut p,
-            |p| !p.is_buffering() && p.stats().av_offset.is_some_and(|o| o.abs() < 0.15),
+            |p| {
+                !p.is_buffering()
+                    && p.position() > recovered_position + 0.4
+                    && p.stats().av_offset.is_some_and(|o| o.abs() < 0.15)
+            },
             Duration::from_secs(10),
         );
         assert!(p.stats().audio_active);
