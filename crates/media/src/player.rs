@@ -1792,17 +1792,24 @@ mod tests {
         let started = Instant::now();
         let mut received_frames = 0;
         let mut saw_decoder_lag = false;
+        let mut lag_frame_pts = None;
         let mut last_report = Instant::now();
-        // Software decoding and audio callbacks can both be slow on hosted
-        // macOS runners. Wait for enough output frames, bounded by a deadline,
-        // rather than assuming the lag will develop within three seconds.
-        while received_frames < 10 && started.elapsed() < Duration::from_secs(20) {
+        // Real software decoding at 1440p100 is slow on hosted runners. Check
+        // a full second of visible progress after lag, not an arbitrary output
+        // count: recovery is allowed to omit overdue presentation frames.
+        while started.elapsed() < Duration::from_secs(30) {
             let received = p.poll_frame().is_some();
             saw_decoder_lag |= p.current_time()
                 - f64::from_bits(p.shared.decoded_pts.load(Ordering::Relaxed))
                 > 0.25;
-            if received && saw_decoder_lag {
-                received_frames += 1;
+            if saw_decoder_lag {
+                let initial = *lag_frame_pts.get_or_insert(p.last_frame_pts);
+                if received {
+                    received_frames += 1;
+                }
+                if p.last_frame_pts - initial >= 1.0 {
+                    break;
+                }
             }
             if last_report.elapsed() >= Duration::from_millis(500) {
                 eprintln!(
@@ -1819,8 +1826,8 @@ mod tests {
         assert!(p.stats().audio_active, "audio did not remain active");
         assert!(saw_decoder_lag, "test did not create decoder lag");
         assert!(
-            received_frames >= 10,
-            "active UI received only {received_frames} frames: video froze while audio advanced"
+            lag_frame_pts.is_some_and(|initial| p.last_frame_pts - initial >= 1.0),
+            "active UI did not advance a second after lag ({received_frames} outputs)"
         );
     }
 
