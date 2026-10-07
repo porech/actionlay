@@ -1250,7 +1250,107 @@ impl Worker {
                 }
             }
 
-            // 4. Decode the next video frame when there is room for it.
+            // 4. Fill audio from already-read packets before a potentially
+            // expensive video copy. One packet per copy cannot sustain audio
+            // when downloads/conversion are slow: cached packets are not the
+            // same as decoded samples ready for the device.
+            for _ in 0..64 {
+                if p.demux_eof
+                    || (p.audio_pending() && !p.video_packets.is_empty())
+                    || p.video_packets.len() >= MAX_VIDEO_PACKETS
+                    || p.video_packet_bytes >= self.shared.buffering.lock().unwrap().packet_bytes()
+                    || self.shared.cancelled.load(Ordering::SeqCst)
+                    || self.shared.generation.load(Ordering::SeqCst) != p.generation.id
+                {
+                    break;
+                }
+                match packets.try_recv() {
+                    Ok(demux::PacketMessage::End { generation })
+                        if generation == p.generation.id =>
+                    {
+                        p.demux_eof = true;
+                        p.audio_input_done = true;
+                        progressed = true;
+                    }
+                    Ok(demux::PacketMessage::End { .. }) => {
+                        progressed = true;
+                    }
+                    Ok(demux::PacketMessage::Packet {
+                        generation,
+                        stream,
+                        packet,
+                    }) => {
+                        progressed = true;
+                        if generation != p.generation.id {
+                            self.shared
+                                .packet_bytes
+                                .fetch_sub(packet.size(), Ordering::SeqCst);
+                        } else if stream == vindex {
+                            p.video_packet_bytes += packet.size();
+                            p.video_packets.push_back(packet);
+                        } else {
+                            self.shared
+                                .packet_bytes
+                                .fetch_sub(packet.size(), Ordering::SeqCst);
+                            if let Some((aindex, dec, rate)) = &mut audio_dec
+                                && stream == *aindex
+                                && audio_wanted
+                            {
+                                if audio_track_end.is_some_and(|end| {
+                                    packet.pts().is_some_and(|pts| {
+                                        (pts + packet.duration()) as f64 * audio_tb.unwrap()
+                                            >= end - 1e-7
+                                    })
+                                }) {
+                                    p.audio_input_done = true;
+                                }
+                                if let Err(e) = dec.send(&packet) {
+                                    log::warn!("audio packet rejected: {e}");
+                                }
+                                loop {
+                                    match dec.receive() {
+                                        Ok(Some(chunk)) => {
+                                            self.shared.audio_decoded_end.store(
+                                                (chunk.pts
+                                                    + (chunk.samples.len() / 2) as f64
+                                                        / f64::from(*rate))
+                                                .to_bits(),
+                                                Ordering::Relaxed,
+                                            );
+                                            queue_audio(&mut p, chunk, *rate);
+                                        }
+                                        Ok(None) => break,
+                                        Err(e) => {
+                                            log::warn!("audio decoding error: {e}");
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(TryRecvError::Empty) => break,
+                    Err(TryRecvError::Disconnected) => {
+                        p.demux_eof = true;
+                        p.audio_input_done = true;
+                        let mut buffer = self.shared.buffer.lock().unwrap();
+                        if buffer.generation == p.generation.id {
+                            buffer.eof = true;
+                        }
+                    }
+                }
+                if p.audio_pending() {
+                    let pushed = self.push_audio(p.generation.id, &p.audio_buf[p.audio_off..]);
+                    p.audio_off += pushed;
+                    progressed |= pushed > 0;
+                    if !p.audio_pending() {
+                        p.audio_buf.clear();
+                        p.audio_off = 0;
+                    }
+                }
+            }
+
+            // 5. Decode the next video frame when there is room for it.
             if p.outbox.is_none() && !p.end_sent {
                 #[cfg(test)]
                 {
@@ -1258,9 +1358,12 @@ impl Worker {
                         self.shared.video_output_delay_ms.load(Ordering::Relaxed);
                 }
                 let earliest = if p.generation.started {
-                    audio_now.map_or(f64::NEG_INFINITY, |now| {
-                        video.playback_cutoff(now, 4.0 * half_frame)
-                    })
+                    // Packet decoding may have taken time since the clock
+                    // snapshot used to drain the presentation channel.
+                    self.with_audio(p.generation.id, |audio| audio.clock())
+                        .map_or(f64::NEG_INFINITY, |now| {
+                            video.playback_cutoff(now, half_frame)
+                        })
                 } else {
                     // Precise-seek preroll is kept until its first frame aligns
                     // the audio; it must not use the previous audio clock.
@@ -1341,88 +1444,6 @@ impl Worker {
                         p.outbox = Some(Msg::End {
                             generation: p.generation.id,
                         });
-                    }
-                }
-            }
-
-            // 5. Consume already-read packets without waiting for storage.
-            if !p.demux_eof
-                && p.video_packets.len() < MAX_VIDEO_PACKETS
-                && p.video_packet_bytes < self.shared.buffering.lock().unwrap().packet_bytes()
-            {
-                match packets.try_recv() {
-                    Ok(demux::PacketMessage::End { generation })
-                        if generation == p.generation.id =>
-                    {
-                        p.demux_eof = true;
-                        p.audio_input_done = true;
-                        progressed = true;
-                    }
-                    Ok(demux::PacketMessage::End { .. }) => {
-                        progressed = true;
-                    }
-                    Ok(demux::PacketMessage::Packet {
-                        generation,
-                        stream,
-                        packet,
-                    }) => {
-                        progressed = true;
-                        if generation != p.generation.id {
-                            self.shared
-                                .packet_bytes
-                                .fetch_sub(packet.size(), Ordering::SeqCst);
-                        } else if stream == vindex {
-                            p.video_packet_bytes += packet.size();
-                            p.video_packets.push_back(packet);
-                        } else {
-                            self.shared
-                                .packet_bytes
-                                .fetch_sub(packet.size(), Ordering::SeqCst);
-                            if let Some((aindex, dec, rate)) = &mut audio_dec
-                                && stream == *aindex
-                                && audio_wanted
-                            {
-                                if audio_track_end.is_some_and(|end| {
-                                    packet.pts().is_some_and(|pts| {
-                                        (pts + packet.duration()) as f64 * audio_tb.unwrap()
-                                            >= end - 1e-7
-                                    })
-                                }) {
-                                    p.audio_input_done = true;
-                                }
-                                if let Err(e) = dec.send(&packet) {
-                                    log::warn!("audio packet rejected: {e}");
-                                }
-                                loop {
-                                    match dec.receive() {
-                                        Ok(Some(chunk)) => {
-                                            self.shared.audio_decoded_end.store(
-                                                (chunk.pts
-                                                    + (chunk.samples.len() / 2) as f64
-                                                        / f64::from(*rate))
-                                                .to_bits(),
-                                                Ordering::Relaxed,
-                                            );
-                                            queue_audio(&mut p, chunk, *rate);
-                                        }
-                                        Ok(None) => break,
-                                        Err(e) => {
-                                            log::warn!("audio decoding error: {e}");
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Err(TryRecvError::Empty) => {}
-                    Err(TryRecvError::Disconnected) => {
-                        p.demux_eof = true;
-                        p.audio_input_done = true;
-                        let mut buffer = self.shared.buffer.lock().unwrap();
-                        if buffer.generation == p.generation.id {
-                            buffer.eof = true;
-                        }
                     }
                 }
             }
@@ -1734,7 +1755,7 @@ mod tests {
         // The fixture has ten frames per second. Make output conversion slower
         // than real time while reference decoding stays fast, as with costly
         // hardware downloads. A seek removes any already-converted head start.
-        p.shared.video_output_delay_ms.store(150, Ordering::Relaxed);
+        p.shared.video_output_delay_ms.store(250, Ordering::Relaxed);
         p.seek(0.2, true);
         p.play();
         let started = Instant::now();
