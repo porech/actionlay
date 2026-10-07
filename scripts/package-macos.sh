@@ -9,12 +9,15 @@ VERSION="$(sed -n 's/^version = "\([^"]*\)"/\1/p' "$ROOT/Cargo.toml" | head -1)"
 BUILD="${GITHUB_RUN_NUMBER:-1}"
 WORK="$(mktemp -d /tmp/actionlay-dmg.XXXXXX)"
 MOUNT="$WORK/mounted"
+VERIFY_MOUNT="$WORK/verified"
 cleanup() {
-  if mount | grep -Fq " on $MOUNT "; then hdiutil detach "$MOUNT" -quiet || true; fi
+  for point in "$MOUNT" "$VERIFY_MOUNT"; do
+    hdiutil detach -quiet "$point" >/dev/null 2>&1 || true
+  done
   rm -rf "$WORK"
 }
 trap cleanup EXIT
-mkdir -p "$OUTPUT" "$WORK/stage" "$MOUNT"
+mkdir -p "$OUTPUT" "$WORK/stage" "$MOUNT" "$VERIFY_MOUNT"
 APP="$WORK/stage/ActionLay.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 for binary in actionlay actionlay-telemetry; do
@@ -79,4 +82,10 @@ python3 -m venv "$WORK/dmg-tools"
 hdiutil detach -quiet "$MOUNT"
 hdiutil convert -quiet "$WORK/writable.dmg" -format UDZO -imagekey zlib-level=9 -o "$OUTPUT/actionlay-macos-universal.dmg"
 hdiutil verify -quiet "$OUTPUT/actionlay-macos-universal.dmg"
+# Validate the actual distributed image, mounted at a different path. A valid
+# staging alias alone does not prove Finder can resolve it on the user's Mac.
+hdiutil attach -quiet -readonly -nobrowse -mountpoint "$VERIFY_MOUNT" "$OUTPUT/actionlay-macos-universal.dmg"
+"$WORK/dmg-tools/bin/python" "$ROOT/scripts/verify-dmg-layout.py" "$VERIFY_MOUNT" "$WORK/background.alias"
+swift "$ROOT/scripts/verify-dmg-background.swift" "$WORK/background.alias" "$VERIFY_MOUNT/.background/background.png"
+hdiutil detach -quiet "$VERIFY_MOUNT"
 echo "$OUTPUT/actionlay-macos-universal.dmg"
