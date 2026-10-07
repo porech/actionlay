@@ -50,6 +50,7 @@ impl<R: Read + Seek> Read for CachedReader<R> {
         let block = if let Some(i) = self.blocks.iter().position(|b| b.offset == offset) {
             self.blocks.remove(i).unwrap()
         } else {
+            let started = std::time::Instant::now();
             self.source.seek(SeekFrom::Start(offset))?;
             let len = (self.size - offset).min(BLOCK_BYTES as u64) as usize;
             let mut data = vec![0; len];
@@ -64,6 +65,12 @@ impl<R: Read + Seek> Read for CachedReader<R> {
                     Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
                     Err(e) => return Err(e),
                 }
+            }
+            if started.elapsed() >= std::time::Duration::from_millis(100) {
+                log::debug!(
+                    "source read: offset={offset} bytes={got} elapsed_ms={}",
+                    started.elapsed().as_millis()
+                );
             }
             data.truncate(got);
             Block { offset, data }

@@ -46,4 +46,11 @@ beep() { # $1 = duration, $2 = sample rate; sample-accurate (aevalsrc), mono
   -c:v libx265 -preset ultrafast -pix_fmt yuv420p -tag:v hvc1 -x265-params log-level=error \
   -c:a pcm_s16le -shortest "$OUT/hevc8-pcm-audio.mov"
 
+# Audio ends before the minimum resume watermark; video must still reach EOF.
+"$FF" -v error -y \
+  -f lavfi -i "testsrc2=size=160x90:rate=30:duration=3" \
+  -f lavfi -i "$(beep 0.1 48000)" \
+  -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
+  -c:a aac -b:a 128k "$OUT/h264-short-audio.mp4"
+
 ls -l "$OUT"

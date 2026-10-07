@@ -40,3 +40,17 @@ cargo run --release -p actionlay-app --example playback-check -- /path/to/video.
 
 
 Release packaging is documented in [releasing.md](releasing.md).
+
+For playback diagnostics, set `RUST_LOG=actionlay_media=debug` and capture stderr.
+The player reports a snapshot once per second: monotonic elapsed time, Unix wall
+time in milliseconds, generation, audio/system clocks, decoded/presented video
+PTS, queue sizes, buffering state, backend, and audio device format. The audio
+tuple contains clock seconds, queued/consumed stereo frames, sample rate, then
+device latency in microseconds, cumulative underrun callback count, and cumulative
+silence frames inserted because samples were missing. Silence caused by user
+volume zero or internal suspension during buffering is not counted as starvation.
+Slow cache-miss reads (at least 100 ms) and buffering transitions are also logged.
+No logging occurs in the audio data callback. A negative A/V diagnostic means the
+last presented video PTS trails the audio clock; it alone does not establish
+audible-content synchronization. Compare a captured output with the source audio
+when investigating gaps or drift.

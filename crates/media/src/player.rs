@@ -102,6 +102,9 @@ const POLL: Duration = Duration::from_millis(5);
 const AUDIO_STARVATION: Duration = Duration::from_millis(500);
 /// Resynchronize after presentation was suspended instead of replaying old frames.
 const MAX_VIDEO_LAG: f64 = 0.5;
+/// Leave enough samples for the next UI poll and device callback.
+const AUDIO_LOW_WATER: f64 = 0.08;
+const AUDIO_RESUME_WATER: f64 = 0.2;
 
 /// Metadata from the very same demux pass as video/audio. It survives video
 /// generations: the consumer caches packets by timestamp across seeks.
@@ -179,6 +182,12 @@ struct Shared {
     /// The player wants audio for the current generation (audio is driving).
     audio_wanted: AtomicBool,
     backend: Mutex<&'static str>,
+    decoded_pts: AtomicU64,
+    decoded_frames: AtomicU64,
+    audio_pending_frames: AtomicUsize,
+    video_pending_packets: AtomicUsize,
+    audio_decoded_end: AtomicU64,
+    audio_finished: AtomicBool,
     #[cfg(test)]
     decode_delay_ms: AtomicU64,
 }
@@ -186,6 +195,8 @@ struct Shared {
 pub struct Player {
     telemetry: Option<std::sync::mpsc::Receiver<TelemetryEvent>>,
     last_poll: Instant,
+    diagnostic_start: Instant,
+    diagnostic_last: Instant,
     buffering: bool,
     info: MediaInfo,
     commands: Sender<Command>,
@@ -281,6 +292,12 @@ impl Player {
             generation: AtomicU64::new(0),
             audio_wanted: AtomicBool::new(false),
             backend: Mutex::new("unknown"),
+            decoded_pts: AtomicU64::new(f64::NAN.to_bits()),
+            decoded_frames: AtomicU64::new(0),
+            audio_pending_frames: AtomicUsize::new(0),
+            video_pending_packets: AtomicUsize::new(0),
+            audio_decoded_end: AtomicU64::new(f64::NAN.to_bits()),
+            audio_finished: AtomicBool::new(false),
             #[cfg(test)]
             decode_delay_ms: AtomicU64::new(0),
         });
@@ -307,6 +324,8 @@ impl Player {
         Ok(Self {
             telemetry: Some(telemetry_rx),
             last_poll: Instant::now(),
+            diagnostic_start: Instant::now(),
+            diagnostic_last: Instant::now(),
             buffering: false,
             info,
             commands: cmd_tx,
@@ -366,6 +385,11 @@ impl Player {
         self.clock.seek(self.position, Instant::now());
         self.clock.set_paused(true, Instant::now());
         self.buffering = true;
+        log::debug!(
+            "buffering entered: position={:.3} video={:.3}",
+            self.position,
+            self.last_frame_pts
+        );
         self.stall.reset();
         self.starving_since = None;
         self.update_audio_mode();
@@ -495,6 +519,7 @@ impl Player {
         // checks it under the same lock before every push, so no audio of an
         // older generation can land in the buffer after this reset.
         self.shared.generation.store(generation, Ordering::SeqCst);
+        self.shared.audio_finished.store(false, Ordering::SeqCst);
         *self.shared.buffer.lock().unwrap() = BufferState {
             generation,
             until: to,
@@ -571,6 +596,7 @@ impl Player {
             poll_time.duration_since(self.last_poll).as_secs_f64() > MAX_VIDEO_LAG;
         self.last_poll = poll_time;
         self.receive();
+        self.report_diagnostics();
         if self.awaiting_seek_frame {
             let f = self.queue.pop_front()?;
             self.awaiting_seek_frame = false;
@@ -586,14 +612,61 @@ impl Player {
             return None;
         }
         let buffer = *self.shared.buffer.lock().unwrap();
+        let mut catch_up_frame = None;
         if self.buffering {
-            if self.buffered_seconds()
-                < self.shared.buffering.lock().unwrap().start_buffer_seconds * self.speed()
-                && !buffer.full
-                && !buffer.eof
-            {
-                return None;
+            // A frozen clock must still drain overdue video. Otherwise bounded
+            // presentation queues can block the worker before it reaches audio.
+            let (frame, dropped) = select_frame(&mut self.queue, self.position);
+            self.dropped += dropped as u64;
+            catch_up_frame = frame;
+            self.receive();
+            let compressed_ready = self.buffered_seconds()
+                >= self.shared.buffering.lock().unwrap().start_buffer_seconds * self.speed()
+                || buffer.full
+                || buffer.eof;
+            let video_ready = self.end_seen
+                || self
+                    .queue
+                    .back()
+                    .is_some_and(|f| f.pts + self.frame_duration() >= self.position)
+                || catch_up_frame
+                    .as_ref()
+                    .is_some_and(|f| f.pts + self.frame_duration() >= self.position);
+            let audio_ready = !self.audio_can_drive()
+                || self.audio_lost
+                || self.shared.audio_finished.load(Ordering::SeqCst)
+                || self.audio.as_ref().is_some_and(|a| {
+                    let a = a.lock().unwrap();
+                    a.queued_frames() as f64 / f64::from(a.sample_rate()) >= AUDIO_RESUME_WATER
+                });
+            if !(compressed_ready && video_ready && audio_ready) {
+                // Unknown/short audio tracks must not deadlock video forever.
+                // Only apply the existing missing-audio fallback when storage
+                // and decoded video have recovered, with no pending samples.
+                if compressed_ready
+                    && buffer.until - self.position >= AUDIO_STARVATION.as_secs_f64() * self.speed()
+                    && video_ready
+                    && !audio_ready
+                    && self.shared.audio_pending_frames.load(Ordering::Relaxed) == 0
+                {
+                    let since = *self.starving_since.get_or_insert_with(Instant::now);
+                    if since.elapsed() >= AUDIO_STARVATION {
+                        self.audio_lost = true;
+                        self.update_audio_mode();
+                    }
+                } else {
+                    self.starving_since = None;
+                }
+                return catch_up_frame.map(|f| self.present(f));
             }
+            log::debug!(
+                "buffering resume: position={:.3} video={:.3} compressed_until={:.3} full={} eof={}",
+                self.position,
+                self.last_frame_pts,
+                buffer.until,
+                buffer.full,
+                buffer.eof
+            );
             self.buffering = false;
             self.stall.reset();
             self.starving_since = None;
@@ -604,6 +677,22 @@ impl Player {
         }
         self.watch_audio();
         let now = self.current_time();
+        if self.audio_driven() {
+            let audio_low = self.audio.as_ref().is_some_and(|a| {
+                let a = a.lock().unwrap();
+                a.queued_frames() as f64 / f64::from(a.sample_rate()) < AUDIO_LOW_WATER
+            });
+            let newest_video = self.queue.back().map_or(self.last_frame_pts, |f| f.pts);
+            let decoder_late =
+                !presentation_suspended && !self.end_seen && now - newest_video > MAX_VIDEO_LAG;
+            if (audio_low && !self.shared.audio_finished.load(Ordering::SeqCst)) || decoder_late {
+                log::debug!(
+                    "decoded data low water: position={now:.3} audio_low={audio_low} video_late={decoder_late}"
+                );
+                self.prebuffer();
+                return catch_up_frame.map(|f| self.present(f));
+            }
+        }
         self.shared.read_until.store(
             (now + self.shared.buffering.lock().unwrap().read_ahead_seconds * self.speed())
                 .to_bits(),
@@ -634,11 +723,65 @@ impl Player {
         {
             self.prebuffer();
         }
-        let frame = frame.map(|f| self.present(f));
+        let frame = frame.or(catch_up_frame).map(|f| self.present(f));
         if self.at_end() {
             self.pause();
         }
         frame
+    }
+
+    fn report_diagnostics(&mut self) {
+        if !log::log_enabled!(log::Level::Debug)
+            || self.diagnostic_last.elapsed() < Duration::from_secs(1)
+        {
+            return;
+        }
+        self.diagnostic_last = Instant::now();
+        let audio = self.audio.as_ref().map(|a| {
+            let a = a.lock().unwrap();
+            (
+                a.clock(),
+                a.queued_frames(),
+                a.frames_played(),
+                a.sample_rate(),
+                a.diagnostics(),
+            )
+        });
+        let buffer = *self.shared.buffer.lock().unwrap();
+        log::debug!(
+            "playback: mono={:.3} wall_ms={} gen={} pos={:.3} system={:.3} presented_pts={:.3} decoded_pts={:.3} audio={:?} paused={} buffering={} driven={} lost={} dead={} awaiting={} eof={}/{} buffer_until={:.3} full={} bytes={} queue={} channel={} video_packets={} pending_audio={} audio_end={:.3} decoded={} presented={} dropped={} backend={}",
+            self.diagnostic_start.elapsed().as_secs_f64(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis(),
+            self.generation,
+            self.position,
+            self.clock.time(Instant::now()),
+            self.last_frame_pts,
+            f64::from_bits(self.shared.decoded_pts.load(Ordering::Relaxed)),
+            audio,
+            self.is_paused(),
+            self.buffering,
+            self.audio_driven(),
+            self.audio_lost,
+            self.audio_dead,
+            self.awaiting_seek_frame,
+            buffer.eof,
+            self.end_seen,
+            buffer.until,
+            buffer.full,
+            self.shared.packet_bytes.load(Ordering::Relaxed),
+            self.queue.len(),
+            self.msgs.len(),
+            self.shared.video_pending_packets.load(Ordering::Relaxed),
+            self.shared.audio_pending_frames.load(Ordering::Relaxed),
+            f64::from_bits(self.shared.audio_decoded_end.load(Ordering::Relaxed)),
+            self.shared.decoded_frames.load(Ordering::Relaxed),
+            self.presented,
+            self.dropped,
+            *self.shared.backend.lock().unwrap()
+        );
     }
 
     /// Moves messages of the current generation from the channel to the queue.
@@ -694,7 +837,10 @@ impl Player {
             self.starving_since = None;
             return;
         }
-        let lost = if self.end_seen {
+        let lost = if self.end_seen
+            || (self.shared.audio_finished.load(Ordering::SeqCst)
+                && self.shared.audio_pending_frames.load(Ordering::Relaxed) == 0)
+        {
             true
         } else if self.queue.len() >= QUEUE_CAP {
             let since = *self.starving_since.get_or_insert_with(Instant::now);
@@ -871,6 +1017,7 @@ struct Pipeline {
     demux_eof: bool,
     video_eof_sent: bool,
     end_sent: bool,
+    audio_input_done: bool,
 }
 
 impl Pipeline {
@@ -886,6 +1033,7 @@ impl Pipeline {
             demux_eof: false,
             video_eof_sent: false,
             end_sent: false,
+            audio_input_done: false,
         }
     }
 
@@ -921,6 +1069,28 @@ impl Worker {
             }
             _ => None,
         };
+        let audio_track_end = self
+            .info
+            .audio
+            .as_ref()
+            .and_then(|a| input.stream(a.stream_index))
+            .and_then(|s| {
+                (s.duration() > 0 && s.duration() != ffmpeg::ffi::AV_NOPTS_VALUE).then(|| {
+                    (s.duration()
+                        + if s.start_time() == ffmpeg::ffi::AV_NOPTS_VALUE {
+                            0
+                        } else {
+                            s.start_time()
+                        }) as f64
+                        * f64::from(s.time_base())
+                })
+            });
+        let audio_tb = self
+            .info
+            .audio
+            .as_ref()
+            .and_then(|a| input.stream(a.stream_index))
+            .map(|s| f64::from(s.time_base()));
         let half_frame = 0.5 / self.info.video.fps.max(1.0);
 
         let mut p = Pipeline::new(Generation::new(0, f64::NEG_INFINITY));
@@ -974,8 +1144,19 @@ impl Worker {
                     f64::NEG_INFINITY
                 };
                 p = Pipeline::new(Generation::new(generation, skip_before));
+                p.audio_input_done = audio_track_end.is_some_and(|end| to >= end);
             }
 
+            self.shared.audio_finished.store(
+                p.audio_input_done && !p.audio_pending() && p.early_audio.is_empty(),
+                Ordering::SeqCst,
+            );
+            self.shared
+                .audio_pending_frames
+                .store((p.audio_buf.len() - p.audio_off) / 2, Ordering::Relaxed);
+            self.shared
+                .video_pending_packets
+                .store(p.video_packets.len(), Ordering::Relaxed);
             let mut progressed = false;
             let mut audio_now = None;
             let audio_wanted =
@@ -1032,6 +1213,10 @@ impl Worker {
                     None
                 });
                 if let Some(frame) = decoded {
+                    self.shared
+                        .decoded_pts
+                        .store(frame.pts.to_bits(), Ordering::Relaxed);
+                    self.shared.decoded_frames.fetch_add(1, Ordering::Relaxed);
                     #[cfg(test)]
                     if let delay = self.shared.decode_delay_ms.load(Ordering::Relaxed)
                         && delay > 0
@@ -1097,6 +1282,7 @@ impl Worker {
                         if generation == p.generation.id =>
                     {
                         p.demux_eof = true;
+                        p.audio_input_done = true;
                         progressed = true;
                     }
                     Ok(demux::PacketMessage::End { .. }) => {
@@ -1123,12 +1309,29 @@ impl Worker {
                                 && stream == *aindex
                                 && audio_wanted
                             {
+                                if audio_track_end.is_some_and(|end| {
+                                    packet.pts().is_some_and(|pts| {
+                                        (pts + packet.duration()) as f64 * audio_tb.unwrap()
+                                            >= end - 1e-7
+                                    })
+                                }) {
+                                    p.audio_input_done = true;
+                                }
                                 if let Err(e) = dec.send(&packet) {
                                     log::warn!("audio packet rejected: {e}");
                                 }
                                 loop {
                                     match dec.receive() {
-                                        Ok(Some(chunk)) => queue_audio(&mut p, chunk, *rate),
+                                        Ok(Some(chunk)) => {
+                                            self.shared.audio_decoded_end.store(
+                                                (chunk.pts
+                                                    + (chunk.samples.len() / 2) as f64
+                                                        / f64::from(*rate))
+                                                .to_bits(),
+                                                Ordering::Relaxed,
+                                            );
+                                            queue_audio(&mut p, chunk, *rate);
+                                        }
                                         Ok(None) => break,
                                         Err(e) => {
                                             log::warn!("audio decoding error: {e}");
@@ -1142,6 +1345,7 @@ impl Worker {
                     Err(TryRecvError::Empty) => {}
                     Err(TryRecvError::Disconnected) => {
                         p.demux_eof = true;
+                        p.audio_input_done = true;
                         let mut buffer = self.shared.buffer.lock().unwrap();
                         if buffer.generation == p.generation.id {
                             buffer.eof = true;
@@ -1594,6 +1798,127 @@ mod tests {
         );
         assert!(!p.is_buffering());
         assert!(!p.is_paused());
+    }
+
+    #[test]
+    fn short_audio_below_resume_watermark_does_not_hold_video_or_seek() {
+        let path = std::env::var_os("ACTIONLAY_SAMPLES")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/synthetic")
+            })
+            .join("h264-short-audio.mp4");
+        if !path.exists() {
+            return;
+        }
+        let mut p = Player::open(&path, PlayerOptions::default()).unwrap();
+        p.play();
+        pump(&mut p, |p| p.position() > 2.5, Duration::from_secs(8));
+        assert!(!p.is_buffering());
+        p.seek(1.0, true);
+        pump(&mut p, |p| p.position() > 2.5, Duration::from_secs(8));
+        assert!(!p.is_buffering());
+        pump(&mut p, |p| p.at_end(), Duration::from_secs(5));
+    }
+
+    #[test]
+    fn source_underrun_suspends_before_callback_silence_and_resumes_with_ready_samples() {
+        let Some((mut p, stall, blocked)) = slow_player(Duration::from_secs(5)) else {
+            return;
+        };
+        if !p.stats().audio_active {
+            return;
+        }
+        p.play();
+        pump(
+            &mut p,
+            |p| !p.is_buffering() && p.position() > 0.4 && p.buffered_seconds() > 2.5,
+            Duration::from_secs(5),
+        );
+        let initial = p.audio.as_ref().unwrap().lock().unwrap().diagnostics().1;
+        stall.store(true, Ordering::SeqCst);
+        pump(
+            &mut p,
+            |_| blocked.load(Ordering::SeqCst),
+            Duration::from_secs(5),
+        );
+        pump(&mut p, |p| p.is_buffering(), Duration::from_secs(5));
+        let frozen = p.position();
+        let generation = p.generation;
+        pump(
+            &mut p,
+            |p| !p.is_buffering() && p.position() > frozen + 0.4,
+            Duration::from_secs(10),
+        );
+        let underruns = p.audio.as_ref().unwrap().lock().unwrap().diagnostics().1;
+        assert_eq!(
+            underruns, initial,
+            "callback emitted starvation silence instead of entering buffering"
+        );
+        assert_eq!(p.generation, generation, "buffering must not seek");
+        assert!(p.stats().audio_active);
+        assert!(p.stats().av_offset.unwrap().abs() < 0.15);
+    }
+
+    #[test]
+    fn slow_decode_and_repeated_buffering_bound_video_lag_without_seeking() {
+        let path = std::env::var_os("ACTIONLAY_SAMPLES")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/synthetic")
+            })
+            .join("hevc8-1440p100-sync.mp4");
+        if !path.exists() {
+            return;
+        }
+        let mut p = Player::open(
+            &path,
+            PlayerOptions {
+                prefer_hw: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        if !p.stats().audio_active {
+            return;
+        }
+        p.play();
+        pump(
+            &mut p,
+            |p| !p.is_buffering() && p.position() > 0.4,
+            Duration::from_secs(10),
+        );
+        let generation = p.generation;
+        let initial_underruns = p.audio.as_ref().unwrap().lock().unwrap().diagnostics().1;
+        p.shared.decode_delay_ms.store(20, Ordering::Relaxed);
+        let deadline = Instant::now() + Duration::from_secs(6);
+        let mut resumes = 0;
+        let mut was_buffering = false;
+        while Instant::now() < deadline {
+            p.poll_frame();
+            if was_buffering && !p.is_buffering() {
+                resumes += 1;
+            }
+            was_buffering = p.is_buffering();
+            if let Some(offset) = p.stats().av_offset {
+                assert!(offset > -0.65, "video lag grew to {offset}s");
+            }
+            std::thread::sleep(POLL);
+        }
+        assert!(resumes >= 2, "test did not exercise repeated recovery");
+        assert_eq!(p.generation, generation);
+        p.shared.decode_delay_ms.store(0, Ordering::Relaxed);
+        pump(
+            &mut p,
+            |p| !p.is_buffering() && p.stats().av_offset.is_some_and(|o| o.abs() < 0.15),
+            Duration::from_secs(10),
+        );
+        assert!(p.stats().audio_active);
+        assert_eq!(
+            p.audio.as_ref().unwrap().lock().unwrap().diagnostics().1,
+            initial_underruns,
+            "video backpressure must not starve the audio callback"
+        );
     }
 
     #[test]

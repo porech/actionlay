@@ -115,6 +115,8 @@ struct Shared {
     latency_us: AtomicU64,
     muted: AtomicBool,
     gain: AtomicU32,
+    underruns: AtomicU64,
+    silence_frames: AtomicU64,
 }
 
 pub struct AudioOutput {
@@ -164,6 +166,13 @@ impl AudioOutput {
             .default_output_config()
             .map_err(|e| MediaError::Audio(e.to_string()))?;
         let sample_rate = supported.sample_rate();
+        log::debug!(
+            "audio output: device={:?} sample_rate={} channels={} format={:?}",
+            device.description().ok(),
+            sample_rate,
+            supported.channels(),
+            supported.sample_format()
+        );
         let mut config = supported.config();
         config.channels = 2;
 
@@ -176,6 +185,8 @@ impl AudioOutput {
             latency_us: AtomicU64::new(0),
             muted: AtomicBool::new(false),
             gain: AtomicU32::new(1.0_f32.to_bits()),
+            underruns: AtomicU64::new(0),
+            silence_frames: AtomicU64::new(0),
         });
 
         let slot = consumer_slot.clone();
@@ -195,6 +206,11 @@ impl AudioOutput {
                     }
                     let mut guard = slot.lock().unwrap();
                     let got = guard.as_mut().map(|c| c.pop_slice(data)).unwrap_or(0);
+                    if got < data.len() {
+                        sh.underruns.fetch_add(1, Ordering::Relaxed);
+                        sh.silence_frames
+                            .fetch_add(((data.len() - got) / 2) as u64, Ordering::Relaxed);
+                    }
                     data[got..].fill(0.0);
                     let gain = f32::from_bits(sh.gain.load(Ordering::Relaxed));
                     apply_gain(data, gain);
@@ -216,6 +232,16 @@ impl AudioOutput {
             sample_rate,
             clock: AudioClock::new(0.0),
         })
+    }
+
+    /// Device latency (microseconds), underrun callbacks, and silence frames.
+    /// Cumulative counters are read outside the real-time callback.
+    pub(crate) fn diagnostics(&self) -> (u64, u64, u64) {
+        (
+            self.shared.latency_us.load(Ordering::Relaxed),
+            self.shared.underruns.load(Ordering::Relaxed),
+            self.shared.silence_frames.load(Ordering::Relaxed),
+        )
     }
 
     pub fn sample_rate(&self) -> u32 {
