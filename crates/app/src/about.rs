@@ -59,7 +59,7 @@ impl Dialog {
                 ui.label(format!(
                     "{} {}",
                     crate::i18n::text("Version"),
-                    env!("CARGO_PKG_VERSION")
+                    env!("ACTIONLAY_BUILD_VERSION")
                 ));
                 ui.label("© Alessandro Rinaldi");
                 ui.horizontal(|ui| {

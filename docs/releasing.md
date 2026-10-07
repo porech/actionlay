@@ -40,6 +40,9 @@ The stable README download links always use `/releases/latest`; development
 builds are linked separately and never become the latest stable release.
 Pull requests and other branches do not publish releases.
 
+The About dialog shows `VERSION-dev+SHORT_SHA` for development builds and
+`VERSION` for matching stable tags. Local Git builds follow the same rule.
+
 Download filenames include the workspace version, including DMG, installer and
 portable archives. Installed executable names remain stable so shortcuts, file
 associations and upgrades continue to work. Publishing nightly removes obsolete
