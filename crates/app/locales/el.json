@@ -522,5 +522,7 @@
   "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Αυτά είναι ανώτατα όρια. Ο αριθμός πακέτων και τα αποκωδικοποιημένα καρέ περιορίζουν επίσης την προσωρινή αποθήκευση· η συνολική χρήση μνήμης μπορεί να είναι μεγαλύτερη.",
   "Full screen": "Πλήρης οθόνη",
   "Exit full screen": "Έξοδος από πλήρη οθόνη",
-  "F11 · Esc to exit": "F11 · Esc για έξοδο"
+  "F11 · Esc to exit": "F11 · Esc για έξοδο",
+  "Use software video decoding": "Χρήση αποκωδικοποίησης βίντεο μέσω λογισμικού",
+  "Applies the next time a video is opened.": "Εφαρμόζεται την επόμενη φορά που ανοίγει ένα βίντεο."
 }

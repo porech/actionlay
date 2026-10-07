@@ -522,5 +522,7 @@
   "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Són límits màxims. El nombre de paquets i els fotogrames descodificats també limiten la memòria intermèdia; l’ús total de memòria pot ser superior.",
   "Full screen": "Pantalla completa",
   "Exit full screen": "Surt de la pantalla completa",
-  "F11 · Esc to exit": "F11 · Esc per sortir"
+  "F11 · Esc to exit": "F11 · Esc per sortir",
+  "Use software video decoding": "Utilitza la descodificació de vídeo per programari",
+  "Applies the next time a video is opened.": "S’aplica la pròxima vegada que s’obre un vídeo."
 }

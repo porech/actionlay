@@ -522,5 +522,7 @@
   "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Bunlar üst sınırlardır. Paket sayısı ve çözülmüş kareler de arabelleği sınırlar; toplam bellek kullanımı daha yüksek olabilir.",
   "Full screen": "Tam ekran",
   "Exit full screen": "Tam ekrandan çık",
-  "F11 · Esc to exit": "F11 · Çıkmak için Esc"
+  "F11 · Esc to exit": "F11 · Çıkmak için Esc",
+  "Use software video decoding": "Yazılımla video çözmeyi kullan",
+  "Applies the next time a video is opened.": "Bir sonraki video açılışında uygulanır."
 }

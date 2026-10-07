@@ -522,5 +522,7 @@
   "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Detta är övre gränser. Antalet paket och avkodade bildrutor begränsar också buffringen; den totala minnesanvändningen kan vara högre.",
   "Full screen": "Helskärm",
   "Exit full screen": "Lämna helskärm",
-  "F11 · Esc to exit": "F11 · Esc för att lämna"
+  "F11 · Esc to exit": "F11 · Esc för att lämna",
+  "Use software video decoding": "Använd programvarubaserad videoavkodning",
+  "Applies the next time a video is opened.": "Gäller nästa gång en video öppnas."
 }

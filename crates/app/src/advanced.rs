@@ -1,12 +1,23 @@
 use actionlay_media::player::BufferingOptions;
 use eframe::egui;
 
-pub fn show(ctx: &egui::Context, visible: &mut bool, options: &mut BufferingOptions) -> bool {
-    let before = *options;
+pub fn show(ctx: &egui::Context, visible: &mut bool, prefs: &mut crate::prefs::Prefs) -> bool {
+    let before = (
+        prefs.buffering,
+        prefs.show_diagnostic_data,
+        prefs.software_video_decoding,
+    );
+    let options = &mut prefs.buffering;
     egui::Window::new(crate::i18n::text("Advanced"))
         .open(visible)
         .default_width(440.0)
         .show(ctx, |ui| {
+            ui.checkbox(&mut prefs.software_video_decoding, crate::i18n::text("Use software video decoding"));
+            ui.small(crate::i18n::ui_text(ui, "Applies the next time a video is opened."));
+            ui.separator();
+            ui.checkbox(&mut prefs.show_diagnostic_data, crate::i18n::text("Show diagnostic data"));
+            ui.small(crate::i18n::ui_text(ui, "Show decoder, frame, audio synchronization and rendering statistics below the player."));
+            ui.separator();
             ui.heading(crate::i18n::text("Buffering"));
             ui.small(crate::i18n::ui_text(ui, "Read-ahead starts when the video opens, even while paused."));
             ui.label(crate::i18n::text("Read-ahead (seconds)"));
@@ -22,5 +33,9 @@ pub fn show(ctx: &egui::Context, visible: &mut bool, options: &mut BufferingOpti
             }
         });
     *options = options.normalized();
-    *options != before
+    (
+        prefs.buffering,
+        prefs.show_diagnostic_data,
+        prefs.software_video_decoding,
+    ) != before
 }

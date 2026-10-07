@@ -522,5 +522,7 @@
   "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "這些是上限。封包數量和已解碼影格也會限制緩衝量；總記憶體使用量可能更高。",
   "Full screen": "全螢幕",
   "Exit full screen": "退出全螢幕",
-  "F11 · Esc to exit": "F11 · 按 Esc 退出"
+  "F11 · Esc to exit": "F11 · 按 Esc 退出",
+  "Use software video decoding": "使用軟體影片解碼",
+  "Applies the next time a video is opened.": "下次開啟影片時生效。"
 }

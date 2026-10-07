@@ -522,5 +522,7 @@
   "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "אלו גבולות עליונים. מספר החבילות והפריימים המפוענחים מגבילים גם הם את המאגר; השימוש הכולל בזיכרון עשוי להיות גבוה יותר.",
   "Full screen": "מסך מלא",
   "Exit full screen": "יציאה ממסך מלא",
-  "F11 · Esc to exit": "F11 · Esc ליציאה"
+  "F11 · Esc to exit": "F11 · Esc ליציאה",
+  "Use software video decoding": "שימוש בפענוח וידאו באמצעות תוכנה",
+  "Applies the next time a video is opened.": "יחול בפעם הבאה שייפתח סרטון."
 }

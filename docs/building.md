@@ -41,7 +41,11 @@ cargo run --release -p actionlay-app --example playback-check -- /path/to/video.
 
 Release packaging is documented in [releasing.md](releasing.md).
 
-For playback diagnostics, set `RUST_LOG=actionlay_media=debug` and capture stderr.
+For playback diagnostics, enable **Show diagnostic data** in **Settings → Advanced**.
+The same window offers **Use software video decoding**, applied when a video is
+next opened; leave it disabled to prefer hardware with software fallback.
+`ACTIONLAY_NO_HW=1` still forces software decoding for command-line comparisons.
+Set `RUST_LOG=actionlay_media=debug` and capture stderr.
 The player reports a snapshot once per second: monotonic elapsed time, Unix wall
 time in milliseconds, generation, audio/system clocks, decoded/presented video
 PTS, queue sizes, buffering state, backend, and audio device format. The audio

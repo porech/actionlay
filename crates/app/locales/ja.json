@@ -522,5 +522,7 @@
   "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "これらは上限です。パケット数とデコード済みフレームもバッファ量を制限します。全体のメモリ使用量はこれより大きくなる場合があります。",
   "Full screen": "全画面表示",
   "Exit full screen": "全画面表示を終了",
-  "F11 · Esc to exit": "F11 · Escで終了"
+  "F11 · Esc to exit": "F11 · Escで終了",
+  "Use software video decoding": "ソフトウェアで動画をデコードする",
+  "Applies the next time a video is opened.": "次に動画を開いたときに適用されます。"
 }

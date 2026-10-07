@@ -522,5 +522,7 @@
   "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Ezek felső korlátok. A csomagok száma és a dekódolt képkockák is korlátozzák a pufferelést; a teljes memóriahasználat nagyobb lehet.",
   "Full screen": "Teljes képernyő",
   "Exit full screen": "Kilépés a teljes képernyőből",
-  "F11 · Esc to exit": "F11 · Esc a kilépéshez"
+  "F11 · Esc to exit": "F11 · Esc a kilépéshez",
+  "Use software video decoding": "Szoftveres videodekódolás használata",
+  "Applies the next time a video is opened.": "A következő videó megnyitásakor lép érvénybe."
 }

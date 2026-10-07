@@ -522,5 +522,7 @@
   "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Dit zijn bovengrenzen. Het aantal pakketten en gedecodeerde frames beperken ook het bufferen; het totale geheugengebruik kan hoger zijn.",
   "Full screen": "Volledig scherm",
   "Exit full screen": "Volledig scherm verlaten",
-  "F11 · Esc to exit": "F11 · Esc om te verlaten"
+  "F11 · Esc to exit": "F11 · Esc om te verlaten",
+  "Use software video decoding": "Videodecodering via software gebruiken",
+  "Applies the next time a video is opened.": "Wordt toegepast wanneer een video opnieuw wordt geopend."
 }

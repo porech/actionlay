@@ -522,5 +522,7 @@
   "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.",
   "Full screen": "Full screen",
   "Exit full screen": "Exit full screen",
-  "F11 · Esc to exit": "F11 · Esc to exit"
+  "F11 · Esc to exit": "F11 · Esc to exit",
+  "Use software video decoding": "Use software video decoding",
+  "Applies the next time a video is opened.": "Applies the next time a video is opened."
 }

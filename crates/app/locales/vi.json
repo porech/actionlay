@@ -522,5 +522,7 @@
   "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Đây là giới hạn trên. Số gói và khung hình đã giải mã cũng giới hạn bộ đệm; tổng mức sử dụng bộ nhớ có thể cao hơn.",
   "Full screen": "Toàn màn hình",
   "Exit full screen": "Thoát toàn màn hình",
-  "F11 · Esc to exit": "F11 · Esc để thoát"
+  "F11 · Esc to exit": "F11 · Esc để thoát",
+  "Use software video decoding": "Sử dụng giải mã video bằng phần mềm",
+  "Applies the next time a video is opened.": "Áp dụng khi mở video lần tiếp theo."
 }

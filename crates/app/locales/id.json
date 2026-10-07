@@ -522,5 +522,7 @@
   "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Ini adalah batas maksimum. Jumlah paket dan bingkai yang didekode juga membatasi penyanggaan; penggunaan memori total bisa lebih tinggi.",
   "Full screen": "Layar penuh",
   "Exit full screen": "Keluar dari layar penuh",
-  "F11 · Esc to exit": "F11 · Esc untuk keluar"
+  "F11 · Esc to exit": "F11 · Esc untuk keluar",
+  "Use software video decoding": "Gunakan dekode video perangkat lunak",
+  "Applies the next time a video is opened.": "Berlaku saat video dibuka berikutnya."
 }

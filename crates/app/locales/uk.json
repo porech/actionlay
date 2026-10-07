@@ -522,5 +522,7 @@
   "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Це верхні межі. Кількість пакетів і декодовані кадри також обмежують буферизацію; загальне використання пам’яті може бути вищим.",
   "Full screen": "Повний екран",
   "Exit full screen": "Вийти з повноекранного режиму",
-  "F11 · Esc to exit": "F11 · Esc для виходу"
+  "F11 · Esc to exit": "F11 · Esc для виходу",
+  "Use software video decoding": "Використовувати програмне декодування відео",
+  "Applies the next time a video is opened.": "Застосовується під час наступного відкриття відео."
 }

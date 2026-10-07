@@ -522,5 +522,7 @@
   "These are upper limits. Packet count and decoded frames also limit buffering; total memory use can be higher.": "Ide o horné limity. Počet paketov a dekódované snímky tiež obmedzujú ukladanie do vyrovnávacej pamäte; celkové využitie pamäte môže byť vyššie.",
   "Full screen": "Celá obrazovka",
   "Exit full screen": "Ukončiť celú obrazovku",
-  "F11 · Esc to exit": "F11 · Esc na ukončenie"
+  "F11 · Esc to exit": "F11 · Esc na ukončenie",
+  "Use software video decoding": "Použiť softvérové dekódovanie videa",
+  "Applies the next time a video is opened.": "Použije sa pri ďalšom otvorení videa."
 }

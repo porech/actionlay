@@ -367,9 +367,6 @@ impl Interface {
             });
             self.was_open = response.inner.is_some();
             ui.small(ui_text(ui, "System default follows your system language. Unsupported languages use English."));
-            ui.separator();
-            changed |= ui.checkbox(&mut prefs.show_diagnostic_data, text("Show diagnostic data")).changed();
-            ui.small(ui_text(ui, "Show decoder, frame, audio synchronization and rendering statistics below the player."));
         });
         self.visible = visible;
         changed

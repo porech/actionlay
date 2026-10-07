@@ -1265,6 +1265,7 @@ impl App {
         match Player::open_mode(
             &path,
             PlayerOptions {
+                prefer_hw: !self.prefs.software_video_decoding,
                 buffering: self.prefs.buffering,
                 ..Default::default()
             },
@@ -1664,13 +1665,7 @@ impl eframe::App for App {
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_secs(1));
         }
-        if !fullscreen
-            && advanced::show(
-                ui.ctx(),
-                &mut self.advanced_visible,
-                &mut self.prefs.buffering,
-            )
-        {
+        if !fullscreen && advanced::show(ui.ctx(), &mut self.advanced_visible, &mut self.prefs) {
             if let Some(player) = &mut self.player {
                 player.set_buffering(self.prefs.buffering);
             }

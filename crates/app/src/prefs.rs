@@ -32,6 +32,9 @@ pub struct Prefs {
     pub dismiss_association_prompt: bool,
     #[serde(default)]
     pub show_diagnostic_data: bool,
+    /// Force software decoding for newly opened videos; false keeps hardware fallback.
+    #[serde(default)]
+    pub software_video_decoding: bool,
     #[serde(default)]
     pub video_sources: std::collections::BTreeMap<String, SourceSettings>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -121,6 +124,22 @@ fn normalize(recent: &mut Vec<PathBuf>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn software_decoding_is_opt_in_and_survives_restart() {
+        let legacy: Prefs = serde_json::from_str(r#"{"show_diagnostic_data":true}"#).unwrap();
+        assert!(!legacy.software_video_decoding);
+        assert!(legacy.show_diagnostic_data);
+        assert!(!Prefs::default().software_video_decoding);
+        let path = temp("software-decoding");
+        let prefs = Prefs {
+            software_video_decoding: true,
+            ..legacy
+        };
+        prefs.save(&path).unwrap();
+        assert_eq!(Prefs::load(&path), prefs);
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
 
     #[test]
     fn normal_geometry_and_maximized_state_survive_restart() {
