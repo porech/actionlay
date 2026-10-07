@@ -23,7 +23,7 @@ with DSStore.open(str(volume / '.DS_Store'), 'w+') as store:
     store['.']['bwsp'] = {
         'ShowStatusBar': False, 'ShowTabView': False, 'ShowToolbar': False,
         'ShowPathbar': False, 'ShowSidebar': False, 'ContainerShowSidebar': False,
-        'WindowBounds': '{{180, 160}, {720, 480}}', 'SidebarWidth': 0,
+        'WindowBounds': '{{180, 160}, {720, 560}}', 'SidebarWidth': 0,
     }
     store['.']['icvp'] = {
         'viewOptionsVersion': 1, 'backgroundType': 2,

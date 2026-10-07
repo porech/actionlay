@@ -21,3 +21,7 @@ standard `/Volumes/ActionLay` mount hint. The packaging job verifies icon
 positions and resolves the background with macOS after compressing and mounting
 the final read-only DMG at a different path. This catches temporary build paths
 leaking into Finder metadata (including `/tmp` versus `/private/tmp`).
+
+The 720 × 560 Finder window reserves room for the title, path and status bars
+so the complete 720 × 480 artwork remains visible even when Finder shows them.
+The header uses the same slogan as the GitHub social preview.

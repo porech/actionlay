@@ -7,6 +7,7 @@ from mac_alias import Alias
 
 volume = Path(sys.argv[1]).resolve()
 with DSStore.open(str(volume / '.DS_Store'), 'r') as store:
+    assert store['.']['bwsp']['WindowBounds'] == '{{180, 160}, {720, 560}}'
     options = store['.']['icvp']
     assert options['backgroundType'] == 2
     assert store['.']['icvl'] == (b'type', b'icnv')
