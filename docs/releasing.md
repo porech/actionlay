@@ -15,7 +15,7 @@ describes the architecture merge. Native runners use the documented
 [GitHub macOS runner architectures](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 
 All packages contain licence notices and a link to their exact build source.
-Each release also includes `third-party-sources.tar.gz` containing the pristine
+Each release also includes `third-party-sources-VERSION.tar.gz` containing the pristine
 pinned FFmpeg/x264/x265 trees and the matching build/compatibility scripts.
 The build job's artifacts are intermediate inputs; downloads are published as
 GitHub Release assets once **all** builds and packaging checks succeed.
@@ -24,7 +24,8 @@ GitHub Release assets once **all** builds and packaging checks succeed.
 
 1. Update `[workspace.package].version` in `Cargo.toml` and the local workspace
    packages in `Cargo.lock` (Cargo updates them automatically).
-2. Update `docs/release-notes.md`, commit and push. Wait for CI to pass.
+2. Update `docs/release-notes.md`, the installer fallback version and the versioned
+   README download filenames, commit and push. Wait for CI to pass.
 3. Tag the tested commit, for example `git tag v1.0.0`, then `git push origin v1.0.0`.
 
 The workflow verifies the tag matches the workspace version. It uploads all
@@ -38,6 +39,11 @@ same package names. Its notes and source notices identify the exact commit.
 The stable README download links always use `/releases/latest`; development
 builds are linked separately and never become the latest stable release.
 Pull requests and other branches do not publish releases.
+
+Download filenames include the workspace version, including DMG, installer and
+portable archives. Installed executable names remain stable so shortcuts, file
+associations and upgrades continue to work. Publishing nightly removes obsolete
+assets after uploading the current set; stable release assets are immutable.
 
 ## Local packaging and icons
 

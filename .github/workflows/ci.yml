@@ -237,7 +237,7 @@ jobs:
         if: runner.os == 'Linux'
         with:
           name: third-party-sources
-          path: dist/third-party-sources.tar.gz
+          path: dist/third-party-sources-*.tar.gz
           if-no-files-found: error
 
       - name: Upload binaries
@@ -267,24 +267,25 @@ jobs:
         shell: pwsh
         run: |
           python scripts/package-release.py --target windows --binaries binaries --output dist
-          Expand-Archive dist/actionlay-windows-x64.zip dist/windows
+          $version = (Select-String '^version = "([^"]+)"' Cargo.toml).Matches[0].Groups[1].Value
+          Expand-Archive "dist/actionlay-$version-windows-x64.zip" dist/windows
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { choco install innosetup --yes --no-progress }
-          $version = (Select-String '^version = "([^"]+)"' Cargo.toml).Matches[0].Groups[1].Value
           & $iscc "/DAppVersion=$version" "/DSourceDir=$pwd\dist\windows\ActionLay" "/DOutputDir=$pwd\dist" packaging/windows/actionlay.iss
           if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed' }
           $parsed = [Version]$version
           $upgrade = "$($parsed.Major).$($parsed.Minor).$($parsed.Build + 1)"
           & $iscc "/DAppVersion=$upgrade" "/DSourceDir=$pwd\dist\windows\ActionLay" "/DOutputDir=$pwd\dist\upgrade" packaging/windows/actionlay.iss
           if ($LASTEXITCODE -ne 0) { throw 'Upgrade test installer compilation failed' }
+          "APP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
           "UPGRADE_VERSION=$upgrade" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Verify installer scopes, upgrade and uninstall
         shell: pwsh
-        run: scripts/verify-windows-installer.ps1 -Installer "$pwd\dist\actionlay-windows-x64-setup.exe" -UpgradeInstaller "$pwd\dist\upgrade\actionlay-windows-x64-setup.exe" -UpgradeVersion "$env:UPGRADE_VERSION"
+        run: scripts/verify-windows-installer.ps1 -Installer "$pwd\dist\actionlay-$env:APP_VERSION-windows-x64-setup.exe" -UpgradeInstaller "$pwd\dist\upgrade\actionlay-$env:UPGRADE_VERSION-windows-x64-setup.exe" -UpgradeVersion "$env:UPGRADE_VERSION"
       - uses: actions/upload-artifact@v7
         with:
           name: windows-installer
-          path: dist/actionlay-windows-x64-setup.exe
+          path: dist/actionlay-*-windows-x64-setup.exe
           if-no-files-found: error
 
   package-linux:
@@ -365,7 +366,7 @@ jobs:
       - name: Checksums
         run: |
           cd dist
-          shasum -a 256 actionlay-* actionlay_* third-party-sources.tar.gz > SHA256SUMS
+          shasum -a 256 actionlay-* actionlay_* third-party-sources-*.tar.gz > SHA256SUMS
       - uses: actions/upload-artifact@v7
         with:
           name: release-packages

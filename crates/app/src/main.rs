@@ -38,6 +38,8 @@ struct App {
     interface: i18n::Interface,
     regional_visible: bool,
     advanced_visible: bool,
+    #[cfg(not(target_os = "macos"))]
+    about_visible: bool,
     #[cfg(target_os = "macos")]
     _file_open_handler: objc2::rc::Retained<integration::macos::FileOpenHandler>,
     #[cfg(not(target_os = "macos"))]
@@ -1158,6 +1160,8 @@ impl App {
             menus::Command::InterfaceSettings => self.interface.visible = true,
             menus::Command::RegionalSettings => self.regional_visible = true,
             menus::Command::AdvancedSettings => self.advanced_visible = true,
+            #[cfg(not(target_os = "macos"))]
+            menus::Command::About => self.about_visible = true,
             menus::Command::Sources => self.select_sources = self.player.is_some(),
             menus::Command::AudioSettings => {
                 match actionlay_media::audio::AudioOutput::devices() {
@@ -1669,6 +1673,24 @@ impl eframe::App for App {
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_secs(1));
         }
+        #[cfg(not(target_os = "macos"))]
+        if !fullscreen && self.about_visible {
+            egui::Window::new(crate::i18n::text("About ActionLay"))
+                .open(&mut self.about_visible)
+                .collapsible(false)
+                .resizable(false)
+                .show(ui.ctx(), |ui| {
+                    ui.heading("ActionLay");
+                    ui.label(format!(
+                        "{} {}",
+                        crate::i18n::text("Version"),
+                        env!("CARGO_PKG_VERSION")
+                    ));
+                    ui.label("© Alessandro Rinaldi");
+                    ui.label("GPL-3.0-or-later");
+                    ui.hyperlink("https://github.com/porech/actionlay");
+                });
+        }
         if !fullscreen && advanced::show(ui.ctx(), &mut self.advanced_visible, &mut self.prefs) {
             if let Some(player) = &mut self.player {
                 player.set_buffering(self.prefs.buffering);
@@ -2107,6 +2129,8 @@ fn main() -> eframe::Result {
                 interface: Default::default(),
                 regional_visible: false,
                 advanced_visible: false,
+                #[cfg(not(target_os = "macos"))]
+                about_visible: false,
                 #[cfg(target_os = "macos")]
                 _file_open_handler: file_open_handler,
                 #[cfg(not(target_os = "macos"))]

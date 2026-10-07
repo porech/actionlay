@@ -14,8 +14,8 @@ or a separate overlay for your video editor. Free and open source.
 
 | System | Download | Install |
 |---|---|---|
-| macOS 12+, Apple Silicon **and Intel** | [Universal DMG](https://github.com/porech/actionlay/releases/latest/download/actionlay-macos-universal.dmg) | Open the DMG and drag ActionLay to Applications |
-| Windows 10/11, 64-bit | [Windows installer](https://github.com/porech/actionlay/releases/latest/download/actionlay-windows-x64-setup.exe) | Choose installation for yourself or everyone; desktop shortcut optional |
+| macOS 12+, Apple Silicon **and Intel** | [Universal DMG](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.2.0-macos-universal.dmg) | Open the DMG and drag ActionLay to Applications |
+| Windows 10/11, 64-bit | [Windows installer](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.2.0-windows-x64-setup.exe) | Choose installation for yourself or everyone; desktop shortcut optional |
 | Linux, 64-bit | [Package repositories and setup instructions](https://porech.github.io/actionlay/) | Add the APT or DNF repository, then install `actionlay` |
 
 The **[latest release](https://github.com/porech/actionlay/releases/latest)** also
@@ -170,7 +170,7 @@ or GPL-3.0-or-later, at your option; see the [artwork licence and attribution](a
 The binaries include GPL-enabled FFmpeg,
 x264 and x265. Source revisions and build scripts are included in the repository;
 licence notices and source links accompany the downloads. Each release also
-includes the exact FFmpeg/x264/x265 sources in `third-party-sources.tar.gz`.
+includes the exact FFmpeg/x264/x265 sources in `third-party-sources-1.2.0.tar.gz`.
 
 ## Legal notice
 

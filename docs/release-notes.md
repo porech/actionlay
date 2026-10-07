@@ -4,6 +4,8 @@ ActionLay 1.2.0 adds immersive full-screen playback, remembered window geometry,
 
 ### Playback and window behaviour
 
+- **About ActionLay** displays the application version: in the native ActionLay menu on macOS, and in the ActionLay menu on Windows and Linux.
+
 - **Full-screen playback** with a dedicated transport overlay. Controls and the mouse pointer hide after **3 seconds** without movement and reappear when you move the mouse. Use **F11** or the full-screen button to toggle it, and **Escape** to exit. Full-screen is available during playback, outside the layout editor.
 - The app **remembers window position, size and maximized state**. A first launch opens a centered window smaller than the usable screen area; restored geometry is kept within available displays.
 - **Software video decoding** can be selected under **Settings → Advanced**, alongside the playback diagnostics setting. This is a decoder preference; it does not replace the graphics backend used to display the interface.
@@ -32,6 +34,8 @@ ActionLay 1.2.0 adds immersive full-screen playback, remembered window geometry,
 
 ## Installation and distribution
 
+- Download filenames now include **1.2.0**, including the Windows installer, universal macOS DMG and portable archives. Installed application names remain stable for upgrades and file associations.
+
 - **Windows installer:** welcome/completion artwork and the header icon now use the ActionLay gecko and coordinated teal palette. Per-user/all-users installation, upgrades, uninstall, the Start Menu entry and optional desktop shortcut remain supported.
 - **macOS DMG:** the installation window now displays the branded background, drag direction and shared slogan: **Your videos. Your telemetry. No strings attached.** The window leaves room for Finder’s bars so the instructions remain visible. The portable background alias and icon positions are verified after the final DMG is compressed and remounted.
 - Signed Linux repositories are now deployed **within the main release pipeline**, after release publication. A repository deployment failure is reported in the same CI run. Pages actions have been updated to Node 24.
@@ -39,8 +43,8 @@ ActionLay 1.2.0 adds immersive full-screen playback, remembered window geometry,
 
 ## Download and install
 
-- **Windows 10/11 x64:** use [`actionlay-windows-x64-setup.exe`](https://github.com/porech/actionlay/releases/download/v1.2.0/actionlay-windows-x64-setup.exe).
-- **macOS 12 or newer, Apple Silicon and Intel:** use [`actionlay-macos-universal.dmg`](https://github.com/porech/actionlay/releases/download/v1.2.0/actionlay-macos-universal.dmg), then drag ActionLay to Applications.
+- **Windows 10/11 x64:** use [`actionlay-1.2.0-windows-x64-setup.exe`](https://github.com/porech/actionlay/releases/download/v1.2.0/actionlay-1.2.0-windows-x64-setup.exe).
+- **macOS 12 or newer, Apple Silicon and Intel:** use [`actionlay-1.2.0-macos-universal.dmg`](https://github.com/porech/actionlay/releases/download/v1.2.0/actionlay-1.2.0-macos-universal.dmg), then drag ActionLay to Applications.
 - **Linux x64:** follow the [signed APT/DNF repository instructions](https://porech.github.io/actionlay/), using the stable channel. Ubuntu 22.04+, Mint 21+, Debian 12+ and Fedora-compatible systems with glibc 2.35+ are supported. A graphics backend compatible with wgpu is required.
 
 Portable Windows ZIP and Linux tar.gz builds, native DEB/RPM packages, dependency sources and `SHA256SUMS` are also attached. The telemetry CLI is included; on macOS it is inside `ActionLay.app/Contents/MacOS/`.

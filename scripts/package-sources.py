@@ -16,7 +16,8 @@ projects = [
     ('x264', 'https://github.com/mirror/x264.git', re.search(r'^X264_REV=(\w+)', encoders, re.M).group(1), ROOT / 'third_party/src/x264'),
     ('x265', 'https://github.com/videolan/x265.git', re.search(r'^X265_REV=(\w+)', encoders, re.M).group(1), ROOT / 'third_party/src/x265'),
 ]
-output = ROOT / 'dist/third-party-sources.tar.gz'
+version = re.search(r'^version = "([^"]+)"', (ROOT / 'Cargo.toml').read_text(), re.M).group(1)
+output = ROOT / f'dist/third-party-sources-{version}.tar.gz'
 output.parent.mkdir(exist_ok=True)
 sha = os.environ.get('GITHUB_SHA') or subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
 with tempfile.TemporaryDirectory(prefix='actionlay-source-') as directory, tarfile.open(output, 'w:gz', compresslevel=9) as bundle:

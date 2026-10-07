@@ -11,6 +11,7 @@ import tempfile
 import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+VERSION = re.search(r'^version = "([^"]+)"', (ROOT / 'Cargo.toml').read_text(), re.M).group(1)
 
 def notices(destination):
     destination.mkdir(parents=True, exist_ok=True)
@@ -21,7 +22,7 @@ def notices(destination):
     for license_file in (ROOT / 'assets/fonts/interface').glob('*-OFL.txt'):
         shutil.copy2(license_file, destination / f'Noto-{license_file.name}')
     sha = os.environ.get('GITHUB_SHA') or subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
-    version = re.search(r'^version = "([^"]+)"', (ROOT / 'Cargo.toml').read_text(), re.M).group(1)
+    version = VERSION
     (destination / 'SOURCE.txt').write_text(
         f'ActionLay {version}\nBuild commit: {sha}\n'
         f'Complete ActionLay source and build scripts:\nhttps://github.com/porech/actionlay/tree/{sha}\n'
@@ -30,7 +31,7 @@ def notices(destination):
         'ActionLay gecko photograph and artwork — Alessandro Rinaldi.\n'
         'Artwork is available under CC BY-SA 4.0 or GPL-3.0-or-later, at your option.\n'
         f'Artwork source and provenance: https://github.com/porech/actionlay/tree/{sha}/assets/icons\n'
-        'The release includes third-party-sources.tar.gz with the exact FFmpeg/x264/x265 sources.\n'
+        f'The release includes third-party-sources-{version}.tar.gz with the exact FFmpeg/x264/x265 sources.\n'
         'Their source revisions and download locations\n'
         'are in scripts/ffmpeg-version.env, scripts/build-ffmpeg.sh and scripts/build-encoders.sh.\n'
         'The Rust dependency versions are pinned in Cargo.lock. Roboto is Apache-2.0;\n'
@@ -60,7 +61,7 @@ def main():
             shutil.copy2(source, stage / source.name)
             (stage / source.name).chmod(0o755)
         if args.target == 'windows':
-            destination = args.output / 'actionlay-windows-x64.zip'
+            destination = args.output / f'actionlay-{VERSION}-windows-x64.zip'
             with zipfile.ZipFile(destination, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
                 for file in sorted(stage.rglob('*')):
                     if file.is_file():
@@ -72,7 +73,7 @@ def main():
                 'Comment=Action-camera telemetry dashboards\nExec=actionlay %f\n'
                 'Icon=actionlay\nTerminal=false\nCategories=AudioVideo;Video;\n'
                 'MimeType=video/mp4;video/quicktime;video/x-actionlay-lrv;video/x-actionlay-insv;\n', encoding='utf-8')
-            destination = args.output / 'actionlay-linux-x64.tar.gz'
+            destination = args.output / f'actionlay-{VERSION}-linux-x64.tar.gz'
             with tarfile.open(destination, 'w:gz') as archive:
                 archive.add(stage, arcname='ActionLay')
         print(destination)

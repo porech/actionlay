@@ -26,6 +26,8 @@ pub enum Command {
     ClearRecentVideos,
     CloseVideo,
     Quit,
+    #[cfg(not(target_os = "macos"))]
+    About,
 }
 
 #[cfg(target_os = "macos")]
@@ -469,6 +471,15 @@ impl Menus {
                             command = Some(command_to_run);
                             ui.close();
                         }
+                    }
+                });
+                ui.menu_button(crate::i18n::ui_text(ui, "ActionLay"), |ui| {
+                    if ui
+                        .button(crate::i18n::ui_text(ui, "About ActionLay"))
+                        .clicked()
+                    {
+                        command = Some(Command::About);
+                        ui.close();
                     }
                 });
             });
