@@ -11,59 +11,422 @@ use std::{
 
 pub struct Dialog {
     pub settings: Settings,
+    input: export::InputProperties,
+    advanced_open: bool,
     start: f64,
     end: f64,
     duration: f64,
     error: Option<String>,
 }
+
+fn option_row(
+    ui: &mut egui::Ui,
+    label: &str,
+    modified: bool,
+    edit: impl FnOnce(&mut egui::Ui),
+) -> bool {
+    ui.push_id(label, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            let label = crate::i18n::text(label);
+            if modified {
+                ui.colored_label(ui.visuals().warn_fg_color, label);
+            } else {
+                ui.label(label);
+            }
+            edit(ui);
+            modified
+                && ui
+                    .small_button(crate::i18n::text("Set preset default"))
+                    .clicked()
+        })
+        .inner
+    })
+    .inner
+}
+
+fn megabits(ui: &mut egui::Ui, value: &mut u32, minimum: f64, maximum: f64) {
+    let mut displayed = f64::from(*value) / 1000.0;
+    if ui
+        .add(
+            egui::DragValue::new(&mut displayed)
+                .range(minimum..=maximum)
+                .speed(0.1),
+        )
+        .changed()
+    {
+        *value = (displayed * 1000.0).round() as u32;
+    }
+}
+
 impl Dialog {
-    pub fn new(mut settings: Settings, duration: f64) -> Self {
-        settings.mode = Mode::Video;
+    pub fn new(settings: Settings, duration: f64, input: export::InputProperties) -> Self {
         Self {
+            advanced_open: settings.advanced_edited || settings.is_custom(),
             settings,
+            input,
             start: 0.0,
             end: duration,
             duration,
             error: None,
         }
     }
+    fn select_preset(&mut self, preset: export::QualityPreset) {
+        self.settings.apply_preset(preset);
+        self.advanced_open = false;
+        self.error = None;
+    }
+    fn advanced(&mut self, ui: &mut egui::Ui) {
+        use actionlay_media::export::{EncodingSpeed, RateControl};
+        use export::Container;
+        let before = self.settings.clone();
+        let defaults = Settings::preset_defaults(self.settings.preset);
+        let format = self.settings.resolved_format(&self.input);
+        if option_row(
+            ui,
+            "Format",
+            self.settings.format != defaults.format,
+            |ui| {
+                let selected = if self.settings.format == Format::Input {
+                    format!(
+                        "{} · {}",
+                        crate::i18n::text("Copy from input"),
+                        format.codec()
+                    )
+                } else {
+                    self.settings.format.codec().to_owned()
+                };
+                egui::ComboBox::from_id_salt("export-format")
+                    .selected_text(selected)
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(
+                            &mut self.settings.format,
+                            Format::Input,
+                            crate::i18n::text("Copy from input"),
+                        );
+                        if self.settings.mode != Mode::Transparent {
+                            ui.selectable_value(&mut self.settings.format, Format::H264, "H.264");
+                            ui.selectable_value(&mut self.settings.format, Format::H265, "H.265");
+                        }
+                        ui.selectable_value(
+                            &mut self.settings.format,
+                            Format::Prores,
+                            "ProRes 4444",
+                        );
+                        ui.selectable_value(
+                            &mut self.settings.format,
+                            Format::Png,
+                            crate::i18n::text("PNG sequence"),
+                        );
+                    });
+            },
+        ) {
+            self.settings.format = defaults.format;
+        }
+        if self.settings.format == Format::Input
+            && self.input.format.is_none()
+            && self.settings.mode != Mode::Transparent
+        {
+            ui.small(crate::i18n::text("Input codec unavailable"));
+        }
+        let format = self.settings.resolved_format(&self.input);
+        if !matches!(format, Format::Png | Format::Prores) {
+            if option_row(
+                ui,
+                "File container",
+                self.settings.container != defaults.container,
+                |ui| {
+                    let selected = if self.settings.container == Container::Input {
+                        format!(
+                            "{} · {}",
+                            crate::i18n::text("Copy from input"),
+                            self.settings.resolved_container(&self.input).extension()
+                        )
+                    } else {
+                        self.settings.container.extension().to_owned()
+                    };
+                    egui::ComboBox::from_id_salt("export-container")
+                        .selected_text(selected)
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(
+                                &mut self.settings.container,
+                                Container::Input,
+                                crate::i18n::text("Copy from input"),
+                            );
+                            ui.selectable_value(
+                                &mut self.settings.container,
+                                Container::Mp4,
+                                "MP4",
+                            );
+                            ui.selectable_value(
+                                &mut self.settings.container,
+                                Container::Mov,
+                                "MOV",
+                            );
+                        });
+                },
+            ) {
+                self.settings.container = defaults.container;
+            }
+            if self.settings.container == Container::Input && self.input.container.is_none() {
+                ui.small(crate::i18n::text("Input container unavailable"));
+            }
+        }
+        if option_row(
+            ui,
+            "Resolution",
+            self.settings.resolution != defaults.resolution,
+            |ui| {
+                let mut copy = self.settings.resolution.is_none();
+                if ui
+                    .checkbox(&mut copy, crate::i18n::text("Copy from input"))
+                    .changed()
+                {
+                    self.settings.resolution = (!copy).then_some(self.input.dimensions);
+                }
+                let mut dimensions = self.settings.resolution.unwrap_or(self.input.dimensions);
+                ui.add_enabled_ui(!copy, |ui| {
+                    ui.add(
+                        egui::DragValue::new(&mut dimensions[0])
+                            .range(2..=8192)
+                            .speed(2.0),
+                    );
+                    ui.label("×");
+                    ui.add(
+                        egui::DragValue::new(&mut dimensions[1])
+                            .range(2..=8192)
+                            .speed(2.0),
+                    );
+                });
+                if !copy {
+                    self.settings.resolution = Some(dimensions);
+                }
+            },
+        ) {
+            self.settings.resolution = defaults.resolution;
+        }
+        if matches!(format, Format::H264 | Format::H265) {
+            if option_row(
+                ui,
+                "Rate control",
+                self.settings.encoding.rate_control != defaults.encoding.rate_control,
+                |ui| {
+                    let label = |rate| {
+                        crate::i18n::text(match rate {
+                            RateControl::Input => "Copy from input",
+                            RateControl::Quality => "Constant quality",
+                            RateControl::Bitrate => "Target bitrate",
+                        })
+                    };
+                    egui::ComboBox::from_id_salt("export-rate")
+                        .selected_text(label(self.settings.encoding.rate_control))
+                        .show_ui(ui, |ui| {
+                            for rate in [
+                                RateControl::Input,
+                                RateControl::Quality,
+                                RateControl::Bitrate,
+                            ] {
+                                ui.add_enabled_ui(
+                                    rate != RateControl::Quality || !self.settings.hardware,
+                                    |ui| {
+                                        ui.selectable_value(
+                                            &mut self.settings.encoding.rate_control,
+                                            rate,
+                                            label(rate),
+                                        );
+                                    },
+                                );
+                            }
+                        });
+                },
+            ) {
+                self.settings.encoding.rate_control = defaults.encoding.rate_control;
+                if defaults.encoding.rate_control == RateControl::Quality {
+                    self.settings.hardware = false;
+                }
+            }
+            match self.settings.encoding.rate_control {
+                RateControl::Input => {
+                    if self.input.bit_rate > 0 {
+                        ui.label(format!(
+                            "{}: {:.2} Mbps",
+                            crate::i18n::text("Target bitrate"),
+                            self.input.bit_rate as f64 / 1_000_000.0
+                        ));
+                    } else {
+                        ui.small(crate::i18n::text("Input bitrate unavailable"));
+                    }
+                }
+                RateControl::Quality => {
+                    if option_row(
+                        ui,
+                        "Quality (CRF)",
+                        self.settings.encoding.quality != defaults.encoding.quality,
+                        |ui| {
+                            ui.add(
+                                egui::DragValue::new(&mut self.settings.encoding.quality)
+                                    .range(0..=51),
+                            );
+                        },
+                    ) {
+                        self.settings.encoding.quality = defaults.encoding.quality;
+                    }
+                }
+                RateControl::Bitrate => {
+                    if option_row(
+                        ui,
+                        "Video bitrate (Mbps)",
+                        self.settings.encoding.bitrate_kbps != defaults.encoding.bitrate_kbps,
+                        |ui| {
+                            megabits(ui, &mut self.settings.encoding.bitrate_kbps, 0.1, 500.0);
+                        },
+                    ) {
+                        self.settings.encoding.bitrate_kbps = defaults.encoding.bitrate_kbps;
+                    }
+                }
+            }
+            if option_row(
+                ui,
+                "Maximum bitrate (Mbps)",
+                self.settings.encoding.max_bitrate_kbps != defaults.encoding.max_bitrate_kbps,
+                |ui| {
+                    let previous = self.settings.encoding.max_bitrate_kbps;
+                    megabits(ui, &mut self.settings.encoding.max_bitrate_kbps, 0.0, 500.0);
+                    if previous != self.settings.encoding.max_bitrate_kbps {
+                        self.settings.encoding.buffer_kbits =
+                            self.settings.encoding.max_bitrate_kbps.saturating_mul(2);
+                    }
+                },
+            ) {
+                self.settings.encoding.max_bitrate_kbps = defaults.encoding.max_bitrate_kbps;
+                self.settings.encoding.buffer_kbits = defaults.encoding.buffer_kbits;
+            }
+            if option_row(
+                ui,
+                "Buffer size (Mbit)",
+                self.settings.encoding.buffer_kbits != defaults.encoding.buffer_kbits,
+                |ui| {
+                    megabits(ui, &mut self.settings.encoding.buffer_kbits, 0.0, 1000.0);
+                },
+            ) {
+                self.settings.encoding.buffer_kbits = defaults.encoding.buffer_kbits;
+                self.settings.encoding.max_bitrate_kbps = defaults.encoding.max_bitrate_kbps;
+            }
+            if option_row(
+                ui,
+                "Keyframe interval (frames)",
+                self.settings.encoding.keyframe_frames != defaults.encoding.keyframe_frames,
+                |ui| {
+                    ui.add(
+                        egui::DragValue::new(&mut self.settings.encoding.keyframe_frames)
+                            .range(0..=10_000),
+                    );
+                },
+            ) {
+                self.settings.encoding.keyframe_frames = defaults.encoding.keyframe_frames;
+            }
+            ui.small(crate::i18n::text("0 = automatic"));
+            if option_row(
+                ui,
+                "Encoding speed",
+                self.settings.encoding.speed != defaults.encoding.speed,
+                |ui| {
+                    let label = |speed| {
+                        crate::i18n::text(match speed {
+                            EncodingSpeed::Veryfast => "Fast export",
+                            EncodingSpeed::Fast => "Balanced",
+                            EncodingSpeed::Slow => "High quality",
+                        })
+                    };
+                    egui::ComboBox::from_id_salt("export-speed")
+                        .selected_text(label(self.settings.encoding.speed))
+                        .show_ui(ui, |ui| {
+                            for speed in [
+                                EncodingSpeed::Veryfast,
+                                EncodingSpeed::Fast,
+                                EncodingSpeed::Slow,
+                            ] {
+                                ui.selectable_value(
+                                    &mut self.settings.encoding.speed,
+                                    speed,
+                                    label(speed),
+                                );
+                            }
+                        });
+                },
+            ) {
+                self.settings.encoding.speed = defaults.encoding.speed;
+            }
+            if option_row(
+                ui,
+                "Prefer hardware encoder",
+                self.settings.hardware != defaults.hardware,
+                |ui| {
+                    if ui.checkbox(&mut self.settings.hardware, "").changed()
+                        && self.settings.hardware
+                        && self.settings.encoding.rate_control == RateControl::Quality
+                    {
+                        self.settings.encoding.rate_control = RateControl::Input;
+                    }
+                },
+            ) {
+                self.settings.hardware = defaults.hardware;
+            }
+        }
+        if self.settings != before {
+            self.settings.advanced_edited = true;
+        }
+    }
     pub fn show(&mut self, ctx: &egui::Context) -> (bool, Option<PathBuf>) {
         let mut open = true;
         let mut choose = false;
-        egui::Window::new(crate::i18n::text("Export video / overlay")).open(&mut open).resizable(false).show(ctx,|ui| {
-            egui::ComboBox::from_id_salt("export-mode").selected_text(crate::i18n::ui_text(ui, match self.settings.mode { Mode::Video=>"Video with overlay",Mode::Transparent=>"Overlay · transparent",Mode::Solid=>"Overlay · solid background" })).show_ui(ui,|ui| {
-                ui.selectable_value(&mut self.settings.mode,Mode::Video,crate::i18n::ui_text(ui, "Video with overlay"));
-                ui.selectable_value(&mut self.settings.mode,Mode::Solid,crate::i18n::ui_text(ui, "Overlay · solid background"));
-                ui.selectable_value(&mut self.settings.mode,Mode::Transparent,crate::i18n::ui_text(ui, "Overlay · transparent"));
+        egui::Window::new(crate::i18n::text("Export video / overlay")).open(&mut open).default_width(620.0).resizable(true).vscroll(true).show(ctx, |ui| {
+            egui::ComboBox::from_id_salt("export-mode").selected_text(crate::i18n::ui_text(ui, match self.settings.mode { Mode::Video => "Video with overlay", Mode::Transparent => "Overlay · transparent", Mode::Solid => "Overlay · solid background" })).show_ui(ui, |ui| {
+                ui.selectable_value(&mut self.settings.mode, Mode::Video, crate::i18n::text("Video with overlay"));
+                ui.selectable_value(&mut self.settings.mode, Mode::Solid, crate::i18n::text("Overlay · solid background"));
+                ui.selectable_value(&mut self.settings.mode, Mode::Transparent, crate::i18n::text("Overlay · transparent"));
             });
-            if self.settings.mode==Mode::Transparent && matches!(self.settings.format,Format::H264|Format::H265) { self.settings.format=Format::Prores; }
-            if self.settings.mode==Mode::Solid { ui.horizontal(|ui| { ui.label(crate::i18n::ui_text(ui, "Background")); ui.color_edit_button_srgb(&mut self.settings.color); if ui.button(crate::i18n::ui_text(ui, "Green screen")).clicked() {self.settings.color=[0,255,0];} }); }
-            egui::ComboBox::from_id_salt("export-format").selected_text(crate::i18n::ui_text(ui, self.settings.format.codec())).show_ui(ui,|ui| {
-                if self.settings.mode!=Mode::Transparent { ui.selectable_value(&mut self.settings.format,Format::H264,crate::i18n::ui_text(ui, "H.264 · MP4")); ui.selectable_value(&mut self.settings.format,Format::H265,crate::i18n::ui_text(ui, "H.265 · MP4")); }
-                ui.selectable_value(&mut self.settings.format,Format::Prores,crate::i18n::ui_text(ui, "ProRes 4444 · MOV"));
-                ui.selectable_value(&mut self.settings.format,Format::Png,crate::i18n::ui_text(ui, "PNG sequence"));
+            if self.settings.mode == Mode::Solid { ui.horizontal(|ui| { ui.label(crate::i18n::text("Background")); ui.color_edit_button_srgb(&mut self.settings.color); if ui.button(crate::i18n::text("Green screen")).clicked() { self.settings.color = [0,255,0]; } }); }
+            ui.horizontal(|ui| {
+                ui.label(crate::i18n::text("Quality preset"));
+                let mut selected = None;
+                egui::ComboBox::from_id_salt("export-quality-preset").selected_text(crate::i18n::text(self.settings.preset.label())).show_ui(ui, |ui| {
+                    for preset in [export::QualityPreset::Balanced, export::QualityPreset::HighQuality, export::QualityPreset::Fast] {
+                        if ui.selectable_label(self.settings.preset == preset, crate::i18n::text(preset.label())).clicked() { selected = Some(preset); }
+                    }
+                });
+                if let Some(preset) = selected { self.select_preset(preset); }
             });
-            ui.checkbox(&mut self.settings.hardware,crate::i18n::ui_text(ui, "Prefer hardware encoder"));
-            ui.horizontal(|ui| { ui.label(crate::i18n::ui_text(ui, "In (seconds)")); ui.add(egui::DragValue::new(&mut self.start).speed(0.1).range(0.0..=self.duration)); });
-            ui.horizontal(|ui| { ui.label(crate::i18n::ui_text(ui, "Out (seconds)")); ui.add(egui::DragValue::new(&mut self.end).speed(0.1).range(0.0..=self.duration)); });
-            ui.label(crate::i18n::ui_text(ui, "Original resolution and frame timestamps. Video-file audio is copied; overlay-only and PNG exports are silent."));
-            if let Some(error)=&self.error {ui.colored_label(egui::Color32::RED,crate::i18n::ui_text(ui, error));}
-            if ui.button(crate::i18n::ui_text(ui, "Choose destination and export…")).clicked() {
-                if self.end>self.start {choose=true;} else {self.error=Some("Out must be after In".into());}
+            let format = self.settings.resolved_format(&self.input);
+            let dimensions = self.settings.resolution.unwrap_or(self.input.dimensions);
+            ui.label(format!("{} · {} · {}×{}", format.codec(), if format == Format::Png { "PNG" } else { self.settings.resolved_container(&self.input).extension() }, dimensions[0], dimensions[1]));
+            let id = ui.make_persistent_id("export-advanced");
+            let mut state = egui::collapsing_header::CollapsingState::load_with_default_open(ctx, id, self.advanced_open);
+            state.set_open(self.advanced_open);
+            let mut toggle = false;
+            state.show_header(ui, |ui| { toggle = ui.selectable_label(false, crate::i18n::text("Advanced")).clicked(); }).body(|ui| self.advanced(ui));
+            self.advanced_open = egui::collapsing_header::CollapsingState::load(ctx, id).is_some_and(|s| s.is_open());
+            if toggle { self.advanced_open = !self.advanced_open; }
+            ui.horizontal(|ui| { ui.label(crate::i18n::text("In (seconds)")); ui.add(egui::DragValue::new(&mut self.start).speed(0.1).range(0.0..=self.duration)); });
+            ui.horizontal(|ui| { ui.label(crate::i18n::text("Out (seconds)")); ui.add(egui::DragValue::new(&mut self.end).speed(0.1).range(0.0..=self.duration)); });
+            ui.small(crate::i18n::text("Frame timestamps are preserved. Video-file audio is copied; overlay-only and PNG exports are silent."));
+            let valid = self.settings.encoding.valid() && dimensions.iter().all(|d| *d > 0 && *d <= 8192 && *d % 2 == 0);
+            if !valid { ui.colored_label(ui.visuals().error_fg_color, crate::i18n::text("Invalid export encoding settings")); }
+            if let Some(error) = &self.error { ui.colored_label(ui.visuals().error_fg_color, crate::i18n::ui_text(ui, error)); }
+            if ui.add_enabled(valid, egui::Button::new(crate::i18n::text("Choose destination and export…"))).clicked() {
+                if self.end > self.start { choose = true; } else { self.error = Some("Out must be after In".into()); }
             }
         });
         let output = if choose {
             let dialog = rfd::FileDialog::new()
                 .set_title(crate::i18n::native_text("New export destination"));
-            if self.settings.format == Format::Png {
+            let format = self.settings.resolved_format(&self.input);
+            if format == Format::Png {
                 dialog.set_file_name("overlay-frames").save_file()
             } else {
+                let extension = self.settings.resolved_container(&self.input).extension();
                 dialog
-                    .add_filter(
-                        crate::i18n::native_text("Export"),
-                        &[self.settings.format.extension()],
-                    )
-                    .set_file_name(format!("export.{}", self.settings.format.extension()))
+                    .add_filter(crate::i18n::native_text("Export"), &[extension])
+                    .set_file_name(format!("export.{extension}"))
                     .save_file()
             }
         } else {
@@ -204,6 +567,10 @@ struct Args {
     end: Option<f64>,
     #[arg(long)]
     software: bool,
+    #[arg(long, conflicts_with = "software")]
+    hardware: bool,
+    #[arg(long, value_enum, default_value = "balanced")]
+    preset: export::QualityPreset,
     video: PathBuf,
 }
 pub fn cli() -> anyhow::Result<()> {
@@ -239,13 +606,10 @@ pub fn cli() -> anyhow::Result<()> {
         layout: Arc::new(layout),
         settings: Settings {
             mode: args.mode,
-            format: args.format.unwrap_or(if args.mode == Mode::Transparent {
-                Format::Prores
-            } else {
-                Format::H264
-            }),
+            format: args.format.unwrap_or(Format::Input),
             color,
-            hardware: !args.software,
+            hardware: args.hardware,
+            ..Settings::preset_defaults(args.preset)
         },
         start: args.start,
         end: args.end,
@@ -325,14 +689,100 @@ mod display_tests {
         }
     }
     #[test]
-    fn new_export_defaults_to_video_with_overlay() {
-        let saved = Settings {
-            mode: Mode::Transparent,
+    fn advanced_reset_button_restores_only_its_option() {
+        let settings = Settings {
+            format: Format::H265,
+            resolution: Some([1280, 720]),
+            advanced_edited: true,
             ..Settings::default()
         };
-        assert!(matches!(
-            Dialog::new(saved, 10.0).settings.mode,
-            Mode::Video
-        ));
+        let input = export::InputProperties {
+            dimensions: [1920, 1080],
+            format: Some(Format::H264),
+            container: Some(export::Container::Mp4),
+            bit_rate: 20_000_000,
+        };
+        let mut dialog = Dialog::new(settings, 10.0, input);
+        let ctx = egui::Context::default();
+        let draw = |dialog: &mut Dialog, events| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1000.0, 1000.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ui| {
+                    dialog.show(ui.ctx());
+                },
+            );
+            output.textures_delta.clear();
+            output
+        };
+        draw(&mut dialog, vec![]);
+        let output = draw(&mut dialog, vec![]);
+        fn button(shape: &egui::epaint::Shape, label: &str) -> Option<egui::Pos2> {
+            match shape {
+                egui::epaint::Shape::Text(text) if text.galley.text() == label => {
+                    Some(text.pos + text.galley.size() * 0.5)
+                }
+                egui::epaint::Shape::Vec(shapes) => shapes.iter().find_map(|s| button(s, label)),
+                _ => None,
+            }
+        }
+        let pos = output
+            .shapes
+            .iter()
+            .find_map(|shape| button(&shape.shape, crate::i18n::text("Set preset default")))
+            .expect("modified format has a reset button");
+        draw(
+            &mut dialog,
+            vec![
+                egui::Event::PointerMoved(pos),
+                egui::Event::PointerButton {
+                    pos,
+                    button: egui::PointerButton::Primary,
+                    pressed: true,
+                    modifiers: egui::Modifiers::NONE,
+                },
+            ],
+        );
+        draw(
+            &mut dialog,
+            vec![egui::Event::PointerButton {
+                pos,
+                button: egui::PointerButton::Primary,
+                pressed: false,
+                modifiers: egui::Modifiers::NONE,
+            }],
+        );
+        assert_eq!(dialog.settings.format, Format::Input);
+        assert_eq!(dialog.settings.resolution, Some([1280, 720]));
+    }
+
+    #[test]
+    fn export_remembers_mode_and_modified_advanced_settings() {
+        let saved = Settings {
+            mode: Mode::Transparent,
+            advanced_edited: true,
+            ..Settings::default()
+        };
+        let input = export::InputProperties {
+            dimensions: [1920, 1080],
+            format: Some(Format::H264),
+            container: Some(export::Container::Mp4),
+            bit_rate: 20_000_000,
+        };
+        let mut dialog = Dialog::new(saved, 10.0, input);
+        assert!(matches!(dialog.settings.mode, Mode::Transparent));
+        assert!(dialog.advanced_open);
+        dialog.settings.resolution = Some([640, 480]);
+        dialog.select_preset(export::QualityPreset::Balanced);
+        assert!(!dialog.advanced_open);
+        assert!(!dialog.settings.advanced_edited);
+        assert_eq!(dialog.settings.resolution, None);
+        assert!(!dialog.settings.is_custom());
     }
 }

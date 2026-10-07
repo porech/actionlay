@@ -18,6 +18,72 @@ fn error(message: impl Into<String>) -> MediaError {
     MediaError::Io(message.into())
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum RateControl {
+    #[default]
+    Input,
+    Quality,
+    Bitrate,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum EncodingSpeed {
+    Veryfast,
+    #[default]
+    Fast,
+    Slow,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct EncodingSettings {
+    pub rate_control: RateControl,
+    pub quality: u8,
+    pub bitrate_kbps: u32,
+    pub max_bitrate_kbps: u32,
+    pub buffer_kbits: u32,
+    /// Zero leaves the encoder's GOP default intact.
+    pub keyframe_frames: u32,
+    pub speed: EncodingSpeed,
+}
+
+impl Default for EncodingSettings {
+    fn default() -> Self {
+        Self {
+            rate_control: RateControl::Input,
+            quality: 20,
+            bitrate_kbps: 20_000,
+            max_bitrate_kbps: 0,
+            buffer_kbits: 0,
+            keyframe_frames: 0,
+            speed: EncodingSpeed::Fast,
+        }
+    }
+}
+
+impl EncodingSettings {
+    pub fn valid(&self) -> bool {
+        self.quality <= 51
+            && (100..=500_000).contains(&self.bitrate_kbps)
+            && self.max_bitrate_kbps <= 500_000
+            && self.buffer_kbits <= 1_000_000
+            && self.keyframe_frames <= 10_000
+            && ((self.max_bitrate_kbps == 0 && self.buffer_kbits == 0)
+                || (self.max_bitrate_kbps > 0 && self.buffer_kbits > 0))
+            && (self.rate_control != RateControl::Bitrate
+                || self.max_bitrate_kbps == 0
+                || self.max_bitrate_kbps >= self.bitrate_kbps)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct WriterOptions {
+    pub hardware: bool,
+    pub encoding: EncodingSettings,
+    pub dimensions: Option<[u32; 2]>,
+    pub container: &'static str,
+}
+
 fn keep_stream(input: &mut format::context::Input, index: usize) {
     for i in 0..input.nb_streams() as usize {
         if i != index {
@@ -121,11 +187,14 @@ impl Writer {
         source: &Path,
         output: &Path,
         kind: &str,
-        hardware: bool,
+        settings: &WriterOptions,
         start: f64,
         copy_audio: bool,
     ) -> Result<Self, MediaError> {
         crate::ffmpeg_info::init();
+        if !settings.encoding.valid() {
+            return Err(error("Invalid export encoding settings"));
+        }
         let input = format::input(source)?;
         let stream = input
             .streams()
@@ -140,7 +209,19 @@ impl Writer {
             return Err(error("source has no valid frame rate"));
         }
         let frame_duration = ((1.0 / fps) / f64::from(tb)).round().max(1.0) as i64;
-        let mut output = format::output_as(output, if kind == "prores" { "mov" } else { "mp4" })?;
+        let [width, height] = settings
+            .dimensions
+            .unwrap_or([decoder.width(), decoder.height()]);
+        if width == 0
+            || height == 0
+            || width > 8192
+            || height > 8192
+            || width % 2 != 0
+            || height % 2 != 0
+        {
+            return Err(error("Invalid export resolution"));
+        }
+        let mut output = format::output_as(output, settings.container)?;
         let global = output
             .format()
             .flags()
@@ -152,7 +233,13 @@ impl Writer {
             _ => return Err(error("unsupported export codec")),
         };
         let mut names = Vec::new();
-        if hardware && kind != "prores" {
+        let encoding = settings.encoding;
+        let bitrate = match encoding.rate_control {
+            RateControl::Input => decoder.bit_rate(),
+            RateControl::Bitrate => encoding.bitrate_kbps as usize * 1000,
+            RateControl::Quality => 0,
+        };
+        if settings.hardware && kind != "prores" && bitrate > 0 {
             #[cfg(target_os = "macos")]
             names.push(if kind == "h264" {
                 "h264_videotoolbox"
@@ -178,8 +265,8 @@ impl Writer {
                 continue;
             };
             let mut enc = codec::Context::new_with_codec(codec).encoder().video()?;
-            enc.set_width(decoder.width());
-            enc.set_height(decoder.height());
+            enc.set_width(width);
+            enc.set_height(height);
             enc.set_format(pixel);
             enc.set_time_base(tb);
             enc.set_frame_rate(Some(stream.avg_frame_rate()));
@@ -187,9 +274,17 @@ impl Writer {
             enc.set_colorspace(ffmpeg::color::Space::BT709);
             enc.set_color_range(ffmpeg::color::Range::MPEG);
             enc.set_max_b_frames(0);
-            enc.set_bit_rate(
-                (decoder.width() as usize * decoder.height() as usize * 4).max(4_000_000),
-            );
+            enc.set_bit_rate(bitrate);
+            if kind != "prores" {
+                if encoding.keyframe_frames > 0 {
+                    enc.set_gop(encoding.keyframe_frames);
+                }
+                enc.set_max_bit_rate(encoding.max_bitrate_kbps as usize * 1000);
+                // SAFETY: live encoder context, bounded to fit the i32 FFmpeg field.
+                unsafe {
+                    (*enc.as_mut_ptr()).rc_buffer_size = (encoding.buffer_kbits * 1000) as i32;
+                }
+            }
             enc.set_threading(codec::threading::Config::kind(
                 codec::threading::Type::Frame,
             ));
@@ -201,8 +296,36 @@ impl Writer {
                 options.set("profile", "4");
                 options.set("alpha_bits", "16");
             } else if name == software {
-                options.set("preset", "fast");
-                options.set("crf", "20");
+                options.set(
+                    "preset",
+                    match encoding.speed {
+                        EncodingSpeed::Veryfast => "veryfast",
+                        EncodingSpeed::Fast => "fast",
+                        EncodingSpeed::Slow => "slow",
+                    },
+                );
+                if bitrate == 0 {
+                    options.set("crf", &encoding.quality.to_string());
+                }
+            } else if name.ends_with("_nvenc") {
+                options.set(
+                    "preset",
+                    match encoding.speed {
+                        EncodingSpeed::Veryfast => "p2",
+                        EncodingSpeed::Fast => "p4",
+                        EncodingSpeed::Slow => "p7",
+                    },
+                );
+                options.set("rc", "vbr");
+            } else if name.ends_with("_videotoolbox") {
+                options.set(
+                    "realtime",
+                    if encoding.speed == EncodingSpeed::Veryfast {
+                        "1"
+                    } else {
+                        "0"
+                    },
+                );
             }
             match enc.open_with(options) {
                 Ok(enc) => {
@@ -273,8 +396,8 @@ impl Writer {
             decoder.width(),
             decoder.height(),
             pixel,
-            decoder.width(),
-            decoder.height(),
+            width,
+            height,
             scaling::Flags::BILINEAR,
         )?;
         // SAFETY: live swscale context and static coefficient table; RGBA is

@@ -24,6 +24,7 @@ pub enum Mode {
 }
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
 pub enum Format {
+    Input,
     #[default]
     H264,
     H265,
@@ -33,34 +34,172 @@ pub enum Format {
 impl Format {
     pub fn codec(self) -> &'static str {
         match self {
+            Self::Input => "input",
             Self::H264 => "h264",
             Self::H265 => "h265",
             Self::Prores => "prores",
             Self::Png => "png",
         }
     }
-    pub fn extension(self) -> &'static str {
+}
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
+pub enum QualityPreset {
+    #[default]
+    Balanced,
+    HighQuality,
+    Fast,
+}
+impl QualityPreset {
+    pub fn label(self) -> &'static str {
         match self {
-            Self::H264 | Self::H265 => "mp4",
-            Self::Prores => "mov",
-            Self::Png => "",
+            Self::Balanced => "Balanced",
+            Self::HighQuality => "High quality",
+            Self::Fast => "Fast export",
         }
     }
 }
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Container {
+    #[default]
+    Input,
+    Mp4,
+    Mov,
+}
+impl Container {
+    pub fn muxer(self) -> &'static str {
+        self.extension()
+    }
+    pub fn extension(self) -> &'static str {
+        match self {
+            Self::Input | Self::Mp4 => "mp4",
+            Self::Mov => "mov",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct InputProperties {
+    pub dimensions: [u32; 2],
+    pub format: Option<Format>,
+    pub container: Option<Container>,
+    pub bit_rate: usize,
+}
+impl InputProperties {
+    pub fn new(info: &actionlay_media::probe::MediaInfo) -> Self {
+        Self {
+            dimensions: [info.video.width, info.video.height],
+            format: match info.video.codec.as_str() {
+                "h264" => Some(Format::H264),
+                "hevc" => Some(Format::H265),
+                "prores" => Some(Format::Prores),
+                _ => None,
+            },
+            container: if info
+                .container
+                .split(',')
+                .any(|name| name == "mov" || name == "mp4")
+            {
+                Some(
+                    if info
+                        .major_brand
+                        .as_deref()
+                        .is_some_and(|brand| brand.trim() == "qt")
+                    {
+                        Container::Mov
+                    } else {
+                        Container::Mp4
+                    },
+                )
+            } else {
+                None
+            },
+            bit_rate: info.video.bit_rate,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Settings {
     pub mode: Mode,
     pub format: Format,
     pub color: [u8; 3],
     pub hardware: bool,
+    pub preset: QualityPreset,
+    pub container: Container,
+    pub resolution: Option<[u32; 2]>,
+    pub encoding: media::EncodingSettings,
+    pub advanced_edited: bool,
 }
 impl Default for Settings {
     fn default() -> Self {
         Self {
             mode: Mode::Video,
-            format: Format::H264,
+            format: Format::Input,
             color: [0, 255, 0],
-            hardware: true,
+            hardware: false,
+            preset: QualityPreset::Balanced,
+            container: Container::Input,
+            resolution: None,
+            encoding: media::EncodingSettings::default(),
+            advanced_edited: false,
+        }
+    }
+}
+impl Settings {
+    pub fn preset_defaults(preset: QualityPreset) -> Self {
+        let mut settings = Self {
+            preset,
+            ..Self::default()
+        };
+        match preset {
+            QualityPreset::Balanced => {}
+            QualityPreset::HighQuality => {
+                settings.encoding.rate_control = media::RateControl::Quality;
+                settings.encoding.quality = 18;
+                settings.encoding.speed = media::EncodingSpeed::Slow;
+            }
+            QualityPreset::Fast => {
+                settings.encoding.rate_control = media::RateControl::Quality;
+                settings.encoding.quality = 23;
+                settings.encoding.speed = media::EncodingSpeed::Veryfast;
+            }
+        }
+        settings
+    }
+    pub fn apply_preset(&mut self, preset: QualityPreset) {
+        let (mode, color) = (self.mode, self.color);
+        *self = Self::preset_defaults(preset);
+        self.mode = mode;
+        self.color = color;
+    }
+    pub fn is_custom(&self) -> bool {
+        let defaults = Self::preset_defaults(self.preset);
+        self.hardware != defaults.hardware
+            || self.format != defaults.format
+            || self.container != defaults.container
+            || self.resolution != defaults.resolution
+            || self.encoding != defaults.encoding
+    }
+    pub fn resolved_format(&self, input: &InputProperties) -> Format {
+        if self.mode == Mode::Transparent
+            && matches!(self.format, Format::Input | Format::H264 | Format::H265)
+        {
+            Format::Prores
+        } else if self.format == Format::Input {
+            input.format.unwrap_or(Format::H264)
+        } else {
+            self.format
+        }
+    }
+    pub fn resolved_container(&self, input: &InputProperties) -> Container {
+        if self.resolved_format(input) == Format::Prores {
+            Container::Mov
+        } else if self.container == Container::Input {
+            input.container.unwrap_or(Container::Mp4)
+        } else {
+            self.container
         }
     }
 }
@@ -207,6 +346,19 @@ pub fn run(
     request.layout = capture_export_units(&request.layout, actionlay_render::regional::current());
     let started = Instant::now();
     let info = actionlay_media::probe::probe(&request.source)?;
+    let input = InputProperties::new(&info);
+    let container = request.settings.resolved_container(&input);
+    request.settings.format = request.settings.resolved_format(&input);
+    let dimensions = request.settings.resolution.unwrap_or(input.dimensions);
+    if dimensions
+        .iter()
+        .any(|d| *d == 0 || *d > 8192 || *d % 2 != 0)
+    {
+        bail!("Invalid export resolution");
+    }
+    if !request.settings.encoding.valid() {
+        bail!("Invalid export encoding settings");
+    }
     let end = validate(&request, info.duration)?;
     if info.video.width % 2 != 0
         || info.video.height % 2 != 0
@@ -311,9 +463,7 @@ pub fn run(
     let temp = tempfile::Builder::new()
         .prefix(".actionlay-export-")
         .tempdir_in(parent)?;
-    let movie = temp
-        .path()
-        .join(format!("video.{}", request.settings.format.extension()));
+    let movie = temp.path().join(format!("video.{}", container.extension()));
     let workers = std::thread::available_parallelism()
         .map_or(2, |n| n.get())
         .clamp(1, 4);
@@ -403,7 +553,12 @@ pub fn run(
                                 &request.source,
                                 &movie,
                                 request.settings.format.codec(),
-                                request.settings.hardware,
+                                &media::WriterOptions {
+                                    hardware: request.settings.hardware,
+                                    encoding: request.settings.encoding,
+                                    dimensions: request.settings.resolution,
+                                    container: container.muxer(),
+                                },
                                 t,
                                 request.settings.mode == Mode::Video,
                             )?;
@@ -414,11 +569,28 @@ pub fn run(
                     if let Some(writer) = &mut writer {
                         writer.write(&pixels, info.video.width, info.video.height, t)?;
                     } else {
+                        let pixels = if dimensions != input.dimensions {
+                            let source = image::RgbaImage::from_raw(
+                                info.video.width,
+                                info.video.height,
+                                pixels,
+                            )
+                            .ok_or_else(|| anyhow::anyhow!("invalid RGBA frame size"))?;
+                            image::imageops::resize(
+                                &source,
+                                dimensions[0],
+                                dimensions[1],
+                                image::imageops::FilterType::Triangle,
+                            )
+                            .into_raw()
+                        } else {
+                            pixels
+                        };
                         image::save_buffer_with_format(
                             temp.path().join(format!("frame-{:06}.png", frames)),
                             &pixels,
-                            info.video.width,
-                            info.video.height,
+                            dimensions[0],
+                            dimensions[1],
                             image::ColorType::Rgba8,
                             image::ImageFormat::Png,
                         )?;
@@ -558,6 +730,85 @@ mod tests {
         }
     }
     #[test]
+    fn presets_and_custom_settings_survive_preference_roundtrip() {
+        for preset in [
+            QualityPreset::Balanced,
+            QualityPreset::HighQuality,
+            QualityPreset::Fast,
+        ] {
+            let mut settings = Settings::preset_defaults(preset);
+            assert!(!settings.hardware);
+            assert!(!settings.is_custom());
+            settings.resolution = Some([1280, 720]);
+            settings.encoding.keyframe_frames = 50;
+            settings.advanced_edited = true;
+            assert!(settings.is_custom());
+            let saved = serde_json::to_string(&settings).unwrap();
+            assert_eq!(serde_json::from_str::<Settings>(&saved).unwrap(), settings);
+            settings.apply_preset(preset);
+            assert!(!settings.is_custom());
+            assert!(!settings.advanced_edited);
+        }
+        let old: Settings = serde_json::from_str(
+            r#"{"mode":"Solid","format":"H265","color":[0,255,0],"hardware":false}"#,
+        )
+        .unwrap();
+        assert_eq!(old.format, Format::H265);
+        assert_eq!(old.encoding, media::EncodingSettings::default());
+    }
+
+    #[test]
+    fn input_container_is_probed_even_when_extension_is_wrong() {
+        let dir = tempfile::tempdir().unwrap();
+        let misleading = dir.path().join("source.mov");
+        std::fs::copy(request(dir.path().join("unused.mp4")).source, &misleading).unwrap();
+        let mut info = actionlay_media::probe::probe(&misleading).unwrap();
+        let input = InputProperties::new(&info);
+        assert_eq!(input.container, Some(Container::Mp4));
+        assert_eq!(Settings::default().resolved_format(&input), Format::H264);
+        info.major_brand = Some("qt  ".into());
+        assert_eq!(InputProperties::new(&info).container, Some(Container::Mov));
+        info.container = "matroska,webm".into();
+        assert_eq!(InputProperties::new(&info).container, None);
+    }
+
+    #[test]
+    fn presets_export_resized_movies_and_copy_source_properties() {
+        let dir = tempfile::tempdir().unwrap();
+        for (i, preset) in [
+            QualityPreset::Balanced,
+            QualityPreset::HighQuality,
+            QualityPreset::Fast,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut req = request(dir.path().join(format!("preset-{i}.mov")));
+            req.settings = Settings::preset_defaults(preset);
+            req.settings.container = Container::Mov;
+            req.settings.resolution = Some([80, 46]);
+            let output = req.output.clone();
+            run(req, Arc::new(AtomicBool::new(false)), |_| {}).unwrap();
+            let info = actionlay_media::probe::probe(&output).unwrap();
+            assert_eq!(info.video.codec, "h264");
+            assert_eq!([info.video.width, info.video.height], [80, 46]);
+            assert_eq!(info.video.fps, 10.0);
+            assert!(info.container.contains("mov"));
+            assert_eq!(info.audio.unwrap().sample_rate, 48000);
+        }
+        let req = request(dir.path().join("copy.mp4"));
+        let input = actionlay_media::probe::probe(&req.source).unwrap();
+        let output = req.output.clone();
+        run(req, Arc::new(AtomicBool::new(false)), |_| {}).unwrap();
+        let info = actionlay_media::probe::probe(&output).unwrap();
+        assert_eq!(
+            [info.video.width, info.video.height],
+            [input.video.width, input.video.height]
+        );
+        assert_eq!(info.video.codec, input.video.codec);
+    }
+
+    #[test]
     fn first_export_frame_uses_the_complete_route_even_if_preview_has_only_one_packet() {
         let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/gopro/hero5.mp4");
         if !source.exists() {
@@ -686,6 +937,7 @@ mod tests {
         assert!(validate(&req, 3.0).is_err());
         req.end = Some(0.7);
         req.settings.mode = Mode::Transparent;
+        req.settings.format = Format::H264;
         assert!(validate(&req, 3.0).is_err());
         req.settings.mode = Mode::Video;
         std::fs::write(&req.output, b"original").unwrap();

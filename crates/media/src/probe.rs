@@ -13,6 +13,7 @@ pub struct VideoInfo {
     pub width: u32,
     pub height: u32,
     pub fps: f64,
+    pub bit_rate: usize,
     pub time_base: f64,
     pub color: ColorInfo,
     pub ten_bit: bool,
@@ -27,6 +28,9 @@ pub struct AudioInfo {
 
 #[derive(Debug, Clone)]
 pub struct MediaInfo {
+    /// FFmpeg demuxer names and the ISO base-media major brand, when available.
+    pub container: String,
+    pub major_brand: Option<String>,
     pub duration: f64,
     pub video: VideoInfo,
     pub audio: Option<AudioInfo>,
@@ -66,6 +70,7 @@ pub(crate) fn describe(input: &ffmpeg::format::context::Input) -> Result<MediaIn
             .unwrap_or_default(),
         width: vdec.width(),
         height: vdec.height(),
+        bit_rate: vdec.bit_rate(),
         fps: if rate.denominator() == 0 {
             0.0
         } else {
@@ -111,6 +116,8 @@ pub(crate) fn describe(input: &ffmpeg::format::context::Input) -> Result<MediaIn
             packet_count: usize::try_from(s.frames()).ok().filter(|n| *n > 0),
         });
     Ok(MediaInfo {
+        container: input.format().name().to_owned(),
+        major_brand: input.metadata().get("major_brand").map(str::to_owned),
         duration,
         video,
         audio,

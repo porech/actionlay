@@ -1136,6 +1136,9 @@ impl App {
                     self.export_dialog = Some(export_ui::Dialog::new(
                         self.prefs.export.clone().unwrap_or_default(),
                         duration,
+                        export::InputProperties::new(
+                            self.player.as_ref().expect("export player").info(),
+                        ),
                     ));
                 }
             }

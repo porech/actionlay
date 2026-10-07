@@ -14,8 +14,8 @@ sequences also support straight alpha. Premultiplied renderer pixels are convert
 to straight alpha for transparent output, avoiding darkened translucent edges.
 
 Video files copy the source audio packets. Overlay-only outputs and PNG
-sequences are silent. Source resolution, nominal frame rate and presentation
-timestamps are retained. A range selects frames in `[in, out)` and starts output
+sequences are silent. Source resolution is retained by default; an advanced override resizes the
+composited output. Nominal frame rate and presentation timestamps are retained. A range selects frames in `[in, out)` and starts output
 at the first selected frame. Copied compressed audio is clipped at packet
 boundaries. PNG sequences include `sequence.json` with frame timestamps and FPS.
 
@@ -36,12 +36,28 @@ actionlay export --mode transparent --format prores --out overlay.mov VIDEO.MP4
 actionlay export --mode transparent --format png --out overlay-frames VIDEO.MP4
 ```
 
-`--software` bypasses hardware encoding. An omitted layout uses the remembered
-layout or built-in default. An omitted format uses H.264 for opaque output and
-ProRes for transparent output. One source file is accepted per invocation;
-automatic chapter concatenation belongs to M6. Export settings are remembered
-in desktop preferences. This milestone does not add a queue or advanced
-resolution/bitrate controls.
+Software encoding is the default. `--hardware` prefers an available hardware
+encoder with software fallback; `--software` explicitly keeps software encoding.
+An omitted layout uses the remembered layout or built-in default. The Balanced
+preset copies the supported source codec (H.264, HEVC or ProRes), actual container
+(MP4 or MOV), dimensions and video bitrate when available. Unsupported codecs or
+containers fall back to H.264 or MP4; unavailable bitrate falls back to CRF 20.
+Copying these parameters still re-encodes the rendered video. Transparent output
+uses ProRes 4444 MOV by default. Source FPS/timestamps and video-file audio are
+preserved by the pipeline rather than being independently reconfigured.
+
+Quality presets are Balanced, High quality (CRF 18, slow software encoding), and
+Fast export (CRF 23, veryfast software encoding). The desktop Advanced accordion
+holds codec, container, resolution, rate control, CRF/bitrate, maximum bitrate,
+buffer size, keyframe interval and encoder preference/speed. Modified options
+are highlighted and offer **Set preset default**. Selecting any preset resets
+these options and closes the accordion, retaining output mode/background.
+Preferences remember the last exported settings and reopen Advanced if options
+were edited. Zero maximum bitrate/buffer and keyframe interval use encoder
+defaults. Hardware preference uses bitrate control; constant-quality presets
+keep software encoding. CLI `--preset balanced|high-quality|fast` selects the
+same defaults. One source file is accepted per invocation; chapter concatenation
+belongs to M6.
 
 Builds bundle pinned static x264/x265 and FFmpeg encoders. NVIDIA NVENC is enabled
 on Windows/Linux, and VideoToolbox on macOS; unavailable hardware falls back to
