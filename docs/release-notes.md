@@ -4,7 +4,7 @@ ActionLay 1.2.0 adds immersive full-screen playback, remembered window geometry,
 
 ### Playback and window behaviour
 
-- **About ActionLay** now has a coordinated gecko design, the shared slogan, licence/project links and the application version: in the native ActionLay menu on macOS, and in the ActionLay menu on Windows and Linux.
+- **About ActionLay** now has a coordinated gecko design, the shared slogan, licence/project links and the application version (development builds include the short Git commit): in the native ActionLay menu on macOS, and in the ActionLay menu on Windows and Linux.
 
 - **Full-screen playback** with a dedicated transport overlay. Controls and the mouse pointer hide after **3 seconds** without movement and reappear when you move the mouse. Use **F11** or the full-screen button to toggle it, and **Escape** to exit. Full-screen is available during playback, outside the layout editor.
 - The app **remembers window position, size and maximized state**. A first launch opens a centered window smaller than the usable screen area; restored geometry is kept within available displays.
@@ -30,7 +30,8 @@ ActionLay 1.2.0 adds immersive full-screen playback, remembered window geometry,
 - Overdue video frames are drained across bounded presentation queues. Decoding preserves reference frames while skipping unnecessary downloads/conversions of output that is already late; seek preroll and the final frame at EOF are retained.
 - Output recovery now accounts for the measured recent cost of frame materialization. Slow conversion no longer repeatedly sends the player back into buffering merely because a frame was usable before conversion but late when it finished.
 - Recovery regressions now count actual post-seek buffering transitions, rather than using decoded timestamps that could hide presentation stalls. macOS Intel testing exercised real audio at both 44.1 and 48 kHz; the release pipeline also passed on macOS ARM, Windows and Linux before tagging.
-- Corrected contaminated menu translations and Italian interface vocabulary. New interface options and export controls are translated across all 34 supported languages.
+- Reviewed all 34 language catalogues in context: repaired joined or shifted labels, chapter counts, the action to keep only one file open, GPS states, slope and typography terminology, and incomplete error messages. Catalogue checks now protect placeholders, technical identifiers and single-line labels from translation regressions.
+- Already buffered packets now replenish decoded audio before costly video-frame conversion, reducing audio starvation during recovery. The slow-output regression keeps its real audio clock and strict recovery assertions; both macOS architectures pass.
 
 ## Installation and distribution
 

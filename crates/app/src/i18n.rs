@@ -514,6 +514,39 @@ mod tests {
     }
 
     #[test]
+    fn translations_preserve_code_literals_and_named_fields() {
+        let literals = Regex::new(r"`[^`]+`|\{[A-Za-z_][A-Za-z0-9_]*(?::[^{}]*)?\}").unwrap();
+        for (language, catalogue) in LANGUAGES.iter().zip(catalogues()) {
+            for (source, english) in &catalogues()[0].logical {
+                let translated = &catalogue.logical[source];
+                let mut expected = literals
+                    .find_iter(english)
+                    .map(|m| m.as_str())
+                    .collect::<Vec<_>>();
+                let mut actual = literals
+                    .find_iter(translated)
+                    .map(|m| m.as_str())
+                    .collect::<Vec<_>>();
+                expected.sort_unstable();
+                actual.sort_unstable();
+                assert_eq!(actual, expected, "{}: {source}", language.code);
+                for example in ["[0.02, -0.02]", "\"speed\"", "\"kmh\"", "%H:%M:%S"] {
+                    if english.contains(example) {
+                        // Quotes may be typographic; identifiers and numeric
+                        // JSON examples must remain valid literal values.
+                        let token = example.trim_matches('"');
+                        assert!(
+                            translated.contains(token),
+                            "{}: {source}: {translated}",
+                            language.code
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn menu_translations_are_complete_single_labels() {
         // Extract the actual native menu keys so new entries join this check.
         let labels = Regex::new(r#"native_text\("([^"]+)"\)"#).unwrap();
@@ -533,13 +566,15 @@ mod tests {
                 );
             }
         }
-        let italian = &catalogues()[resolve("it")].logical;
-        for (source, value) in italian {
-            if !source.contains('\n') {
-                assert!(
-                    !value.contains('\n'),
-                    "Italian string contains another label: {source}: {value:?}"
-                );
+        for (language, catalogue) in LANGUAGES.iter().zip(catalogues()) {
+            for (source, value) in &catalogue.logical {
+                if !source.contains('\n') {
+                    assert!(
+                        !value.contains(['\n', '\r']),
+                        "{} string contains another label: {source}: {value:?}",
+                        language.code
+                    );
+                }
             }
         }
     }
