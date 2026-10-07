@@ -56,6 +56,9 @@ if the MIME/desktop database update tools are unavailable.
 - **Use GPX/FIT activities** from a bike computer or watch. Link them to a video,
   align their timestamps and adjust the offset. Supported DJI/Insta360 files can
   also supply native camera telemetry; coverage depends on the camera and firmware.
+- **Watch in full screen.** Press F11 to enter; controls and the pointer hide
+  after 3 seconds and reappear when you move the mouse. Escape exits. Window
+  position, size and maximized state are remembered.
 - **Play GoPro chapter sequences** on one timeline without concatenating files.
   Open the first chapter to load the sequence. Opening an intermediate chapter
   offers the choice of loading the whole recording.
@@ -122,8 +125,13 @@ apply immediately. Defaults are 3 seconds ahead, 2 seconds before playback and 3
 ### Export
 
 Choose **Export…** in the toolbar or **File → Export Video…**. Select the mode,
-format, time range and a new destination. Each new export starts with **Video with overlay**. Transparent overlays use ProRes 4444
-or PNG; solid overlays let you choose a background colour, green by default.
+time range and a new destination. The initial mode is **Video with overlay**;
+subsequent exports remember your settings. Choose **Balanced**, **High quality**
+or **Fast export**. Balanced preserves supported source codec/container,
+resolution and bitrate while re-encoding the overlay; **Advanced** exposes
+individual encoding controls and a resolution override. Transparent overlays
+use ProRes 4444 or PNG; solid overlays let you choose a background colour,
+green by default.
 Existing destinations are not overwritten. Cancellation keeps completed frames
 in a playable partial output.
 
