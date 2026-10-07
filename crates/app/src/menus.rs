@@ -26,7 +26,6 @@ pub enum Command {
     ClearRecentVideos,
     CloseVideo,
     Quit,
-    #[cfg(not(target_os = "macos"))]
     About,
 }
 
@@ -48,7 +47,7 @@ pub struct Menus {
 impl Menus {
     pub fn new(ctx: &egui::Context) -> muda::Result<Self> {
         use muda::accelerator::{Accelerator, Code, Modifiers};
-        use muda::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
+        use muda::{Menu, MenuItem, PredefinedMenuItem, Submenu};
         let key = |code, shift| {
             Some(Accelerator::new(
                 Some(if shift {
@@ -87,13 +86,11 @@ impl Menus {
             crate::i18n::native_text("ActionLay"),
             true,
             &[
-                &PredefinedMenuItem::about(
-                    Some(crate::i18n::native_text("About ActionLay")),
-                    Some(AboutMetadata {
-                        name: Some("ActionLay".into()),
-                        version: Some(env!("CARGO_PKG_VERSION").into()),
-                        ..Default::default()
-                    }),
+                &MenuItem::with_id(
+                    "about-actionlay",
+                    crate::i18n::native_text("About ActionLay"),
+                    true,
+                    None,
                 ),
                 &PredefinedMenuItem::separator(),
                 &PredefinedMenuItem::hide(Some(crate::i18n::native_text("Hide ActionLay"))),
@@ -232,6 +229,7 @@ impl Menus {
         let ctx = ctx.clone();
         muda::MenuEvent::set_event_handler(Some(move |event: muda::MenuEvent| {
             let command = match event.id.0.as_str() {
+                "about-actionlay" => Command::About,
                 "open-video" => Command::OpenVideo,
                 "select-layout" => Command::SelectLayout,
                 "new-layout" => Command::NewLayout,

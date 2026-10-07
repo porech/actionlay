@@ -4,7 +4,7 @@ ActionLay 1.2.0 adds immersive full-screen playback, remembered window geometry,
 
 ### Playback and window behaviour
 
-- **About ActionLay** displays the application version: in the native ActionLay menu on macOS, and in the ActionLay menu on Windows and Linux.
+- **About ActionLay** now has a coordinated gecko design, the shared slogan, licence/project links and the application version: in the native ActionLay menu on macOS, and in the ActionLay menu on Windows and Linux.
 
 - **Full-screen playback** with a dedicated transport overlay. Controls and the mouse pointer hide after **3 seconds** without movement and reappear when you move the mouse. Use **F11** or the full-screen button to toggle it, and **Escape** to exit. Full-screen is available during playback, outside the layout editor.
 - The app **remembers window position, size and maximized state**. A first launch opens a centered window smaller than the usable screen area; restored geometry is kept within available displays.
