@@ -438,6 +438,7 @@ jobs:
     uses: ./.github/workflows/pages.yml
     permissions:
       contents: read
+      actions: read
       pages: write
       id-token: write
     secrets:
