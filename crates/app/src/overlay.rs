@@ -166,6 +166,7 @@ pub struct OverlayFrame {
     /// Time it was rendered for.
     pub t: f64,
     pub render_ms: f32,
+    pub loading_regions: Vec<actionlay_render::loading::LoadingRegion>,
 }
 
 /// One render, with everything read under a single lock so that a layout, telemetry
@@ -467,7 +468,7 @@ fn run(shared: &Shared, notify: &dyn Fn(), maps: actionlay_maps::TileStore) {
             }
             renderer.set_maps(maps.clone());
             renderer.set_scale_mode(job.scale_mode);
-            renderer.render_telemetry_into(&job.layout, &job.telemetry, request.t, &mut job.pixmap);
+            renderer.render_editor_into(&job.layout, &job.telemetry, request.t, &mut job.pixmap);
         }));
         if let Err(e) = rendered {
             log::error!(
@@ -483,7 +484,15 @@ fn run(shared: &Shared, notify: &dyn Fn(), maps: actionlay_maps::TileStore) {
             shared.lock().failed(job.pixmap);
             continue;
         }
+        let loading_regions = actionlay_render::loading::regions(
+            &job.layout,
+            &job.telemetry,
+            request.t,
+            job.telemetry.duration(),
+            renderer.hit_boxes(),
+        );
         let frame = OverlayFrame {
+            loading_regions,
             pixmap: job.pixmap,
             t: request.t,
             render_ms: start.elapsed().as_secs_f32() * 1000.0,
@@ -697,6 +706,7 @@ mod tests {
             pixmap: job.pixmap,
             t: job.request.t,
             render_ms: 1.0,
+            loading_regions: Vec::new(),
         }
     }
 

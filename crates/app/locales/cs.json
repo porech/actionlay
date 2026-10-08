@@ -508,7 +508,7 @@
   "Fit entire route": "Přizpůsobit celé trase",
   "Route size": "Velikost trasy",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Používá celou trasu, i když se kreslí pouze projetá část. Během načítání je přiblížení pevné.",
-  "Route data could not be fully loaded. Export was not started.": "Nepodařilo se načíst všechna data trasy. Export nebyl zahájen.",
+  "Telemetry data could not be fully loaded. Export was not started.": "Nepodařilo se načíst všechna telemetrická data. Export nebyl zahájen.",
   "Export cancelled": "Export zrušen",
   "Advanced": "Pokročilé",
   "Advanced…": "Pokročilé…",
@@ -549,5 +549,10 @@
   "Resolution": "Rozlišení",
   "Set preset default": "Obnovit hodnotu předvolby",
   "Target bitrate": "Cílový datový tok",
-  "Video bitrate (Mbps)": "Datový tok videa (Mbps)"
+  "Video bitrate (Mbps)": "Datový tok videa (Mbps)",
+  "Copy": "Kopírovat",
+  "Paste": "Vložit",
+  "Lock selection": "Uzamknout výběr",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Tažením změníte velikost kontejneru. Podržením Shift změníte měřítko i všech potomků.",
+  "Drag to resize": "Tažením změnit velikost"
 }

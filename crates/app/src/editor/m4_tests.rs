@@ -303,3 +303,375 @@ fn copying_from_different_parents_keeps_selection_geometry() {
         copy,
     );
 }
+
+#[test]
+fn clipboard_survives_editor_changes_and_pastes_an_independent_section_with_undo() {
+    let ctx = egui::Context::default();
+    let layout = actionlay_layout::catalog::find("training")
+        .unwrap()
+        .layout();
+    let chart = layout
+        .nodes
+        .iter()
+        .position(|node| node.id() == Some("training-chart"))
+        .unwrap();
+    let mut source = Editor::new(layout, None, None, false);
+    source.selection = Some(vec![chart]);
+    let expected = source.draft.nodes[chart].clone();
+    source.copy_selection(&ctx);
+    assert!(!source.dirty());
+    drop(source);
+
+    let layout = actionlay_layout::catalog::find("moto").unwrap().layout();
+    let mut destination = Editor::new(layout.clone(), None, None, false);
+    destination.selection = Some(vec![0, 0]); // Paste must not nest inside the clock.
+    destination.paste_selection(&ctx).unwrap();
+    assert_eq!(destination.draft.nodes.len(), layout.nodes.len() + 1);
+    let pasted = destination.draft.nodes.last().unwrap();
+    let mut expected = serde_json::to_value(expected).unwrap();
+    expected.as_object_mut().unwrap().remove("id");
+    expected["offset"] = json!([24.0, 24.0]);
+    assert_eq!(serde_json::to_value(pasted).unwrap(), expected);
+    assert!(destination.dirty());
+    destination.undo();
+    assert_eq!(destination.draft, layout);
+    assert!(!destination.dirty());
+    destination.redo();
+    assert_eq!(destination.draft.nodes.len(), layout.nodes.len() + 1);
+    destination.selection = None;
+    destination.copy_selection(&ctx); // Empty selection must not erase clipboard.
+    destination.paste_selection(&ctx).unwrap();
+    assert_eq!(destination.draft.nodes.len(), layout.nodes.len() + 2);
+}
+
+#[test]
+fn clipboard_keeps_whole_containers_and_assets_without_overwriting_destination_assets() {
+    let ctx = egui::Context::default();
+    let layout = Layout::from_json(r#"{"version":1,"nodes":[{"type":"frame","id":"section","size":[400,200],"children":[{"type":"text","id":"child","text":"Altitude","future_asset":"assets/custom.ttf"}]}]}"#).unwrap().layout;
+    let mut source = Editor::new(layout, None, None, false);
+    actionlay_layout::package::attach(&mut source.draft, "assets/custom.ttf".into(), vec![1, 2])
+        .unwrap();
+    source.selection = Some(vec![0]);
+    source.additional_selection = vec![vec![0, 0]]; // Do not duplicate selected descendants.
+    source.copy_selection(&ctx);
+    let mut destination = Editor::new(Editor::blank(), None, None, false);
+    actionlay_layout::package::attach(
+        &mut destination.draft,
+        "assets/custom.ttf".into(),
+        vec![3, 4],
+    )
+    .unwrap();
+    let before = destination.draft.clone();
+    destination.paste_selection(&ctx).unwrap();
+    assert_eq!(destination.draft.nodes.len(), 1);
+    let node = serde_json::to_value(&destination.draft.nodes[0]).unwrap();
+    assert!(node.get("id").is_none());
+    assert!(node["children"][0].get("id").is_none());
+    assert_eq!(node["children"][0]["text"], "Altitude");
+    assert_eq!(
+        node["children"][0]["future_asset"],
+        "assets/copy-2-custom.ttf"
+    );
+    assert_eq!(
+        &**destination
+            .draft
+            .loaded_assets
+            .get("assets/custom.ttf")
+            .unwrap(),
+        &[3, 4]
+    );
+    assert_eq!(
+        &**destination
+            .draft
+            .loaded_assets
+            .get("assets/copy-2-custom.ttf")
+            .unwrap(),
+        &[1, 2]
+    );
+    let mut package = std::io::Cursor::new(Vec::new());
+    actionlay_layout::package::write_to(&destination.draft, &mut package).unwrap();
+    package.set_position(0);
+    assert_eq!(
+        actionlay_layout::package::load_reader(package)
+            .unwrap()
+            .layout,
+        destination.draft
+    );
+    destination.undo();
+    assert_eq!(destination.draft, before);
+    destination.redo();
+    assert_eq!(destination.draft.loaded_assets.len(), 2);
+}
+
+#[test]
+fn clipboard_detaches_nested_widgets_preserving_geometry_and_inherited_opacity() {
+    let ctx = egui::Context::default();
+    let layout = Layout::from_json(r#"{"version":1,"nodes":[{"type":"frame","offset":[400,200],"size":[400,200],"opacity":0.5,"children":[{"type":"frame","id":"nested","anchor":"bottom-right","offset":[-20,-20],"size":[100,60],"opacity":0.8}]}]}"#).unwrap().layout;
+    let mut source = Editor::new(layout, None, None, false);
+    measure(&mut source);
+    let original = rect_by_id(&source, "nested");
+    source.selection = Some(vec![0, 0]);
+    source.copy_selection(&ctx);
+    let mut destination = Editor::new(Editor::blank(), None, None, false);
+    destination.paste_selection(&ctx).unwrap();
+    measure(&mut destination);
+    let placed = destination
+        .renderer
+        .hit_boxes()
+        .iter()
+        .find(|hit| hit.path == vec![0])
+        .unwrap()
+        .rect;
+    assert_rect(
+        Rect::new(original.x + 24.0, original.y + 24.0, original.w, original.h),
+        placed,
+    );
+    let value = serde_json::to_value(&destination.draft.nodes[0]).unwrap();
+    assert!((value["opacity"].as_f64().unwrap() - 0.4).abs() < 0.00001);
+}
+
+#[test]
+fn native_and_browser_clipboard_events_transfer_nodes_once_between_editors() {
+    let ctx = egui::Context::default();
+    let mut source = editor();
+    source.selection = Some(vec![0]);
+    let input = |events| egui::RawInput {
+        screen_rect: Some(egui::Rect::from_min_size(
+            egui::Pos2::ZERO,
+            egui::vec2(1280.0, 800.0),
+        )),
+        events,
+        ..Default::default()
+    };
+    let mut output = ctx.run_ui(input(vec![egui::Event::Copy]), |ui| {
+        source.ui(ui, None, None, None, 0.0);
+    });
+    output.textures_delta.clear();
+    drop(source);
+    let mut destination = Editor::new(Editor::blank(), None, None, false);
+    let mut output = ctx.run_ui(
+        input(vec![egui::Event::Paste(
+            "unrelated system clipboard text".into(),
+        )]),
+        |ui| {
+            destination.ui(ui, None, None, None, 0.0);
+        },
+    );
+    output.textures_delta.clear();
+    assert_eq!(destination.draft.nodes.len(), 1);
+    assert!(matches!(
+        destination.draft.nodes[0],
+        Node::Known(Widget::Frame(_))
+    ));
+    drop(destination);
+    ctx.tex_manager().write().take_delta().clear();
+}
+
+#[test]
+fn locked_section_keeps_children_selected_as_a_whole_and_can_move_resize_and_copy() {
+    let layout = Layout::from_json(r#"{"version":1,"nodes":[{"type":"frame","id":"section","offset":[100,100],"size":[300,200],"children":[{"type":"frame","id":"child","offset":[20,20],"size":[100,60]}]}]}"#).unwrap().layout;
+    let mut e = Editor::new(layout, None, None, false);
+    measure(&mut e);
+    e.selection = Some(vec![0]);
+    e.selection_locked = true;
+    e.snap = false;
+    let context = egui::Context::default();
+    let canvas = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(960.0, 540.0));
+    let pass = |e: &mut Editor, events| {
+        measure(e);
+        let mut output = context.run_ui(
+            egui::RawInput {
+                screen_rect: Some(canvas),
+                events,
+                ..Default::default()
+            },
+            |ui| {
+                let response = ui.allocate_rect(canvas, egui::Sense::click_and_drag());
+                e.canvas_input(
+                    ui,
+                    &response,
+                    canvas,
+                    Rect::new(0.0, 0.0, 1920.0, 1080.0),
+                    0.5,
+                );
+            },
+        );
+        output.textures_delta.clear();
+    };
+    let button = |pos, pressed| egui::Event::PointerButton {
+        pos,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: egui::Modifiers::SHIFT,
+    };
+    pass(&mut e, vec![]);
+    let child_point = egui::pos2(80.0, 75.0);
+    pass(&mut e, vec![egui::Event::PointerMoved(child_point)]);
+    pass(&mut e, vec![button(child_point, true)]);
+    pass(&mut e, vec![button(child_point, false)]);
+    assert_eq!(e.selected_paths(), vec![vec![0]]);
+    let blank = egui::pos2(500.0, 400.0);
+    pass(&mut e, vec![egui::Event::PointerMoved(blank)]);
+    pass(&mut e, vec![button(blank, true)]);
+    pass(&mut e, vec![button(blank, false)]);
+    assert_eq!(e.selected_paths(), vec![vec![0]]);
+    pass(&mut e, vec![egui::Event::PointerMoved(child_point)]);
+    pass(&mut e, vec![button(child_point, true)]);
+    pass(
+        &mut e,
+        vec![egui::Event::PointerMoved(
+            child_point + egui::vec2(30.0, 20.0),
+        )],
+    );
+    pass(
+        &mut e,
+        vec![button(child_point + egui::vec2(30.0, 20.0), false)],
+    );
+    measure(&mut e);
+    assert_rect(
+        Rect::new(160.0, 140.0, 300.0, 200.0),
+        rect_by_id(&e, "section"),
+    );
+    assert_rect(
+        Rect::new(180.0, 160.0, 100.0, 60.0),
+        rect_by_id(&e, "child"),
+    );
+    let handle = egui::pos2(230.0, 170.0);
+    pass(&mut e, vec![egui::Event::PointerMoved(handle)]);
+    pass(&mut e, vec![button(handle, true)]);
+    pass(
+        &mut e,
+        vec![egui::Event::PointerMoved(handle + egui::vec2(20.0, 15.0))],
+    );
+    pass(&mut e, vec![button(handle + egui::vec2(20.0, 15.0), false)]);
+    measure(&mut e);
+    assert_rect(
+        Rect::new(160.0, 140.0, 340.0, 230.0),
+        rect_by_id(&e, "section"),
+    );
+    e.copy_selection(&context);
+    let mut destination = Editor::new(Editor::blank(), None, None, false);
+    destination.paste_selection(&context).unwrap();
+    assert_eq!(destination.draft.nodes.len(), 1);
+    let Node::Known(widget) = &destination.draft.nodes[0] else {
+        panic!()
+    };
+    assert_eq!(widget.children().len(), 1);
+    e.selection_locked = false;
+    let point = [190.0, 170.0];
+    assert_eq!(
+        e.preview_hit(e.renderer.hit_boxes(), point, false)
+            .unwrap()
+            .path,
+        vec![0, 0]
+    );
+    drop(destination);
+    drop(e);
+    context.tex_manager().write().take_delta().clear();
+}
+
+#[test]
+fn selection_lock_hits_each_selected_root_without_selecting_unselected_widgets() {
+    let mut e = editor();
+    measure(&mut e);
+    e.selection = Some(vec![0]);
+    e.additional_selection = vec![vec![1]];
+    e.selection_locked = true;
+    for id in ["a", "b"] {
+        let r = rect_by_id(&e, id);
+        let hit = e
+            .preview_hit(e.renderer.hit_boxes(), [r.x + 10.0, r.y + 10.0], true)
+            .unwrap();
+        assert!(e.selected_paths().contains(&hit.path));
+    }
+    assert!(
+        e.preview_hit(e.renderer.hit_boxes(), [550.0, 250.0], false)
+            .is_none()
+    );
+    assert!(!e.dirty());
+}
+
+#[test]
+fn shift_can_toggle_section_scaling_during_one_resize_gesture_with_undo() {
+    let mut e = Editor::new(Layout::from_json(r#"{"version":1,"nodes":[{"type":"frame","id":"section","offset":[100,100],"size":[300,200],"children":[{"type":"frame","id":"child","offset":[20,20],"size":[100,60]}]}]}"#).unwrap().layout,None,None,false);
+    let original = e.draft.clone();
+    e.selection = Some(vec![0]);
+    e.selection_locked = true;
+    let context = egui::Context::default();
+    let canvas = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(960.0, 540.0));
+    let pass = |e: &mut Editor, mut events: Vec<egui::Event>, shift| {
+        events.insert(
+            0,
+            egui::Event::ModifiersChanged(egui::Modifiers {
+                shift,
+                ..Default::default()
+            }),
+        );
+        measure(e);
+        let mut output = context.run_ui(
+            egui::RawInput {
+                screen_rect: Some(canvas),
+                events,
+                ..Default::default()
+            },
+            |ui| {
+                let response = ui.allocate_rect(canvas, egui::Sense::click_and_drag());
+                e.canvas_input(
+                    ui,
+                    &response,
+                    canvas,
+                    Rect::new(0.0, 0.0, 1920.0, 1080.0),
+                    0.5,
+                );
+            },
+        );
+        output.textures_delta.clear();
+    };
+    let handle = egui::pos2(200.0, 150.0);
+    let end = handle + egui::vec2(30.0, 0.0);
+    let button = |pos, pressed| egui::Event::PointerButton {
+        pos,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: egui::Modifiers::SHIFT,
+    };
+    pass(&mut e, vec![], true);
+    pass(&mut e, vec![egui::Event::PointerMoved(handle)], true);
+    pass(&mut e, vec![button(handle, true)], true);
+    pass(&mut e, vec![egui::Event::PointerMoved(end)], true);
+    measure(&mut e);
+    let factor = (300.0 * 360.0 + 200.0 * 200.0) / (300.0 * 300.0 + 200.0 * 200.0);
+    assert_rect(
+        Rect::new(100.0, 100.0, 300.0 * factor, 200.0 * factor),
+        rect_by_id(&e, "section"),
+    );
+    assert_rect(
+        Rect::new(
+            100.0 + 20.0 * factor,
+            100.0 + 20.0 * factor,
+            100.0 * factor,
+            60.0 * factor,
+        ),
+        rect_by_id(&e, "child"),
+    );
+    pass(&mut e, vec![], false);
+    measure(&mut e);
+    assert_rect(
+        Rect::new(100.0, 100.0, 360.0, 200.0),
+        rect_by_id(&e, "section"),
+    );
+    assert_rect(
+        Rect::new(120.0, 120.0, 100.0, 60.0),
+        rect_by_id(&e, "child"),
+    );
+    pass(&mut e, vec![], true);
+    pass(&mut e, vec![button(end, false)], true);
+    let resized = e.draft.clone();
+    assert_eq!(e.undo.len(), 1);
+    e.undo();
+    assert_eq!(e.draft, original);
+    e.redo();
+    assert_eq!(e.draft, resized);
+    drop(e);
+    context.tex_manager().write().take_delta().clear();
+}

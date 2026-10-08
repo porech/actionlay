@@ -508,7 +508,7 @@
   "Fit entire route": "Tilpass hele ruten",
   "Route size": "Rutestørrelse",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Bruker hele ruten selv når bare den fullførte delen tegnes. Zoomnivået er fast under innlasting.",
-  "Route data could not be fully loaded. Export was not started.": "Rutedataene kunne ikke lastes inn fullstendig. Eksporten ble ikke startet.",
+  "Telemetry data could not be fully loaded. Export was not started.": "Telemetridataene kunne ikke lastes inn fullstendig. Eksporten ble ikke startet.",
   "Export cancelled": "Eksport avbrutt",
   "Advanced": "Avansert",
   "Advanced…": "Avansert…",
@@ -549,5 +549,10 @@
   "Resolution": "Oppløsning",
   "Set preset default": "Gjenopprett forhåndsinnstilt verdi",
   "Target bitrate": "Målbitrate",
-  "Video bitrate (Mbps)": "Videobitrate (Mbps)"
+  "Video bitrate (Mbps)": "Videobitrate (Mbps)",
+  "Copy": "Kopier",
+  "Paste": "Lim inn",
+  "Lock selection": "Lås markering",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Dra for å endre beholderens størrelse. Hold Shift inne for å skalere alle underordnede elementer også.",
+  "Drag to resize": "Dra for å endre størrelse"
 }

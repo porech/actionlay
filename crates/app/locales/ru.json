@@ -508,7 +508,7 @@
   "Fit entire route": "Вместить весь маршрут",
   "Route size": "Размер маршрута",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Использует весь маршрут, даже если показана только пройденная часть. При загрузке масштаб остаётся фиксированным.",
-  "Route data could not be fully loaded. Export was not started.": "Не удалось полностью загрузить данные маршрута. Экспорт не был начат.",
+  "Telemetry data could not be fully loaded. Export was not started.": "Не удалось полностью загрузить данные телеметрии. Экспорт не был начат.",
   "Export cancelled": "Экспорт отменён",
   "Advanced": "Дополнительно",
   "Advanced…": "Дополнительно…",
@@ -549,5 +549,10 @@
   "Resolution": "Разрешение",
   "Set preset default": "Восстановить значение предустановки",
   "Target bitrate": "Целевой битрейт",
-  "Video bitrate (Mbps)": "Битрейт видео (Mbps)"
+  "Video bitrate (Mbps)": "Битрейт видео (Mbps)",
+  "Copy": "Копировать",
+  "Paste": "Вставить",
+  "Lock selection": "Заблокировать выделение",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Перетащите, чтобы изменить размер контейнера. Удерживайте Shift, чтобы масштабировать и все дочерние элементы.",
+  "Drag to resize": "Перетащите для изменения размера"
 }

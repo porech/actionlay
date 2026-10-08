@@ -508,7 +508,7 @@
   "Fit entire route": "Ajusta a tot el recorregut",
   "Route size": "Mida del recorregut",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Utilitza tot el recorregut encara que només es dibuixi la part completada. Durant la càrrega s’utilitza un zoom fix.",
-  "Route data could not be fully loaded. Export was not started.": "No s’han pogut carregar totes les dades del recorregut. L’exportació no ha començat.",
+  "Telemetry data could not be fully loaded. Export was not started.": "No s’han pogut carregar totes les dades de telemetria. L’exportació no ha començat.",
   "Export cancelled": "Exportació cancel·lada",
   "Advanced": "Avançat",
   "Advanced…": "Avançat…",
@@ -549,5 +549,10 @@
   "Resolution": "Resolució",
   "Set preset default": "Restaura el valor predefinit",
   "Target bitrate": "Taxa de bits objectiu",
-  "Video bitrate (Mbps)": "Taxa de bits del vídeo (Mbps)"
+  "Video bitrate (Mbps)": "Taxa de bits del vídeo (Mbps)",
+  "Copy": "Copia",
+  "Paste": "Enganxa",
+  "Lock selection": "Bloqueja la selecció",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Arrossega per redimensionar el contenidor. Mantén premuda Shift per escalar-lo amb tots els fills.",
+  "Drag to resize": "Arrossega per redimensionar"
 }

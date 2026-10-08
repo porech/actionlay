@@ -508,7 +508,7 @@
   "Fit entire route": "Tüm rotayı sığdır",
   "Route size": "Rota boyutu",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Yalnızca tamamlanan bölüm çizilse bile tüm rotayı kullanır. Yükleme sırasında yakınlaştırma sabit kalır.",
-  "Route data could not be fully loaded. Export was not started.": "Rotanın tüm verileri yüklenemedi. Dışa aktarma başlatılmadı.",
+  "Telemetry data could not be fully loaded. Export was not started.": "Tüm telemetri verileri yüklenemedi. Dışa aktarma başlatılmadı.",
   "Export cancelled": "Dışa aktarma iptal edildi",
   "Advanced": "Gelişmiş",
   "Advanced…": "Gelişmiş…",
@@ -549,5 +549,10 @@
   "Resolution": "Çözünürlük",
   "Set preset default": "Ön ayar değerini geri yükle",
   "Target bitrate": "Hedef bit hızı",
-  "Video bitrate (Mbps)": "Video bit hızı (Mbps)"
+  "Video bitrate (Mbps)": "Video bit hızı (Mbps)",
+  "Copy": "Kopyala",
+  "Paste": "Yapıştır",
+  "Lock selection": "Seçimi kilitle",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Kapsayıcıyı yeniden boyutlandırmak için sürükleyin. Tüm alt öğeleri de ölçeklemek için Shift tuşunu basılı tutun.",
+  "Drag to resize": "Boyutlandırmak için sürükleyin"
 }

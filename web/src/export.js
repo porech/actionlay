@@ -2,7 +2,7 @@ import { Input, BlobSource, ALL_FORMATS, VideoSampleSink, EncodedPacketSink, Out
 import { drawOverlay } from './overlay.js';
 const MAX_MEMORY_OUTPUT = 256 * 1024 * 1024;
 
-export async function exportVideo(file, core, options, signal, progress) {
+export async function exportVideo(file, core, options, signal, progress, prepareTelemetry = async () => {}) {
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   let output;
   let writable;
@@ -53,6 +53,8 @@ export async function exportVideo(file, core, options, signal, progress) {
         const timestamp = Math.max(start, sample.timestamp);
         const frameEnd = Math.min(end, sample.timestamp + sample.duration);
         if (frameEnd <= timestamp) continue;
+        await prepareTelemetry(timestamp);
+        signal.throwIfAborted();
         context.fillStyle = options.mode === 'solid' ? options.color : '#000000';
         context.fillRect(0, 0, width, height);
         if (options.mode === 'video') sample.draw(context, 0, 0, width, height);

@@ -14,8 +14,8 @@ or a separate overlay for your video editor. Free and open source.
 
 | System | Download | Install |
 |---|---|---|
-| macOS 12+, Apple Silicon **and Intel** | [Universal DMG](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.2.0-macos-universal.dmg) | Open the DMG and drag ActionLay to Applications |
-| Windows 10/11, 64-bit | [Windows installer](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.2.0-windows-x64-setup.exe) | Choose installation for yourself or everyone; desktop shortcut optional |
+| macOS 12+, Apple Silicon **and Intel** | [Universal DMG](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.3.0-macos-universal.dmg) | Open the DMG and drag ActionLay to Applications |
+| Windows 10/11, 64-bit | [Windows installer](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.3.0-windows-x64-setup.exe) | Choose installation for yourself or everyone; desktop shortcut optional |
 | Linux, 64-bit | [Package repositories and setup instructions](https://porech.github.io/actionlay/) | Add the APT or DNF repository, then install `actionlay` |
 
 The **[latest release](https://github.com/porech/actionlay/releases/latest)** also
@@ -64,8 +64,9 @@ if the MIME/desktop database update tools are unavailable.
   offers the choice of loading the whole recording.
 - **Build a dashboard visually.** Start from the included Default, Moto, Training
   or imported dashboards. Move, resize and style widgets; select multiple layers,
-  snap, group and undo changes. Share `.actionlay-layout` packages with assets
-  and fonts, or import layouts from gopro-dashboard-overlay XML.
+  snap, group and undo changes. Copy entire sections between layouts, lock the
+  selection, or hold Shift while resizing a container to scale its children too.
+  Share `.actionlay-layout` packages with assets and fonts, or import layouts from gopro-dashboard-overlay XML.
 - **Customize maps.** Choose north-up or direction-up, no route, the completed
   route or the whole route, with separate colours and adjustable line/marker sizes.
   Select providers and offline mode under **Settings → Maps…**.
@@ -79,10 +80,11 @@ dashboards, or open the visual editor to create your own. The editor also works
 without a video. Drag a GPX/FIT file onto an open video or use **File → Video
 sources…** to link an activity and adjust alignment.
 
-Maps show a loading indicator while recovering the telemetry needed for a route
-or fitted zoom, including after seeking. A percentage appears when the metadata
-index provides a packet count. These indicators only appear in the interface;
-export shows metadata preparation separately before rendering frames.
+Widgets that need historical telemetry show their own loading indicator and
+percentage until the required data is available, including after seeking.
+These indicators only appear in the interface. Export completes full-source
+metadata preparation before rendering if a widget requires it; widgets that
+need only past data recover it as export advances.
 
 Use **Settings → Privacy zones…** to hide private locations and crossing route
 segments on maps. Repeated starts and finishes can reveal a home address even
@@ -162,8 +164,18 @@ actionlay export --out ride.mp4 --start 5 --end 20 GX010123.MP4
 actionlay export --mode transparent --out overlay.mov GX010123.MP4
 ```
 
-Use `actionlay-telemetry --help` or `actionlay export --help` for options. See [building from source](docs/building.md)
-for development and [release packaging](docs/releasing.md) for maintainers.
+Use `actionlay-telemetry --help` or `actionlay export --help` for options.
+
+## Building and contributing
+
+See the [developer and contributor guide](docs/building.md) for desktop and web
+setup, build commands, architecture, development workflow, tests, diagnostics
+and contribution guidance. It explains the shared Rust layers and the native
+and browser backends, including how to check changes across both.
+
+For platform coverage and hosting details, see [the browser guide](docs/web.md).
+Maintainers can find versioning, installers and deployment instructions in
+[the release guide](docs/releasing.md).
 
 ## Credits and licence
 
@@ -179,7 +191,7 @@ or GPL-3.0-or-later, at your option; see the [artwork licence and attribution](a
 The binaries include GPL-enabled FFmpeg,
 x264 and x265. Source revisions and build scripts are included in the repository;
 licence notices and source links accompany the downloads. Each release also
-includes the exact FFmpeg/x264/x265 sources in `third-party-sources-1.2.0.tar.gz`.
+includes the exact FFmpeg/x264/x265 sources in `third-party-sources-1.3.0.tar.gz`.
 
 ## Legal notice
 

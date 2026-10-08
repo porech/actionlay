@@ -508,7 +508,7 @@
   "Fit entire route": "Vừa toàn bộ lộ trình",
   "Route size": "Kích thước lộ trình",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Dùng toàn bộ lộ trình ngay cả khi chỉ vẽ phần đã đi. Thu phóng giữ cố định trong khi tải.",
-  "Route data could not be fully loaded. Export was not started.": "Không thể tải đầy đủ dữ liệu lộ trình. Việc xuất chưa bắt đầu.",
+  "Telemetry data could not be fully loaded. Export was not started.": "Không thể tải đầy đủ dữ liệu đo từ xa. Việc xuất chưa bắt đầu.",
   "Export cancelled": "Đã hủy xuất",
   "Advanced": "Nâng cao",
   "Advanced…": "Nâng cao…",
@@ -549,5 +549,10 @@
   "Resolution": "Độ phân giải",
   "Set preset default": "Khôi phục giá trị thiết lập",
   "Target bitrate": "Tốc độ bit mục tiêu",
-  "Video bitrate (Mbps)": "Tốc độ bit video (Mbps)"
+  "Video bitrate (Mbps)": "Tốc độ bit video (Mbps)",
+  "Copy": "Sao chép",
+  "Paste": "Dán",
+  "Lock selection": "Khóa lựa chọn",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Kéo để đổi kích thước vùng chứa. Giữ Shift để thu phóng cả vùng chứa và mọi phần tử con.",
+  "Drag to resize": "Kéo để đổi kích thước"
 }

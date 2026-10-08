@@ -508,7 +508,7 @@
   "Fit entire route": "Prilagodi celotni poti",
   "Route size": "Velikost poti",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Uporabi celotno pot, tudi ko je narisan samo prevoženi del. Med nalaganjem je povečava fiksna.",
-  "Route data could not be fully loaded. Export was not started.": "Vseh podatkov poti ni bilo mogoče naložiti. Izvoz se ni začel.",
+  "Telemetry data could not be fully loaded. Export was not started.": "Vseh telemetričnih podatkov ni bilo mogoče naložiti. Izvoz se ni začel.",
   "Export cancelled": "Izvoz preklican",
   "Advanced": "Napredno",
   "Advanced…": "Napredno…",
@@ -549,5 +549,10 @@
   "Resolution": "Ločljivost",
   "Set preset default": "Obnovi vrednost prednastavitve",
   "Target bitrate": "Ciljna bitna hitrost",
-  "Video bitrate (Mbps)": "Bitna hitrost videa (Mbps)"
+  "Video bitrate (Mbps)": "Bitna hitrost videa (Mbps)",
+  "Copy": "Kopiraj",
+  "Paste": "Prilepi",
+  "Lock selection": "Zakleni izbor",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Povlecite za spremembo velikosti vsebnika. Držite Shift za sorazmerno spremembo vseh podrejenih elementov.",
+  "Drag to resize": "Povlecite za spremembo velikosti"
 }

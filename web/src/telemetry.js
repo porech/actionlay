@@ -65,12 +65,13 @@ export class TelemetryReader {
     }
     return Math.min(low, this.samples.length - 1);
   }
-  requestTime(time, seek = false) {
+  requestTime(time, seek = false, signal) {
+    if (signal) this.foregroundSignal = signal;
     if (!this.samples.length || this.finished) return Promise.resolve();
     if (!seek && this.lastTime !== undefined && Math.abs(time-this.lastTime)<.25) return this.foreground ?? Promise.resolve();
     this.lastTime = time; this.target = time; this.epoch++;
     if (!this.foreground) {
-      this.foreground = this.readForeground().finally(() => { this.foreground = null; });
+      this.foreground = this.readForeground().catch(error => { this.lastTime=undefined; throw error; }).finally(() => { this.foreground = null; this.foregroundSignal=undefined; });
     }
     return this.foreground;
   }
@@ -80,38 +81,62 @@ export class TelemetryReader {
       const current = this.indexAt(time), first = this.indexAt(Math.max(0,time-1));
       const last = this.indexAt(Math.min(this.duration,time+.5));
       // Publish the sought frame first, then its filter/interpolation context.
-      await this.readSample(current); this.publish(true);
+      const signal = this.foregroundSignal;
+      await this.readSample(current, signal); this.publish(true);
       for (let i=first; i<=last; i++) {
         if (epoch !== this.epoch) break;
-        await this.readSample(i); await yieldTask();
+        await this.readSample(i, signal); await yieldTask();
       }
       this.publish(true);
     }
   }
   requestRoute(end, progress = () => {}) {
-    // Removing route maps pauses their reader, retaining its cursor and cache.
-    if (end <= 0) { this.routeEnd = 0; return this.route ?? Promise.resolve(); }
-    if (!this.samples.length || end <= this.routeEnd) return this.route ?? Promise.resolve();
-    this.routeEnd = end;
-    if (!this.route) this.route = this.readRoute(progress).finally(() => { this.route = null; });
+    return this.requestHistory(end > 0 ? [[0,end]] : [], progress);
+  }
+  requestHistory(ranges, progress = () => {}, signal) {
+    if (signal) this.historySignal = signal;
+    const key = JSON.stringify(ranges.map(([a,b]) => [this.indexAt(a),this.indexAt(Math.max(a,b-1e-6))]));
+    if (key === this.historyKey) return this.route ?? Promise.resolve();
+    this.historyKey = key; this.historyEpoch = (this.historyEpoch ?? 0) + 1;
+    this.historyRanges = ranges;
+    this.routeEnd = Math.max(0, ...ranges.map(r => r[1]));
+    if (!ranges.length || !this.samples.length) return this.route ?? Promise.resolve();
+    if (!this.route) this.route = this.readRoute(progress).catch(error => { this.historyKey=undefined; throw error; }).finally(() => { this.route = null; this.historySignal=undefined; });
     return this.route;
   }
   async readRoute(progress) {
     let lastProgress = 0;
     try {
-      while (this.routeCursor < this.samples.length) {
-        const sample = this.samples[this.routeCursor];
-        if (this.routeEnd < this.duration && sample.cts / sample.timescale >= this.routeEnd) break;
-        // This cursor only moves forward. Playback seeks never modify it.
-        await this.readSample(this.routeCursor++);
-        const total = this.routeEnd >= this.duration ? this.samples.length : this.indexAt(this.routeEnd)+1;
-        if (performance.now()-lastProgress>=150 || this.routeCursor===1) {
-          progress(this.routeCursor/total, this.routeCursor, total, true); lastProgress=performance.now();
+      let epoch;
+      do {
+        epoch = this.historyEpoch;
+        const ranges = this.historyRanges;
+        const indices = ranges.map(([start,end]) => [this.indexAt(start), this.indexAt(Math.max(start,end-1e-6))]);
+        const total = indices.reduce((sum,[a,b]) => sum+b-a+1, 0);
+        let count = 0;
+        for (let r=0; r<ranges.length && epoch===this.historyEpoch; r++) {
+          const [first,last] = indices[r];
+          for (let i=first; i<=last && epoch===this.historyEpoch; i++) {
+            // Separate from playback's cursor; shared cache deduplicates the reads.
+            this.check(this.historySignal);
+            if (first===0) this.routeCursor = Math.max(this.routeCursor,i+1);
+            if (this.loaded.has(i)) { count++; continue; }
+            await this.readSample(i, this.historySignal); count++;
+            if (performance.now()-lastProgress>=150 || count===1) {
+              progress(count/total, count, total, true); lastProgress=performance.now();
+            }
+            await yieldTask();
+          }
+          if (epoch===this.historyEpoch) {
+            const next = this.samples[last+1];
+            const validatedEnd = Math.max(ranges[r][1], next ? next.cts/next.timescale : this.duration);
+            this.core.record_history_read?.(ranges[r][0], validatedEnd);
+            this.onPublish?.();
+          }
         }
-        await yieldTask();
-      }
+      } while (epoch!==this.historyEpoch && this.historyRanges.length);
       this.publish(true);
-    } finally { progress(1, this.routeCursor, this.samples.length, false); }
+    } finally { progress(1, this.loaded.size, this.samples.length, false); }
   }
   async readComplete(signal, progress = () => {}) {
     for(let i=0;i<this.samples.length;i++) {

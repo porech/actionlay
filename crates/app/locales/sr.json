@@ -508,7 +508,7 @@
   "Fit entire route": "Прилагоди целој рути",
   "Route size": "Величина руте",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Користи целу руту чак и када се црта само пређени део. Током учитавања зумирање је фиксно.",
-  "Route data could not be fully loaded. Export was not started.": "Није било могуће учитати све податке руте. Извоз није покренут.",
+  "Telemetry data could not be fully loaded. Export was not started.": "Није било могуће учитати све телеметријске податке. Извоз није покренут.",
   "Export cancelled": "Извоз отказан",
   "Advanced": "Напредно",
   "Advanced…": "Напредно…",
@@ -549,5 +549,10 @@
   "Resolution": "Резолуција",
   "Set preset default": "Врати вредност поставке",
   "Target bitrate": "Циљни проток",
-  "Video bitrate (Mbps)": "Видео проток (Mbps)"
+  "Video bitrate (Mbps)": "Видео проток (Mbps)",
+  "Copy": "Копирај",
+  "Paste": "Налепи",
+  "Lock selection": "Закључај избор",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Превуците за промену величине контејнера. Држите Shift за скалирање свих подређених елемената.",
+  "Drag to resize": "Превуците за промену величине"
 }

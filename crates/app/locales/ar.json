@@ -508,7 +508,7 @@
   "Fit entire route": "احتواء المسار بالكامل",
   "Route size": "حجم المسار",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "يستخدم المسار بالكامل حتى عند رسم الجزء المكتمل فقط. يبقى التكبير ثابتًا أثناء التحميل.",
-  "Route data could not be fully loaded. Export was not started.": "تعذر تحميل بيانات المسار بالكامل. لم يبدأ التصدير.",
+  "Telemetry data could not be fully loaded. Export was not started.": "تعذر تحميل بيانات القياس عن بُعد بالكامل. لم يبدأ التصدير.",
   "Export cancelled": "أُلغي التصدير",
   "Advanced": "متقدمة",
   "Advanced…": "متقدمة…",
@@ -549,5 +549,10 @@
   "Resolution": "الدقة",
   "Set preset default": "استعادة قيمة الإعداد المسبق",
   "Target bitrate": "معدل البت المستهدف",
-  "Video bitrate (Mbps)": "معدل بت الفيديو (Mbps)"
+  "Video bitrate (Mbps)": "معدل بت الفيديو (Mbps)",
+  "Copy": "نسخ",
+  "Paste": "لصق",
+  "Lock selection": "قفل التحديد",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "اسحب لتغيير حجم الحاوية. اضغط باستمرار على Shift لتغيير حجمها مع جميع عناصرها الفرعية.",
+  "Drag to resize": "اسحب لتغيير الحجم"
 }

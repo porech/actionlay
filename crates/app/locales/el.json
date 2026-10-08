@@ -508,7 +508,7 @@
   "Fit entire route": "Προσαρμογή σε όλη τη διαδρομή",
   "Route size": "Μέγεθος διαδρομής",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Χρησιμοποιεί όλη τη διαδρομή ακόμη και όταν σχεδιάζεται μόνο το ολοκληρωμένο τμήμα. Το ζουμ παραμένει σταθερό κατά τη φόρτωση.",
-  "Route data could not be fully loaded. Export was not started.": "Δεν ήταν δυνατή η πλήρης φόρτωση των δεδομένων διαδρομής. Η εξαγωγή δεν ξεκίνησε.",
+  "Telemetry data could not be fully loaded. Export was not started.": "Δεν ήταν δυνατή η πλήρης φόρτωση των δεδομένων τηλεμετρίας. Η εξαγωγή δεν ξεκίνησε.",
   "Export cancelled": "Η εξαγωγή ακυρώθηκε",
   "Advanced": "Για προχωρημένους",
   "Advanced…": "Για προχωρημένους…",
@@ -549,5 +549,10 @@
   "Resolution": "Ανάλυση",
   "Set preset default": "Επαναφορά τιμής προεπιλογής",
   "Target bitrate": "Στόχος ρυθμού bit",
-  "Video bitrate (Mbps)": "Ρυθμός bit βίντεο (Mbps)"
+  "Video bitrate (Mbps)": "Ρυθμός bit βίντεο (Mbps)",
+  "Copy": "Αντιγραφή",
+  "Paste": "Επικόλληση",
+  "Lock selection": "Κλείδωμα επιλογής",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Σύρετε για αλλαγή μεγέθους του περιέκτη. Κρατήστε πατημένο το Shift για κλιμάκωση και όλων των παιδιών του.",
+  "Drag to resize": "Σύρετε για αλλαγή μεγέθους"
 }

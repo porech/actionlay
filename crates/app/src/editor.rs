@@ -16,6 +16,9 @@ type NodePath = Vec<usize>;
 #[path = "editor/m4_tests.rs"]
 mod m4_tests;
 
+#[path = "editor/resize.rs"]
+mod resize;
+
 #[derive(Clone, Copy, PartialEq)]
 pub enum Action {
     Save,
@@ -43,17 +46,17 @@ pub struct Editor {
     is_new: bool,
     selection: Option<NodePath>,
     additional_selection: Vec<NodePath>,
+    selection_locked: bool,
     root: Rect,
     properties_buffer: Option<(NodePath, Value)>,
     invalid_properties: bool,
     property_error: Option<String>,
     undo: Vec<Layout>,
     redo: Vec<Layout>,
-    clipboard: Vec<Node>,
     drag: Option<Drag>,
     pub video_background: bool,
     #[cfg(not(target_arch = "wasm32"))]
-    pub map_progress: Option<crate::telemetry_load::RouteProgress>,
+    pub history_progress: Option<crate::telemetry_load::RouteProgress>,
     pub dimensions: [u32; 2],
     snap: bool,
     automatic_anchor: bool,
@@ -86,20 +89,20 @@ impl Editor {
             is_new,
             selection: None,
             additional_selection: Vec::new(),
+            selection_locked: false,
             root: Rect::new(0.0, 0.0, 1920.0, 1080.0),
             properties_buffer: None,
             invalid_properties: false,
             property_error: None,
             undo: Vec::new(),
             redo: Vec::new(),
-            clipboard: Vec::new(),
             drag: None,
             video_background: video_size.is_some(),
+            #[cfg(not(target_arch = "wasm32"))]
+            history_progress: None,
             dimensions: video_size.unwrap_or([1920, 1080]),
             snap: true,
             automatic_anchor: false,
-            #[cfg(not(target_arch = "wasm32"))]
-            map_progress: None,
             renderer: Renderer::new(),
             offline_maps: actionlay_maps::TileStore::offline(),
             maps: actionlay_maps::TileStore::offline(),
@@ -273,6 +276,103 @@ impl Editor {
             })
             .collect()
     }
+    // Context storage survives closing/recreating an editor, on desktop and web.
+    // This is an application clipboard, independent of browser clipboard permission.
+    fn clipboard_id() -> egui::Id {
+        egui::Id::new("actionlay-layout-clipboard")
+    }
+
+    fn copy_selection(&self, ctx: &egui::Context) {
+        let paths = self.selected_paths();
+        if paths.is_empty() {
+            return;
+        }
+        let mut clipboard = self.draft.clone();
+        clipboard.nodes = paths
+            .iter()
+            .filter_map(|path| {
+                let mut node = node_at(&self.draft.nodes, path)?.clone();
+                // A child copied without its container becomes a root widget.
+                if path.len() > 1
+                    && let Some(hit) = self.renderer.hit_boxes().iter().find(|h| &h.path == path)
+                {
+                    let rect = placement_rect(&node, hit);
+                    set_relative_position(&mut node, self.root, rect);
+                }
+                let opacity = parent_opacity(&self.draft.nodes, &path[..path.len() - 1]);
+                if opacity != 1.0 {
+                    let mut value = serde_json::to_value(&node).unwrap();
+                    value["opacity"] =
+                        json!(value["opacity"].as_f64().unwrap_or(1.0) * opacity as f64);
+                    node = serde_json::from_value(value).unwrap();
+                }
+                Some(node)
+            })
+            .collect();
+        ctx.data_mut(|data| data.insert_temp(Self::clipboard_id(), std::sync::Arc::new(clipboard)));
+    }
+
+    fn paste_selection(&mut self, ctx: &egui::Context) -> Result<(), String> {
+        let Some(clipboard) =
+            ctx.data_mut(|data| data.get_temp::<std::sync::Arc<Layout>>(Self::clipboard_id()))
+        else {
+            return Ok(());
+        };
+        let mut clipboard = (*clipboard).clone();
+        let mut destination = self.draft.clone();
+        let mut replacements = std::collections::BTreeMap::new();
+        for (name, bytes) in &clipboard.loaded_assets {
+            let mut target = name.clone();
+            let mut index = 2;
+            while let Some(existing) = destination.loaded_assets.get(&target) {
+                if existing == bytes {
+                    break;
+                }
+                target = format!(
+                    "assets/copy-{index}-{}",
+                    name.rsplit('/').next().unwrap_or(name)
+                );
+                index += 1;
+            }
+            if !destination.loaded_assets.contains_key(&target) {
+                actionlay_layout::package::attach(
+                    &mut destination,
+                    target.clone(),
+                    (**bytes).clone(),
+                )
+                .map_err(|e| e.to_string())?;
+            }
+            replacements.insert(name.clone(), target);
+        }
+        fn remap(value: &mut Value, names: &std::collections::BTreeMap<String, String>) {
+            match value {
+                Value::String(name) => {
+                    if let Some(replacement) = names.get(name) {
+                        *name = replacement.clone();
+                    }
+                }
+                Value::Array(values) => values.iter_mut().for_each(|v| remap(v, names)),
+                Value::Object(values) => {
+                    for (key, value) in values {
+                        if key != "text" {
+                            remap(value, names);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut nodes = serde_json::to_value(&clipboard.nodes).unwrap();
+        remap(&mut nodes, &replacements);
+        clipboard.nodes = serde_json::from_value(nodes).unwrap();
+        let before = self.draft.clone();
+        self.draft = destination;
+        // Pasted sections are independent roots, even if a destination child is selected.
+        self.insert_copies_in(clipboard.nodes, Vec::new());
+        self.commit(before);
+        Ok(())
+    }
+
     fn delete(&mut self) {
         self.properties_buffer = None;
         self.invalid_properties = false;
@@ -313,6 +413,37 @@ impl Editor {
         )
     }
 
+    /// Locked selections only accept hits on their selected roots, never descendants.
+    fn preview_hit(
+        &self,
+        boxes: &[actionlay_render::HitBox],
+        point: [f32; 2],
+        dragging: bool,
+    ) -> Option<actionlay_render::HitBox> {
+        let contains = |hit: &&actionlay_render::HitBox| {
+            let r = hit.rect;
+            point[0] >= r.x && point[0] <= r.x + r.w && point[1] >= r.y && point[1] <= r.y + r.h
+        };
+        if self.selection_locked {
+            let paths = self.selected_paths();
+            return boxes
+                .iter()
+                .rev()
+                .filter(|hit| paths.contains(&hit.path))
+                .find(contains)
+                .cloned();
+        }
+        if dragging
+            && let Some(hit) = boxes
+                .iter()
+                .filter(|hit| self.selection.as_ref() == Some(&hit.path))
+                .find(contains)
+        {
+            return Some(hit.clone());
+        }
+        boxes.iter().rev().find(contains).cloned()
+    }
+
     fn insert_copies(&mut self, copies: Vec<Node>) {
         if copies.is_empty() {
             return;
@@ -323,6 +454,14 @@ impl Editor {
             .as_ref()
             .map(|p| p[..p.len() - 1].to_vec())
             .unwrap_or_default();
+        self.insert_copies_in(copies, parent);
+        self.commit(before);
+    }
+
+    fn insert_copies_in(&mut self, copies: Vec<Node>, parent: NodePath) {
+        self.properties_buffer = None;
+        self.invalid_properties = false;
+        self.property_error = None;
         let mut selected = Vec::new();
         if let Some(nodes) = children_at_mut(&mut self.draft.nodes, &parent) {
             for mut node in copies {
@@ -340,7 +479,6 @@ impl Editor {
         }
         self.selection = selected.last().cloned();
         self.additional_selection = selected;
-        self.commit(before);
     }
 
     /// Move selected roots into a container while preserving their current boxes.
@@ -626,6 +764,7 @@ impl Editor {
             });
         });
         if ui.is_enabled() && !ctx.egui_wants_keyboard_input() {
+            let (mut copy, mut paste) = (false, false);
             ctx.input_mut(|i| {
                 if i.consume_key(
                     egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
@@ -651,18 +790,28 @@ impl Editor {
                 {
                     self.delete();
                 }
-                if i.consume_key(egui::Modifiers::COMMAND, egui::Key::C) {
-                    self.clipboard = self.selected_copies();
-                }
-                if i.consume_key(egui::Modifiers::COMMAND, egui::Key::V) {
-                    self.insert_copies(self.clipboard.clone());
-                }
+                copy = i.consume_key(egui::Modifiers::COMMAND, egui::Key::C)
+                    || i.events
+                        .iter()
+                        .any(|event| matches!(event, egui::Event::Copy));
+                paste = i.consume_key(egui::Modifiers::COMMAND, egui::Key::V)
+                    || i.events
+                        .iter()
+                        .any(|event| matches!(event, egui::Event::Paste(_)));
+                i.events
+                    .retain(|event| !matches!(event, egui::Event::Copy | egui::Event::Paste(_)));
                 if i.consume_key(egui::Modifiers::COMMAND, egui::Key::A) {
                     self.additional_selection =
                         (0..self.draft.nodes.len()).map(|i| vec![i]).collect();
                     self.selection = self.additional_selection.last().cloned();
                 }
             });
+            if copy {
+                self.copy_selection(&ctx);
+            }
+            if paste {
+                self.error = self.paste_selection(&ctx).err();
+            }
         }
         egui::Panel::left("editor-palette")
             .default_size(190.0)
@@ -717,15 +866,44 @@ impl Editor {
                         ui,
                         "Ctrl/⌘ or Shift-click to select several widgets.",
                     ));
+                    if self.selected_paths().is_empty() {
+                        self.selection_locked = false;
+                    }
+                    ui.add_enabled_ui(!self.selected_paths().is_empty(), |ui| {
+                        ui.checkbox(
+                            &mut self.selection_locked,
+                            crate::i18n::text("Lock selection"),
+                        );
+                    });
                     layer_tree(
                         ui,
                         &self.draft.nodes,
                         &mut Vec::new(),
                         &mut self.selection,
                         &mut self.additional_selection,
+                        &mut self.selection_locked,
                         warnings_telemetry,
                     );
                     ui.horizontal_wrapped(|ui| {
+                        if ui
+                            .add_enabled(
+                                !self.selected_paths().is_empty(),
+                                egui::Button::new(crate::i18n::text("Copy")),
+                            )
+                            .clicked()
+                        {
+                            self.copy_selection(ui.ctx());
+                        }
+                        let can_paste = ui.ctx().data_mut(|data| {
+                            data.get_temp::<std::sync::Arc<Layout>>(Self::clipboard_id())
+                                .is_some()
+                        });
+                        if ui
+                            .add_enabled(can_paste, egui::Button::new(crate::i18n::text("Paste")))
+                            .clicked()
+                        {
+                            self.error = self.paste_selection(ui.ctx()).err();
+                        }
                         if ui.button(crate::i18n::ui_text(ui, "Duplicate")).clicked() {
                             self.duplicate();
                         }
@@ -938,16 +1116,22 @@ impl Editor {
             }
             #[cfg(not(target_arch = "wasm32"))]
             if self.video_background
-                && let Some(progress) = self.map_progress
+                && let Some(telemetry) = telemetry
             {
-                crate::map_loading::show(
-                    ui,
+                let regions = actionlay_render::loading::regions(
                     &self.draft,
-                    canvas,
-                    mode,
                     telemetry,
                     time,
-                    Some(progress),
+                    telemetry.duration(),
+                    self.renderer.hit_boxes(),
+                );
+                crate::map_loading::show_regions(
+                    ui,
+                    canvas,
+                    mode,
+                    &self.draft,
+                    &regions,
+                    self.history_progress,
                 );
             }
             for hit in self.renderer.hit_boxes() {
@@ -1030,7 +1214,17 @@ impl Editor {
                 .rect_filled(handle, 2.0, egui::Color32::LIGHT_BLUE);
             resize_response = Some(
                 ui.interact(handle, egui::Id::new("widget-resize"), egui::Sense::drag())
-                    .on_hover_cursor(egui::CursorIcon::ResizeNwSe),
+                    .on_hover_cursor(egui::CursorIcon::ResizeNwSe)
+                    .on_hover_text(crate::i18n::text(
+                        if matches!(
+                            node_at(&self.draft.nodes, &hit.path),
+                            Some(Node::Known(Widget::Group(_) | Widget::Frame(_)))
+                        ) {
+                            resize::HINT
+                        } else {
+                            "Drag to resize"
+                        },
+                    )),
             );
             if !canvas.contains_rect(rect) {
                 ui.painter().text(
@@ -1044,26 +1238,18 @@ impl Editor {
         }
         let resizing = resize_response.as_ref().is_some_and(|r| r.drag_started());
         if resizing || response.drag_started() || response.clicked() {
-            let hit = if resizing
-                || (response.drag_started()
-                    && selected.is_some_and(|b| {
-                        ctx.pointer_interact_pos()
-                            .is_some_and(|pos| screen(b.rect).contains(pos))
-                    })) {
+            let hit = if resizing {
                 selected.cloned()
             } else {
                 ctx.pointer_interact_pos().and_then(|pos| {
-                    boxes
-                        .iter()
-                        .rev()
-                        .find(|b| screen(b.rect).contains(pos))
-                        .cloned()
+                    let point = (pos - canvas.min) / scale;
+                    self.preview_hit(&boxes, [point.x, point.y], response.drag_started())
                 })
             };
             if let Some(hit) = hit {
                 let additive = ctx.input(|i| i.modifiers.command || i.modifiers.shift);
                 let already_selected = self.selected_paths().contains(&hit.path);
-                if response.clicked() || !already_selected {
+                if !self.selection_locked && (response.clicked() || !already_selected) {
                     select_path(
                         &mut self.selection,
                         &mut self.additional_selection,
@@ -1090,7 +1276,7 @@ impl Editor {
                         moving,
                     });
                 }
-            } else if response.clicked() {
+            } else if response.clicked() && !self.selection_locked {
                 self.selection = None;
                 self.additional_selection.clear();
             }
@@ -1105,7 +1291,12 @@ impl Editor {
             let mut layout = drag.before.clone();
             if let Some(node) = node_at_mut(&mut layout.nodes, &drag.path) {
                 if drag.resize {
-                    resize_node(node, drag.rect, delta / scale, drag.parent);
+                    if ctx.input(|i| i.modifiers.shift) {
+                        let theme = drag.before.theme.clone().unwrap_or_default().resolve();
+                        resize::resize_section(node, drag.rect, delta / scale, drag.parent, &theme);
+                    } else {
+                        resize_node(node, drag.rect, delta / scale, drag.parent);
+                    }
                 } else {
                     let mut rect =
                         union_rects(&drag.moving.iter().map(|hit| hit.rect).collect::<Vec<_>>())
@@ -1266,6 +1457,9 @@ impl Editor {
                 ui,
                 crate::i18n::widget_label(node.type_name()),
             ));
+            if matches!(node, Node::Known(Widget::Group(_) | Widget::Frame(_))) {
+                ui.small(crate::i18n::ui_text(ui, resize::HINT));
+            }
             for warning in metric_warnings(node, telemetry) {
                 ui.colored_label(egui::Color32::YELLOW, crate::i18n::ui_text(ui, warning));
             }
@@ -1547,6 +1741,7 @@ fn layer_tree(
     path: &mut NodePath,
     selected: &mut Option<NodePath>,
     additional: &mut Vec<NodePath>,
+    selection_locked: &mut bool,
     telemetry: Option<&Telemetry>,
 ) {
     for (i, node) in nodes.iter().enumerate() {
@@ -1577,12 +1772,21 @@ fn layer_tree(
         {
             let additive = ui.input(|i| i.modifiers.command || i.modifiers.shift);
             select_path(selected, additional, path.clone(), additive);
+            *selection_locked = false;
         }
         if let Node::Known(w) = node
             && !w.children().is_empty()
         {
             ui.indent(egui::Id::new(path.clone()), |ui| {
-                layer_tree(ui, w.children(), path, selected, additional, telemetry)
+                layer_tree(
+                    ui,
+                    w.children(),
+                    path,
+                    selected,
+                    additional,
+                    selection_locked,
+                    telemetry,
+                )
             });
         }
         path.pop();

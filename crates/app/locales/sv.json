@@ -508,7 +508,7 @@
   "Fit entire route": "Anpassa till hela rutten",
   "Route size": "Ruttstorlek",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Använder hela rutten även när bara den avklarade delen ritas. Zoomnivån är fast under inläsningen.",
-  "Route data could not be fully loaded. Export was not started.": "Alla ruttdata kunde inte läsas in. Exporten startades inte.",
+  "Telemetry data could not be fully loaded. Export was not started.": "Alla telemetridata kunde inte läsas in. Exporten startades inte.",
   "Export cancelled": "Export avbruten",
   "Advanced": "Avancerat",
   "Advanced…": "Avancerat…",
@@ -549,5 +549,10 @@
   "Resolution": "Upplösning",
   "Set preset default": "Återställ förinställt värde",
   "Target bitrate": "Målbithastighet",
-  "Video bitrate (Mbps)": "Videobithastighet (Mbps)"
+  "Video bitrate (Mbps)": "Videobithastighet (Mbps)",
+  "Copy": "Kopiera",
+  "Paste": "Klistra in",
+  "Lock selection": "Lås markering",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Dra för att ändra behållarens storlek. Håll Shift nedtryckt för att även skala alla underordnade element.",
+  "Drag to resize": "Dra för att ändra storlek"
 }

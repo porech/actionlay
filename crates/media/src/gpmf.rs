@@ -18,6 +18,8 @@ pub struct GpmfPacket {
 pub struct ReadProgress {
     pub packets: usize,
     pub total: Option<usize>,
+    /// End timestamp of the last metadata packet read, in source seconds.
+    pub through: Option<f64>,
 }
 impl ReadProgress {
     pub fn fraction(self) -> Option<f32> {
@@ -272,7 +274,11 @@ fn read_range_input_progress(
                 .count()
         })
     };
-    progress(ReadProgress { packets: 0, total });
+    progress(ReadProgress {
+        packets: 0,
+        total,
+        through: Some(start),
+    });
     let mut packets = Vec::new();
     let mut packet = ffmpeg::Packet::empty();
     let mut invalid_in_a_row = 0;
@@ -332,6 +338,7 @@ fn read_range_input_progress(
         progress(ReadProgress {
             packets: packets.len(),
             total,
+            through: Some((ts as f64 + packet.duration().max(0) as f64) * time_base),
         });
         // The MP4 index tells us when the next metadata packet is beyond the
         // requested range; avoid reading that extra payload just to detect it.

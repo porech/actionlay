@@ -508,7 +508,7 @@
   "Fit entire route": "Încadrează întregul traseu",
   "Route size": "Dimensiunea traseului",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Folosește întregul traseu chiar dacă se desenează doar partea parcursă. Zoomul rămâne fix în timpul încărcării.",
-  "Route data could not be fully loaded. Export was not started.": "Nu au putut fi încărcate toate datele traseului. Exportul nu a început.",
+  "Telemetry data could not be fully loaded. Export was not started.": "Nu au putut fi încărcate toate datele de telemetrie. Exportul nu a început.",
   "Export cancelled": "Export anulat",
   "Advanced": "Avansat",
   "Advanced…": "Avansat…",
@@ -549,5 +549,10 @@
   "Resolution": "Rezoluție",
   "Set preset default": "Restabilește valoarea presetării",
   "Target bitrate": "Rată de biți țintă",
-  "Video bitrate (Mbps)": "Rată de biți video (Mbps)"
+  "Video bitrate (Mbps)": "Rată de biți video (Mbps)",
+  "Copy": "Copiază",
+  "Paste": "Lipește",
+  "Lock selection": "Blochează selecția",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Trage pentru a redimensiona containerul. Ține apăsat Shift pentru a scala și toate elementele copil.",
+  "Drag to resize": "Trage pentru a redimensiona"
 }

@@ -508,7 +508,7 @@
   "Fit entire route": "适应整个路线",
   "Route size": "路线大小",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "即使只绘制已完成的部分，也使用整个路线。加载期间使用固定缩放。",
-  "Route data could not be fully loaded. Export was not started.": "无法完整加载路线数据。导出尚未开始。",
+  "Telemetry data could not be fully loaded. Export was not started.": "无法完整加载遥测数据。导出尚未开始。",
   "Export cancelled": "导出已取消",
   "Advanced": "高级",
   "Advanced…": "高级…",
@@ -549,5 +549,10 @@
   "Resolution": "分辨率",
   "Set preset default": "恢复预设默认值",
   "Target bitrate": "目标码率",
-  "Video bitrate (Mbps)": "视频码率 (Mbps)"
+  "Video bitrate (Mbps)": "视频码率 (Mbps)",
+  "Copy": "复制",
+  "Paste": "粘贴",
+  "Lock selection": "锁定选择",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "拖动以调整容器大小。按住 Shift 可同时缩放所有子元素。",
+  "Drag to resize": "拖动以调整大小"
 }

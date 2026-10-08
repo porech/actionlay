@@ -508,7 +508,7 @@
   "Fit entire route": "全ルートに合わせる",
   "Route size": "ルートの大きさ",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "通過済みの区間のみを描画する場合も全ルートを使用します。読み込み中は固定ズームを使用します。",
-  "Route data could not be fully loaded. Export was not started.": "ルートの全データを読み込めませんでした。書き出しは開始されていません。",
+  "Telemetry data could not be fully loaded. Export was not started.": "テレメトリーの全データを読み込めませんでした。書き出しは開始されていません。",
   "Export cancelled": "書き出しをキャンセルしました",
   "Advanced": "詳細設定",
   "Advanced…": "詳細設定…",
@@ -549,5 +549,10 @@
   "Resolution": "解像度",
   "Set preset default": "プリセットの既定値に戻す",
   "Target bitrate": "目標ビットレート",
-  "Video bitrate (Mbps)": "動画ビットレート (Mbps)"
+  "Video bitrate (Mbps)": "動画ビットレート (Mbps)",
+  "Copy": "コピー",
+  "Paste": "貼り付け",
+  "Lock selection": "選択をロック",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "ドラッグしてコンテナのサイズを変更。Shiftを押すとすべての子要素も拡大・縮小します。",
+  "Drag to resize": "ドラッグしてサイズを変更"
 }

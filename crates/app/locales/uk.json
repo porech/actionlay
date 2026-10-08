@@ -508,7 +508,7 @@
   "Fit entire route": "Умістити весь маршрут",
   "Route size": "Розмір маршруту",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Використовує весь маршрут, навіть коли показано лише пройдену частину. Під час завантаження масштаб залишається фіксованим.",
-  "Route data could not be fully loaded. Export was not started.": "Не вдалося повністю завантажити дані маршруту. Експорт не розпочато.",
+  "Telemetry data could not be fully loaded. Export was not started.": "Не вдалося повністю завантажити дані телеметрії. Експорт не розпочато.",
   "Export cancelled": "Експорт скасовано",
   "Advanced": "Додатково",
   "Advanced…": "Додатково…",
@@ -549,5 +549,10 @@
   "Resolution": "Роздільність",
   "Set preset default": "Відновити значення передналаштування",
   "Target bitrate": "Цільовий бітрейт",
-  "Video bitrate (Mbps)": "Бітрейт відео (Mbps)"
+  "Video bitrate (Mbps)": "Бітрейт відео (Mbps)",
+  "Copy": "Копіювати",
+  "Paste": "Вставити",
+  "Lock selection": "Заблокувати виділення",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Перетягніть, щоб змінити розмір контейнера. Утримуйте Shift, щоб масштабувати й усі дочірні елементи.",
+  "Drag to resize": "Перетягніть для зміни розміру"
 }

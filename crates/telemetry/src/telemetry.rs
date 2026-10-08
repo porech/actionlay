@@ -125,6 +125,8 @@ pub struct Telemetry {
     complete: bool,
     imu_acceleration: Option<f64>,
     loaded_ranges: Option<Vec<(f64, f64)>>,
+    // Kept even when external metrics lift the per-value camera read restriction.
+    source_read_ranges: Option<Vec<(f64, f64)>>,
     cumulative_until: Option<f64>,
     duration: f64,
     start_utc: Option<DateTime<Utc>>,
@@ -606,6 +608,7 @@ impl Telemetry {
         } else {
             None
         };
+        tel.source_read_ranges = Some(ranges.clone());
         tel.loaded_ranges = Some(ranges);
         tel.complete = false;
         Ok(tel)
@@ -613,7 +616,21 @@ impl Telemetry {
 
     /// Unread metadata intervals in [0, end], for indexed route backfill.
     pub fn unread_ranges(&self, end: f64) -> Vec<(f64, f64)> {
-        let Some(ranges) = &self.loaded_ranges else {
+        Self::missing_intervals(self.loaded_ranges.as_deref(), end)
+    }
+
+    /// Metadata read coverage stays separate from linked activity values.
+    pub fn unread_source_ranges(&self, end: f64) -> Vec<(f64, f64)> {
+        Self::missing_intervals(
+            self.source_read_ranges
+                .as_deref()
+                .or(self.loaded_ranges.as_deref()),
+            end,
+        )
+    }
+
+    fn missing_intervals(ranges: Option<&[(f64, f64)]>, end: f64) -> Vec<(f64, f64)> {
+        let Some(ranges) = ranges else {
             return Vec::new();
         };
         let mut missing = Vec::new();
@@ -631,6 +648,50 @@ impl Telemetry {
             missing.push((cursor, end));
         }
         missing
+    }
+
+    /// Record validated indexed reads, including source intervals with no samples.
+    /// Missing telemetry values stay missing; only metadata-read coverage changes.
+    pub fn record_read_ranges(&mut self, read: &[(f64, f64)], duration: f64) {
+        if self.complete {
+            return;
+        }
+        self.duration = duration;
+        let ranges = self.loaded_ranges.get_or_insert_with(Vec::new);
+        ranges.extend_from_slice(read);
+        ranges.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let mut merged: Vec<(f64, f64)> = Vec::new();
+        for &(start, end) in ranges.iter() {
+            if let Some(last) = merged.last_mut().filter(|last| start <= last.1 + 0.001) {
+                last.1 = last.1.max(end);
+            } else {
+                merged.push((start, end));
+            }
+        }
+        *ranges = merged;
+        self.source_read_ranges = Some(ranges.clone());
+    }
+
+    /// Source is open but metadata has not yet been read.
+    pub fn pending(duration: f64) -> Self {
+        let mut telemetry = Self::empty(duration);
+        telemetry.complete = false;
+        telemetry.loaded_ranges = Some(Vec::new());
+        telemetry.source_read_ranges = Some(Vec::new());
+        telemetry
+    }
+
+    /// Fraction of a source interval that has been read (not metric availability).
+    pub fn read_fraction(&self, start: f64, end: f64) -> f64 {
+        if self.complete || end <= start {
+            return 1.0;
+        }
+        let missing: f64 = self
+            .unread_source_ranges(end)
+            .into_iter()
+            .map(|(a, b)| (b - a.max(start)).max(0.0))
+            .sum();
+        (1.0 - missing / (end - start)).clamp(0.0, 1.0)
     }
 
     /// Whether metadata has been loaded continuously from the start through `t`.
@@ -769,6 +830,7 @@ impl Telemetry {
             complete: true,
             imu_acceleration,
             loaded_ranges: None,
+            source_read_ranges: None,
             cumulative_until: None,
             duration: ex.duration,
             start_utc,
@@ -788,6 +850,7 @@ impl Telemetry {
             complete: true,
             imu_acceleration: None,
             loaded_ranges: None,
+            source_read_ranges: None,
             cumulative_until: None,
             duration,
             start_utc: None,
@@ -1395,5 +1458,21 @@ mod native_orientation_tests {
             assert_eq!(tel.sample(0.005).get(Metric::Lat), Value::Absent);
             assert!(tel.sample(0.5).get(metric).present().is_none());
         }
+    }
+}
+
+#[cfg(test)]
+mod read_coverage_tests {
+    use super::*;
+    #[test]
+    fn linking_activity_does_not_mark_unread_camera_metadata_as_loaded() {
+        let mut camera = Telemetry::pending(30.0);
+        camera.record_read_ranges(&[(0.0, 15.0)], 30.0);
+        let linked = camera.merge_external(&Telemetry::preview(), 30.0);
+        assert_eq!(linked.read_fraction(10.0, 20.0), 0.5);
+        assert_eq!(linked.unread_source_ranges(30.0), vec![(15.0, 30.0)]);
+        assert!(!linked.is_complete());
+        // Activity values are still available outside the camera-read interval.
+        assert!(linked.sample_metric(Metric::Hr, 20.0).present().is_some());
     }
 }

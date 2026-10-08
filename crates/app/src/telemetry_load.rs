@@ -75,11 +75,16 @@ pub fn load(path: &Path, duration: f64) -> Loaded {
 
 /// The latest snapshot only; a hidden window cannot accumulate heavy snapshots.
 /// Dropping the handle cancels its decoder, without blocking another video's load.
-type RouteRequest = (actionlay_media::chapters::Timeline, Vec<(f64, f64)>, u64);
+type RouteRequest = (
+    actionlay_media::chapters::Timeline,
+    Vec<(f64, f64)>,
+    bool,
+    u64,
+);
 
 enum RouteEvent {
     Data(Result<TelemetryEvent, String>),
-    Finished(u64),
+    Finished(u64, Vec<(f64, f64)>),
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -89,6 +94,8 @@ pub struct RouteProgress {
     pub decoded: bool,
     pub finished: bool,
     pub failed: bool,
+    pub read_start: f64,
+    pub read_end: f64,
 }
 
 pub struct StreamLoad {
@@ -100,10 +107,23 @@ pub struct StreamLoad {
 }
 
 impl StreamLoad {
+    #[cfg(test)]
     pub fn request_route(
         &self,
         timeline: actionlay_media::chapters::Timeline,
         ranges: Vec<(f64, f64)>,
+    ) -> bool {
+        let full = ranges
+            .iter()
+            .any(|&(_, end)| end >= timeline.duration - 0.001);
+        self.request_history(timeline, ranges, full)
+    }
+
+    pub fn request_history(
+        &self,
+        timeline: actionlay_media::chapters::Timeline,
+        ranges: Vec<(f64, f64)>,
+        full: bool,
     ) -> bool {
         let Some(tx) = &self.route_requests else {
             return false;
@@ -120,7 +140,7 @@ impl StreamLoad {
             });
             request
         };
-        if tx.send((timeline, ranges, request)).is_err() {
+        if tx.send((timeline, ranges, full, request)).is_err() {
             if let Some(progress) = self.route_progress.lock().unwrap().as_mut() {
                 progress.failed = true;
             }
@@ -164,15 +184,12 @@ pub fn spawn(
     let reader_wake = wake.clone();
     std::thread::spawn(move || {
         let mut readers = BTreeMap::new();
-        while let Ok((timeline, ranges, request)) = route_rx.recv() {
+        while let Ok((timeline, ranges, full, request)) = route_rx.recv() {
             if route_cancelled.load(Ordering::SeqCst) {
                 return;
             }
             // A full-route request needs an explicit validated completion event,
             // not an optional MP4 packet count or playback reaching EOF.
-            let full = ranges
-                .iter()
-                .any(|(_, end)| *end >= timeline.duration - 0.001);
             let ranges = if full {
                 vec![(0.0, timeline.duration)]
             } else {
@@ -190,7 +207,7 @@ pub fn spawn(
             let mut completed_work = 0.0;
             let mut last_wake = Instant::now();
             let mut failed = false;
-            for (start, end) in ranges {
+            for &(start, end) in &ranges {
                 for chapter in &timeline.chapters {
                     if chapter.start > end || chapter.start + chapter.info.duration < start {
                         continue;
@@ -205,7 +222,7 @@ pub fn spawn(
                                 Ok(reader) => e.insert(reader),
                                 Err(e) => {
                                     let _ = extra_tx.send(RouteEvent::Data(Err(format!(
-                                        "Route metadata could not be opened: {e}"
+                                        "Historical metadata could not be opened: {e}"
                                     ))));
                                     failed = true;
                                     continue;
@@ -237,6 +254,9 @@ pub fn spawn(
                             *reader_progress.lock().unwrap() = Some(RouteProgress {
                                 fraction,
                                 request,
+                                read_start: start.max(chapter.start),
+                                read_end: chapter.start
+                                    + progress.through.unwrap_or((start - chapter.start).max(0.0)),
                                 ..Default::default()
                             });
                             if last_wake.elapsed() >= Duration::from_millis(100) {
@@ -265,7 +285,7 @@ pub fn spawn(
                         Err(e) => {
                             failed = true;
                             let _ = extra_tx.send(RouteEvent::Data(Err(format!(
-                                "Route metadata could not be read: {e}"
+                                "Historical metadata could not be read: {e}"
                             ))));
                         }
                     }
@@ -282,8 +302,13 @@ pub fn spawn(
                 decoded: false,
                 finished: true,
                 failed,
+                read_start: ranges.first().map_or(0.0, |r| r.0),
+                read_end: ranges.last().map_or(0.0, |r| r.1),
             });
-            let _ = extra_tx.send(RouteEvent::Finished(request));
+            let _ = extra_tx.send(RouteEvent::Finished(
+                request,
+                if failed { Vec::new() } else { ranges },
+            ));
             reader_busy.store(false, Ordering::SeqCst);
             reader_wake();
         }
@@ -306,13 +331,15 @@ pub fn spawn(
             let mut last = Instant::now();
             let mut route_warning = None;
             let mut finished_request = None;
+            let mut read_ranges = Vec::new();
             loop {
                 if cancelled.load(Ordering::SeqCst) {
                     return;
                 }
                 for event in extra_rx.try_iter() {
                     let event = match event {
-                        RouteEvent::Finished(request) => {
+                        RouteEvent::Finished(request, ranges) => {
+                            read_ranges.extend(ranges);
                             finished_request = Some(request);
                             dirty = true;
                             continue;
@@ -380,10 +407,13 @@ pub fn spawn(
                         Telemetry::from_gpmf_packets_progressive(&raw)
                     };
                     let update = match telemetry {
-                        Ok(telemetry) => Loaded {
-                            telemetry,
-                            warning: route_warning.take(),
-                        },
+                        Ok(mut telemetry) => {
+                            telemetry.record_read_ranges(&read_ranges, duration);
+                            Loaded {
+                                telemetry,
+                                warning: route_warning.take(),
+                            }
+                        }
                         Err(e) => Loaded {
                             telemetry: Telemetry::empty(duration),
                             warning: Some(format!("telemetry not decoded: {e}")),
@@ -633,6 +663,46 @@ pub fn spawn_activity(
 #[cfg(test)]
 mod route_tests {
     use super::*;
+    #[test]
+    fn historical_tail_and_backward_seek_do_not_force_full_track_loading() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/gopro/hero5.mp4");
+        if !path.exists() {
+            return;
+        }
+        let timeline = actionlay_media::chapters::Timeline::open(&path, false).unwrap();
+        let (_tx, rx) = mpsc::channel();
+        let loader = spawn(rx, timeline.duration, None, || {});
+        let start = timeline.duration - 2.0;
+        assert!(loader.request_history(timeline.clone(), vec![(start, timeline.duration)], false));
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(update) = loader.take_update()
+                && update.telemetry.read_fraction(start, timeline.duration) == 1.0
+            {
+                assert!(!update.telemetry.is_complete());
+                assert!(!update.telemetry.is_loaded_through(start));
+                break;
+            }
+            assert!(Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(loader.request_history(timeline.clone(), vec![(5.0, 8.0)], false));
+        loop {
+            if let Some(update) = loader.take_update()
+                && update.telemetry.read_fraction(5.0, 8.0) == 1.0
+            {
+                assert!(!update.telemetry.is_complete());
+                assert_eq!(
+                    update.telemetry.read_fraction(start, timeline.duration),
+                    1.0
+                );
+                break;
+            }
+            assert!(Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
     #[test]
     fn full_backfill_completes_without_packet_count_or_playback_eof() {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/gopro/hero5.mp4");

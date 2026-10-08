@@ -508,7 +508,7 @@
   "Fit entire route": "Teljes útvonal igazítása",
   "Route size": "Útvonal mérete",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "A teljes útvonalat használja akkor is, ha csak a megtett szakasz látszik. Betöltés közben a nagyítás rögzített.",
-  "Route data could not be fully loaded. Export was not started.": "Az útvonal összes adata nem tölthető be. Az exportálás nem indult el.",
+  "Telemetry data could not be fully loaded. Export was not started.": "A telemetria összes adata nem tölthető be. Az exportálás nem indult el.",
   "Export cancelled": "Exportálás megszakítva",
   "Advanced": "Speciális",
   "Advanced…": "Speciális…",
@@ -549,5 +549,10 @@
   "Resolution": "Felbontás",
   "Set preset default": "Előbeállítás értékének visszaállítása",
   "Target bitrate": "Célbitráta",
-  "Video bitrate (Mbps)": "Videó bitrátája (Mbps)"
+  "Video bitrate (Mbps)": "Videó bitrátája (Mbps)",
+  "Copy": "Másolás",
+  "Paste": "Beillesztés",
+  "Lock selection": "Kijelölés zárolása",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Húzza a tároló átméretezéséhez. Tartsa lenyomva a Shift billentyűt az összes gyermek arányos méretezéséhez.",
+  "Drag to resize": "Húzza az átméretezéshez"
 }

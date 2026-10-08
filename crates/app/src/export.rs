@@ -327,15 +327,63 @@ fn capture_export_units(
     Arc::new(captured)
 }
 
-fn route_data_required(nodes: &[actionlay_layout::model::Node]) -> bool {
-    use actionlay_layout::model::{MapRoute, Node, Widget};
-    nodes.iter().any(|node| match node {
-        Node::Known(widget) if widget.common().visible != Some(false) => {
-            matches!(widget, Widget::Map(map) if map.needs_full_track() || map.route_mode.unwrap_or_default() != MapRoute::None)
-                || route_data_required(widget.children())
+fn full_data_required(layout: &Layout) -> bool {
+    layout.history_requirements(0.0, 1.0).iter().any(|r| r.full)
+}
+
+/// A sequential metadata reader owned by the export decoder. Frame jobs capture
+/// an immutable telemetry snapshot after their own history has been read.
+struct ExportTelemetry {
+    reader: actionlay_media::gpmf::GpmfReader,
+    raw: std::collections::BTreeMap<i64, RawPacket>,
+    until: Option<f64>,
+    telemetry: Arc<Telemetry>,
+    duration: f64,
+}
+impl ExportTelemetry {
+    fn open(source: &Path, duration: f64, cancel: Arc<AtomicBool>) -> Result<Self> {
+        Ok(Self {
+            reader: actionlay_media::gpmf::GpmfReader::open(source, cancel)?,
+            raw: Default::default(),
+            until: None,
+            telemetry: Arc::new(Telemetry::empty(duration)),
+            duration,
+        })
+    }
+    fn prepare(&mut self, layout: &Layout, time: f64) -> Result<Arc<Telemetry>> {
+        let ranges = layout.history_requirements(time, self.duration);
+        // Small forward context keeps derived GPS values stable near frame boundaries.
+        let end = ranges
+            .iter()
+            .map(|r| r.end)
+            .fold((time + 3.0).min(self.duration), f64::max);
+        if self.until.is_some_and(|until| until >= end) {
+            return Ok(self.telemetry.clone());
         }
-        _ => false,
-    })
+        let start = self.until.unwrap_or_else(|| {
+            ranges
+                .iter()
+                .map(|r| r.start)
+                .fold((time - 3.0).max(0.0), f64::min)
+        });
+        let end = (end + 1.0).min(self.duration);
+        let packets = self.reader.read_range(start, end)?;
+        for packet in crate::telemetry_load::to_raw(packets) {
+            self.raw
+                .entry((packet.pts * 1e6).round() as i64)
+                .or_insert(packet);
+        }
+        let raw: Vec<_> = self.raw.values().cloned().collect();
+        let mut telemetry = if raw.is_empty() {
+            Telemetry::empty(self.duration)
+        } else {
+            Telemetry::from_gpmf_packets_progressive(&raw)?
+        };
+        telemetry.record_read_ranges(&[(start, end)], self.duration);
+        self.telemetry = Arc::new(telemetry);
+        self.until = Some(end);
+        Ok(self.telemetry.clone())
+    }
 }
 
 pub fn run(
@@ -372,33 +420,37 @@ pub fn run(
         status: "Loading metadata before export…".into(),
         ..Default::default()
     });
-    let route_required = route_data_required(&request.layout.nodes);
+    let full_required = full_data_required(&request.layout);
     let mut last_update = Instant::now();
-    let read = actionlay_media::gpmf::read_gpmf_packets_with_progress(
-        &request.source,
-        &cancel,
-        route_required,
-        |progress| {
-            if progress.packets == 0
-                || last_update.elapsed() >= std::time::Duration::from_millis(100)
-            {
-                notify(Progress {
-                    preparing_metadata: true,
-                    metadata_fraction: progress.fraction(),
-                    status: "Loading metadata before export…".into(),
-                    elapsed: started.elapsed().as_secs_f64(),
-                    ..Default::default()
-                });
-                last_update = Instant::now();
-            }
-        },
-    );
+    let read = if full_required {
+        actionlay_media::gpmf::read_gpmf_packets_with_progress(
+            &request.source,
+            &cancel,
+            full_required,
+            |progress| {
+                if progress.packets == 0
+                    || last_update.elapsed() >= std::time::Duration::from_millis(100)
+                {
+                    notify(Progress {
+                        preparing_metadata: true,
+                        metadata_fraction: progress.fraction(),
+                        status: "Loading metadata before export…".into(),
+                        elapsed: started.elapsed().as_secs_f64(),
+                        ..Default::default()
+                    });
+                    last_update = Instant::now();
+                }
+            },
+        )
+    } else {
+        Ok(Vec::new())
+    };
     let packets = match read {
         Ok(packets) => packets,
         Err(_) if cancel.load(Ordering::Relaxed) => Vec::new(),
-        Err(error) if route_required => {
-            log::warn!("complete export route metadata: {error}");
-            bail!("Route data could not be fully loaded. Export was not started.");
+        Err(error) if full_required => {
+            log::warn!("complete export history metadata: {error}");
+            bail!("Telemetry data could not be fully loaded. Export was not started.");
         }
         Err(error) => return Err(error.into()),
     };
@@ -439,9 +491,9 @@ pub fn run(
         ) {
             Ok(telemetry) => telemetry,
             Err(error) => {
-                if route_required {
-                    log::warn!("complete export route decoding: {error}");
-                    bail!("Route data could not be fully loaded. Export was not started.");
+                if full_required {
+                    log::warn!("complete export history decoding: {error}");
+                    bail!("Telemetry data could not be fully loaded. Export was not started.");
                 }
                 log::warn!("export telemetry unavailable: {error}");
                 Telemetry::empty(info.duration)
@@ -467,7 +519,8 @@ pub fn run(
     let workers = std::thread::available_parallelism()
         .map_or(2, |n| n.get())
         .clamp(1, 4);
-    let (jobs_tx, jobs_rx) = crossbeam_channel::bounded::<(usize, Nv12Frame)>(workers);
+    let (jobs_tx, jobs_rx) =
+        crossbeam_channel::bounded::<(usize, Nv12Frame, Arc<Telemetry>)>(workers);
     let (results_tx, results_rx) = crossbeam_channel::bounded(workers);
     // Tokens bound the reorder buffer as well as the work queues.
     let (tokens_tx, tokens_rx) = crossbeam_channel::bounded(workers * 2);
@@ -484,7 +537,15 @@ pub fn run(
         let c = cancel.clone();
         let source = request.source.clone();
         let start = request.start;
-        let decoder = scope.spawn(move || {
+        let export_layout = request.layout.clone();
+        let full_telemetry = telemetry.clone();
+        let duration = info.duration;
+        let decoder = scope.spawn(move || -> Result<()> {
+            let mut progressive = if full_required {
+                None
+            } else {
+                Some(ExportTelemetry::open(&source, duration, c.clone())?)
+            };
             let mut index = 0;
             media::decode(&source, start, end, c.clone(), |frame| {
                 while !c.load(Ordering::Relaxed) {
@@ -497,18 +558,25 @@ pub fn run(
                 if c.load(Ordering::Relaxed) {
                     return Ok(());
                 }
-                if jobs_tx.send((index, frame)).is_err() {
+                let telemetry = if let Some(loader) = &mut progressive {
+                    loader
+                        .prepare(&export_layout, frame.pts)
+                        .map_err(|e| actionlay_media::MediaError::Io(e.to_string()))?
+                } else {
+                    full_telemetry.clone()
+                };
+                if jobs_tx.send((index, frame, telemetry)).is_err() {
                     return Ok(());
                 }
                 index += 1;
                 Ok(())
-            })
+            })?;
+            Ok(())
         });
         for _ in 0..workers {
             let jobs = jobs_rx.clone();
             let results = results_tx.clone();
             let layout = request.layout.clone();
-            let telemetry = telemetry.clone();
             let maps = request.maps.clone();
             let settings = request.settings.clone();
             let scale = request.scale;
@@ -519,7 +587,7 @@ pub fn run(
                 renderer.set_scale_mode(scale);
                 let mut target =
                     Pixmap::new(info.video.width, info.video.height).expect("probed dimensions");
-                while let Ok((index, frame)) = jobs.recv() {
+                while let Ok((index, frame, telemetry)) = jobs.recv() {
                     let pixels = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                         renderer.render_telemetry_into(&layout, &telemetry, frame.pts, &mut target);
                         let background = if settings.mode == Mode::Video {
@@ -630,7 +698,11 @@ pub fn run(
             .join()
             .map_err(|_| anyhow::anyhow!("decoder thread failed"))?;
         processing?;
-        decoding?;
+        if let Err(error) = decoding
+            && !cancel.load(Ordering::Relaxed)
+        {
+            return Err(error);
+        }
         Ok(())
     });
     result?;
@@ -912,19 +984,51 @@ mod tests {
     }
 
     #[test]
+    fn full_journey_charts_require_preloading_without_a_map_but_past_widgets_do_not() {
+        let full = Layout::from_json(r#"{"version":1,"nodes":[{"type":"frame","size":[500,300],"children":[{"type":"gradient_chart","metric":"alt","journey":true}]}]}"#).unwrap().layout;
+        assert!(full_data_required(&full));
+        let past = Layout::from_json(r#"{"version":1,"nodes":[{"type":"gradient_chart","metric":"alt","seconds":60},{"type":"g_meter","show_peaks":true},{"type":"metric","metric":"odo"},{"type":"map","route_mode":"past"}]}"#).unwrap().layout;
+        assert!(!full_data_required(&past));
+    }
+
+    #[test]
+    fn progressive_export_reads_only_the_needed_window_then_advances_without_future_preload() {
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/gopro/hero5.mp4");
+        if !source.exists() {
+            return;
+        }
+        let duration = actionlay_media::probe::probe(&source).unwrap().duration;
+        let layout = Layout::from_json(
+            r#"{"version":1,"nodes":[{"type":"gradient_chart","metric":"alt","seconds":2}]}"#,
+        )
+        .unwrap()
+        .layout;
+        let mut loader =
+            ExportTelemetry::open(&source, duration, Arc::new(AtomicBool::new(false))).unwrap();
+        let first = loader.prepare(&layout, 10.0).unwrap();
+        assert!(!first.is_complete());
+        assert!(loader.until.unwrap() < duration);
+        assert!(loader.raw.values().all(|p| p.pts > 5.0 && p.pts < 15.0));
+        let second = loader.prepare(&layout, 15.0).unwrap();
+        assert!(!second.is_complete());
+        assert!(loader.until.unwrap() < duration);
+        assert!(loader.raw.values().all(|p| p.pts < 20.0));
+    }
+
+    #[test]
     fn relative_zoom_loads_the_whole_route_without_drawing_it() {
         let layout = Layout::from_json(
             r#"{"version":1,"nodes":[{"type":"map","zoom_mode":"route","route_mode":"none"}]}"#,
         )
         .unwrap()
         .layout;
-        assert!(route_data_required(&layout.nodes));
+        assert!(full_data_required(&layout));
         let layout = Layout::from_json(
             r#"{"version":1,"nodes":[{"type":"map","zoom_mode":"fixed","route_mode":"none"}]}"#,
         )
         .unwrap()
         .layout;
-        assert!(!route_data_required(&layout.nodes));
+        assert!(!full_data_required(&layout));
     }
 
     #[test]

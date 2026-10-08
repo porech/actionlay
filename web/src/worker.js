@@ -32,21 +32,28 @@ async function run({ id, type, ...data }) {
     metadataOperation = new AbortController();
     duration = data.duration;
     reader = await openGpmf(file, core, duration, metadataOperation.signal);
-    if (reader) reader.onPublish = () => self.postMessage({telemetryUpdated:true});
+    if (reader?.samples.length) reader.onPublish = () => self.postMessage({telemetryUpdated:true});
+    else core.finish_telemetry(duration);
     result = reader?.samples.length ?? 0;
     requestTelemetry(0, true);
   } else if (type === 'render') {
     requestTelemetry(data.time);
     const pixels = straightRgba(core.render(data.time, data.width, data.height));
-    self.postMessage({ id, result: {pixels, maps: JSON.parse(core.map_regions(data.width, data.height))} }, [pixels.buffer]);
+    self.postMessage({ id, result: {pixels, maps: JSON.parse(core.map_regions(data.width, data.height, data.time))} }, [pixels.buffer]);
     return;
   } else if (type === 'export') {
     if (!file) throw new Error('Open a video first.');
     operation = new AbortController();
     try {
-      await reader?.readComplete(operation.signal);
+      if (core.needs_full_history()) await reader?.readComplete(operation.signal);
       operation.signal.throwIfAborted();
-      result = await exportVideo(file, core, data.options, operation.signal, progress => self.postMessage({ progress })); }
+      result = await exportVideo(file, core, data.options, operation.signal, progress => self.postMessage({ progress }), async time => {
+        if (!reader || core.needs_full_history()) return;
+        // Export advances monotonically; recover the required prefix/window before committing each frame.
+        await reader.requestTime(time, false, operation.signal);
+        await reader.requestHistory(JSON.parse(core.history_ranges(time, duration)), undefined, operation.signal);
+        operation.signal.throwIfAborted();
+      }); }
     finally { operation = null; }
   }
   self.postMessage({ id, result });
@@ -59,7 +66,7 @@ function requestTelemetry(time, seek = false) {
     if (error.name !== 'AbortError' && reader === current) self.postMessage({metadataError:String(error.message ?? error)});
   };
   current.requestTime(time, seek).catch(report);
-  current.requestRoute(core.route_read_until(time, duration), (fraction,count,total,active) => {
+  current.requestHistory(JSON.parse(core.history_ranges(time, duration)), (fraction,count,total,active) => {
     if (reader === current) self.postMessage({progress:{metadata:fraction,count,total,active}});
   }).catch(report);
 }

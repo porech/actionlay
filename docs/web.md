@@ -33,13 +33,19 @@ for cross-origin isolation/SharedArrayBuffer. FFmpeg is not needed for this buil
   telemetry rather than the currently playing video.
 - A dedicated Web Worker reads the MP4 index, then only the GPMF sample ranges.
   Telemetry is published progressively during playback; seeking prioritises indexed
-  samples at the requested point. An independent route reader backfills the full
-  track only if a map in the layout needs it; seeks never move its cursor. Past-only
-  routes backfill just their requested prefix. Both readers share a packet cache.
-  Full-route maps show a percentage spinner until the complete track is available.
+  samples at the requested point. An independent history reader recovers the
+  intervals declared by `actionlay-layout::history`: full source for journey charts
+  and fitted/full-route maps, windows for charts, and prefixes for cumulative
+  metrics, filtered compasses and G-meter calibration/peaks. Full reads continue
+  independently of playback seeks; finite windows follow the current requirements.
+  Both readers share a packet cache. Every historical widget shows its own
+  percentage spinner until its required data is ready. Read coverage is distinct
+  from missing metric values; loading indicators are never part of export pixels.
   It renders previews and runs export. Mediabunny supplies browser demuxing,
   WebCodecs decoding/encoding and MP4 muxing. Export awaits backpressure instead
-  of keeping a decoded movie in memory.
+  of keeping a decoded movie in memory. Export preloads and validates full metadata
+  when any visible widget requires the full source; otherwise it acquires the
+  necessary history before each frame while advancing sequentially.
 - Playback uses a native HTML video element with shared fullscreen controls for
   the video, overlays and map loaders. `requestVideoFrameCallback` provides
   presentation time where available; preview overlays are rendered at up to 25 Hz.

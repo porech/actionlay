@@ -508,7 +508,7 @@
   "Fit entire route": "Hele route inpassen",
   "Route size": "Routegrootte",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Gebruikt de hele route, ook als alleen het afgelegde deel wordt getekend. Tijdens het laden blijft de zoom vast.",
-  "Route data could not be fully loaded. Export was not started.": "De routegegevens konden niet volledig worden geladen. De export is niet gestart.",
+  "Telemetry data could not be fully loaded. Export was not started.": "De telemetriegegevens konden niet volledig worden geladen. De export is niet gestart.",
   "Export cancelled": "Export geannuleerd",
   "Advanced": "Geavanceerd",
   "Advanced…": "Geavanceerd…",
@@ -549,5 +549,10 @@
   "Resolution": "Resolutie",
   "Set preset default": "Voorinstellingswaarde herstellen",
   "Target bitrate": "Doelbitrate",
-  "Video bitrate (Mbps)": "Videobitrate (Mbps)"
+  "Video bitrate (Mbps)": "Videobitrate (Mbps)",
+  "Copy": "Kopiëren",
+  "Paste": "Plakken",
+  "Lock selection": "Selectie vergrendelen",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Sleep om de container te vergroten of verkleinen. Houd Shift ingedrukt om alle onderliggende elementen mee te schalen.",
+  "Drag to resize": "Sleep om de grootte te wijzigen"
 }

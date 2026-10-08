@@ -76,3 +76,33 @@ test('removing the route requirement pauses background reads and keeps their cac
   await reader.requestRoute(10);
   assert.equal(new Set(order).size,10); assert.equal(order.length,10);
 });
+
+test('history seeks read the requested window independently, without scanning the prefix or future', async () => {
+  const order = [], validated = [];
+  const reader = await openGpmf(metadataFile(100), {
+    add_packet(pts) {order.push(pts);}, update_telemetry() {}, finish_telemetry() {assert.fail('window completed the source');},
+    record_history_read(start,end) {validated.push([start,end]);},
+  }, 100);
+  await reader.requestTime(70,true);
+  await reader.requestHistory([[60,70]]);
+  assert.deepEqual(validated,[[60,70]]);
+  assert(order.every(t => t>=60 && t<=70));
+  await reader.requestTime(25,true);
+  await reader.requestHistory([[15,25]]);
+  assert.deepEqual(validated,[[60,70],[15,25]]);
+  assert(order.every(t => (t>=60&&t<=70)||(t>=15&&t<=25)));
+  assert.equal(order.length,new Set(order).size);
+});
+
+test('cancelling export history stops the read and a later preview can resume it', async () => {
+  const controller=new AbortController(), order=[];
+  const reader=await openGpmf(metadataFile(50), {
+    add_packet(pts) {order.push(pts);}, update_telemetry() {}, finish_telemetry() {},
+  },50);
+  await assert.rejects(reader.requestHistory([[0,40]],(_,count,__,active) => {
+    if(count===1 && active) controller.abort();
+  },controller.signal),{name:'AbortError'});
+  assert.equal(order.length,1);
+  await reader.requestHistory([[0,40]]);
+  assert.equal(order.length,40);
+});

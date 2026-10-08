@@ -4,6 +4,7 @@ mod dials;
 pub mod fonts;
 mod history;
 mod icons;
+pub mod loading;
 mod scene;
 mod shapes;
 mod text;

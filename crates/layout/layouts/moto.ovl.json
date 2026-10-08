@@ -43,66 +43,12 @@
       ]
     },
     {
-      "id": "gps",
-      "type": "frame",
-      "anchor": "top-right",
-      "size": [
-        330,
-        112
-      ],
-      "children": [
-        {
-          "id": "gps-lock",
-          "type": "gps_lock_icon",
-          "anchor": "left",
-          "offset": [
-            18,
-            0
-          ],
-          "size": 44,
-          "stale_secs": 3
-        },
-        {
-          "id": "lat",
-          "type": "metric",
-          "metric": "lat",
-          "anchor": "top-right",
-          "offset": [
-            -20,
-            16
-          ],
-          "format": "{value:.5}°",
-          "size": 32,
-          "weight": "medium",
-          "stale_secs": 3
-        },
-        {
-          "id": "lon",
-          "type": "metric",
-          "metric": "lon",
-          "anchor": "bottom-right",
-          "offset": [
-            -20,
-            -16
-          ],
-          "format": "{value:.5}°",
-          "size": 32,
-          "weight": "medium",
-          "stale_secs": 3
-        }
-      ],
-      "offset_relative": [
-        -0.018,
-        0.025
-      ]
-    },
-    {
       "id": "course",
       "type": "frame",
       "anchor": "top-right",
       "offset_relative": [
         -0.018,
-        0.16
+        0.025
       ],
       "size": [
         206,
@@ -397,7 +343,7 @@
       "anchor": "top-right",
       "offset_relative": [
         -0.15,
-        0.16
+        0.025
       ],
       "size": [
         300,

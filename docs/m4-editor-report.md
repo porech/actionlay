@@ -12,6 +12,22 @@ unknown extended group is refused to avoid discarding its fields. Single-widget
 resizing and paint-order controls remain available. Properties edit the primary
 selection. Each drag is one undo operation.
 
+The Layers tree has a **Lock selection** toggle. While enabled, preview clicks
+cannot select descendants, deselect a section, or alter a multiple selection.
+Moving, resizing and copying still operate on the selected roots. Selecting a
+level in the tree releases the lock. This is editor session state, shared by the
+desktop and browser editor, and is not saved in layout files.
+
+The application clipboard survives closing an editor and opening another layout,
+on desktop and web. Select a frame or group in the Layers tree to copy the whole
+section, including its children, or use Ctrl/Command-click for several widgets.
+Use Copy/Paste buttons or Ctrl/Command+C/V, then open the destination layout and
+paste. Pasted sections become independent root widgets and can be moved, styled,
+undone and redone. Attached assets accompany the copy; conflicting asset paths
+are renamed without replacing destination assets. Inherited styles use the
+receiving layout's theme. The clipboard lasts for the application/browser-page
+session and is separate from the operating system's text clipboard.
+
 Optional snapping uses edges and centres of other widgets and the preview root,
 with an eight-screen-pixel tolerance and yellow guides. Alt temporarily bypasses
 snapping. Multiple selections move as one bounding box. Automatic choice among
@@ -48,3 +64,13 @@ the Windows build. Linux and macOS were not tested locally.
 
 Build and check logs accompany the local executable. With automated checks and
 the user's Windows interaction verification complete, milestone M4 is closed.
+
+Container resize has two modes on desktop and web: drag the corner handle to
+change only the container bounds, or hold Shift while dragging to scale the
+entire section proportionally, including nested children, text sizes and
+explicit styles. The hint appears in container properties and on the handle.
+Shift can be pressed or released during the gesture; each preview is calculated
+from the original layout and the entire gesture is one undo operation. Scaling
+writes ordinary widget parameters, so saved layouts need no new runtime format.
+Map labels with automatic sizes retain their standard attribution/empty-state
+sizes; explicit label sizes are scaled.

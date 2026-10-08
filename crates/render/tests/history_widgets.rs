@@ -298,3 +298,59 @@ fn missing_gps_and_units_respect_each_widgets_tolerance() {
         );
     }
 }
+
+#[test]
+fn loading_badges_follow_each_widget_and_disappear_when_its_own_history_is_ready() {
+    let layout = layout(
+        r#"[
+      {"type":"frame","size":[900,500],"offset":[100,100],"children":[
+        {"type":"gradient_chart","id":"window","metric":"alt","seconds":60,"size":[300,160]},
+        {"type":"chart","id":"journey","metric":"alt","journey":true,"offset":[320,0]},
+        {"type":"g_meter","id":"forces","offset":[0,180]},
+        {"type":"compass","id":"filtered","metric":"heading","offset":[260,180],"smoothing":{}},
+        {"type":"metric","id":"distance","metric":"odo","offset":[500,200]}
+      ]},
+      {"type":"frame","size":[900,500],"visible":false,"children":[{"type":"map","route_mode":"full"}]}
+    ]"#,
+    );
+    let mut telemetry = Telemetry::from_gpmf_packets_progressive(&[]).unwrap();
+    telemetry.record_read_ranges(&[(120.0, 150.0)], 300.0);
+    let mut renderer = Renderer::new();
+    let mut image = Pixmap::new(1920, 1080).unwrap();
+    renderer.render_editor_into(&layout, &telemetry, 180.0, &mut image);
+    let regions =
+        actionlay_render::loading::regions(&layout, &telemetry, 180.0, 300.0, renderer.hit_boxes());
+    assert_eq!(regions.len(), 5);
+    let chart_box = renderer
+        .hit_boxes()
+        .iter()
+        .find(|hit| hit.path == vec![0, 0])
+        .unwrap();
+    assert_eq!(regions[0].rect, chart_box.rect);
+    assert!((regions[0].fraction - 30.0 / 61.0).abs() < 1e-9);
+    telemetry.record_read_ranges(&[(119.0, 180.0)], 300.0);
+    let regions =
+        actionlay_render::loading::regions(&layout, &telemetry, 180.0, 300.0, renderer.hit_boxes());
+    assert_eq!(regions.len(), 4);
+    assert!(regions.iter().all(|r| r.rect != chart_box.rect));
+    telemetry.record_read_ranges(&[(0.0, 300.0)], 300.0);
+    let regions =
+        actionlay_render::loading::regions(&layout, &telemetry, 180.0, 300.0, renderer.hit_boxes());
+    assert_eq!(regions.len(), 1); // Journey waits for validated full-source completion.
+    assert_eq!(regions[0].fraction, 1.0);
+    assert!(
+        actionlay_render::loading::regions(
+            &layout,
+            &Telemetry::empty(300.0),
+            180.0,
+            300.0,
+            renderer.hit_boxes()
+        )
+        .is_empty()
+    );
+    // Loading state is metadata: render pixels do not include any spinner/badge.
+    let mut clean = Pixmap::new(1920, 1080).unwrap();
+    renderer.render_telemetry_into(&layout, &telemetry, 180.0, &mut clean);
+    renderer.render_editor_into(&layout, &telemetry, 180.0, &mut image);
+    assert_eq!(clean.data(), image.data());
+}

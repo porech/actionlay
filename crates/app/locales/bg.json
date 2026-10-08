@@ -508,7 +508,7 @@
   "Fit entire route": "Побиране на целия маршрут",
   "Route size": "Размер на маршрута",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Използва целия маршрут, дори когато се чертае само изминатата част. При зареждане мащабът остава фиксиран.",
-  "Route data could not be fully loaded. Export was not started.": "Данните за маршрута не можаха да бъдат заредени изцяло. Експортирането не започна.",
+  "Telemetry data could not be fully loaded. Export was not started.": "Телеметричните данни не можаха да бъдат заредени изцяло. Експортирането не започна.",
   "Export cancelled": "Експортирането е отменено",
   "Advanced": "Разширени",
   "Advanced…": "Разширени…",
@@ -549,5 +549,10 @@
   "Resolution": "Разделителна способност",
   "Set preset default": "Възстановяване на стойността от настройката",
   "Target bitrate": "Целеви битрейт",
-  "Video bitrate (Mbps)": "Видео битрейт (Mbps)"
+  "Video bitrate (Mbps)": "Видео битрейт (Mbps)",
+  "Copy": "Копиране",
+  "Paste": "Поставяне",
+  "Lock selection": "Заключване на избора",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Плъзнете, за да преоразмерите контейнера. Задръжте Shift, за да мащабирате и всички дъщерни елементи.",
+  "Drag to resize": "Плъзнете за преоразмеряване"
 }

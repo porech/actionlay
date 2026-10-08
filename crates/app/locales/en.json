@@ -508,7 +508,7 @@
   "Fit entire route": "Fit entire route",
   "Route size": "Route size",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.",
-  "Route data could not be fully loaded. Export was not started.": "Route data could not be fully loaded. Export was not started.",
+  "Telemetry data could not be fully loaded. Export was not started.": "Telemetry data could not be fully loaded. Export was not started.",
   "Export cancelled": "Export cancelled",
   "Advanced": "Advanced",
   "Advanced…": "Advanced…",
@@ -549,5 +549,10 @@
   "Resolution": "Resolution",
   "Set preset default": "Set preset default",
   "Target bitrate": "Target bitrate",
-  "Video bitrate (Mbps)": "Video bitrate (Mbps)"
+  "Video bitrate (Mbps)": "Video bitrate (Mbps)",
+  "Copy": "Copy",
+  "Paste": "Paste",
+  "Lock selection": "Lock selection",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Drag to resize the container. Hold Shift to scale it with all its children.",
+  "Drag to resize": "Drag to resize"
 }

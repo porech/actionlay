@@ -508,7 +508,7 @@
   "Fit entire route": "התאם למסלול המלא",
   "Route size": "גודל המסלול",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "משתמש במסלול המלא גם כשמצויר רק החלק שהושלם. התקריב נשאר קבוע בזמן הטעינה.",
-  "Route data could not be fully loaded. Export was not started.": "לא ניתן היה לטעון את כל נתוני המסלול. הייצוא לא התחיל.",
+  "Telemetry data could not be fully loaded. Export was not started.": "לא ניתן היה לטעון את כל נתוני הטלמטריה. הייצוא לא התחיל.",
   "Export cancelled": "הייצוא בוטל",
   "Advanced": "מתקדם",
   "Advanced…": "מתקדם…",
@@ -549,5 +549,10 @@
   "Resolution": "רזולוציה",
   "Set preset default": "שחזור ערך ברירת המחדל של ההגדרה",
   "Target bitrate": "קצב סיביות יעד",
-  "Video bitrate (Mbps)": "קצב סיביות וידאו (Mbps)"
+  "Video bitrate (Mbps)": "קצב סיביות וידאו (Mbps)",
+  "Copy": "העתק",
+  "Paste": "הדבק",
+  "Lock selection": "נעילת הבחירה",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "גרור לשינוי גודל המכל. החזק Shift כדי לשנות את קנה המידה שלו ושל כל רכיבי המשנה.",
+  "Drag to resize": "גרור לשינוי גודל"
 }

@@ -21,8 +21,6 @@ worker.onmessage = ({ data }) => {
   if (data.metadataError) { status(data.metadataError, true); return; }
   if (data.progress) {
     if (data.progress.metadata !== undefined) {
-      metadataFraction = data.progress.metadata;
-      routeLoading = data.progress.active;
       updateMapLoaders();
       lastTime = -1;
     }
@@ -45,8 +43,6 @@ let generation = 0;
 let sourceGeneration = 0;
 let layoutRevision = 0;
 let loading = false;
-let metadataFraction = 0;
-let routeLoading = false;
 let mapRegions = [];
 let exporting = false;
 let editorStarted = false;
@@ -135,7 +131,7 @@ async function openVideo(file) {
   $('overlay').getContext('2d').clearRect(0, 0, $('overlay').width, $('overlay').height);
   $('empty').hidden = true;
   $('export').disabled = true;
-  metadataFraction = 0; routeLoading = false; mapRegions = []; updateMapLoaders();
+  mapRegions = []; updateMapLoaders();
   status(t('Opening {name}…', {name:file.name}));
   const metadata = new Promise((resolve, reject) => {
     const cleanup = () => { video.removeEventListener('loadedmetadata', loaded); video.removeEventListener('error', failed); };
@@ -289,7 +285,7 @@ setInterval(guarded(async () => {
 }), 100);
 function updateMapLoaders() {
   const container = $('map-loaders');
-  container.hidden = !routeLoading || !mapRegions.length;
+  container.hidden = !mapRegions.length;
   // Reuse animated elements across preview frames so their rotation is continuous.
   if (container.children.length !== mapRegions.length) {
     container.replaceChildren(...mapRegions.map(() => {
@@ -299,11 +295,11 @@ function updateMapLoaders() {
       return loader;
     }));
   }
-  mapRegions.forEach(([x,y,w,h], i) => {
+  mapRegions.forEach(([x,y,w,h,fraction], i) => {
     const loader = container.children[i];
     loader.style.left = `${(x+w/2)*100}%`; loader.style.top = `${(y+h/2)*100}%`;
     loader.setAttribute('aria-label', t('Reading telemetry…'));
-    loader.lastElementChild.textContent = `${Math.floor(metadataFraction*100)}%`;
+    loader.lastElementChild.textContent = `${Math.floor(fraction*100)}%`;
   });
 }
 function updateExportControls() { $('color-control').hidden = $('mode').value !== 'solid'; }

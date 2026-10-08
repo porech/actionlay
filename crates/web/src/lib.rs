@@ -50,6 +50,8 @@ struct State {
     maps: actionlay_maps::TileStore,
     editor: Option<editor::Editor>,
     action: u8,
+    video_duration: f64,
+    read_ranges: Vec<(f64, f64)>,
 }
 #[wasm_bindgen]
 pub struct Core(Rc<RefCell<State>>);
@@ -75,6 +77,8 @@ impl Core {
             maps,
             editor: None,
             action: 0,
+            video_duration: 0.0,
+            read_ranges: Vec::new(),
         })))
     }
     pub fn presets() -> String {
@@ -154,7 +158,9 @@ impl Core {
     pub fn reset_video(&self, duration: f64) {
         let mut s = self.0.borrow_mut();
         s.packets.clear();
-        s.telemetry = Telemetry::empty(duration);
+        s.read_ranges.clear();
+        s.video_duration = duration;
+        s.telemetry = Telemetry::pending(duration);
     }
     pub fn add_packet(&self, pts: f64, duration: f64, data: &[u8]) {
         self.0.borrow_mut().packets.push(RawPacket {
@@ -168,6 +174,9 @@ impl Core {
         if !s.packets.is_empty() {
             s.packets.sort_by(|a, b| a.pts.total_cmp(&b.pts));
             s.telemetry = Telemetry::from_gpmf_packets_progressive(&s.packets).map_err(error)?;
+            let ranges = s.read_ranges.clone();
+            let duration = s.video_duration;
+            s.telemetry.record_read_ranges(&ranges, duration);
         }
         Ok(())
     }
@@ -182,6 +191,8 @@ impl Core {
         let count = packets.len();
         if count > 0 {
             s.telemetry = Telemetry::from_gpmf_packets_with(&packets, &options).map_err(error)?;
+        } else {
+            s.telemetry = Telemetry::empty(duration);
         }
         Ok(count)
     }
@@ -217,72 +228,58 @@ impl Core {
         renderer.render_editor_into(&layout, telemetry, time, target);
         Ok(target.data().to_vec())
     }
-    /// Same route requirement as desktop: full only when requested by the layout.
-    pub fn route_read_until(&self, time: f64, duration: f64) -> f64 {
-        use actionlay_layout::model::{MapRoute, Node, Widget};
-        fn required(nodes: &[Node], time: f64, duration: f64) -> f64 {
-            nodes
-                .iter()
-                .filter_map(|node| {
-                    let Node::Known(w) = node else {
-                        return None;
-                    };
-                    if w.common().visible == Some(false) || w.common().opacity == Some(0.0) {
-                        return None;
-                    }
-                    Some(match w {
-                        Widget::Map(m) if m.needs_full_track() => duration,
-                        Widget::Map(m) if m.route_mode.unwrap_or_default() == MapRoute::Past => {
-                            time
-                        }
-                        _ => required(w.children(), time, duration),
-                    })
-                })
-                .fold(0.0, f64::max)
-        }
-        required(&self.0.borrow().layout.nodes, time, duration)
+    pub fn needs_full_history(&self) -> bool {
+        self.0
+            .borrow()
+            .layout
+            .history_requirements(0.0, 1.0)
+            .iter()
+            .any(|r| r.full)
     }
-    /// Map loader placement follows the renderer, including nested layout groups.
-    pub fn map_regions(&self, width: u32, height: u32) -> String {
-        use actionlay_layout::{
-            geom::{Aspect, scale_factor},
-            model::{MapRoute, Node, Widget},
-        };
+    pub fn history_ranges(&self, time: f64, duration: f64) -> String {
         let s = self.0.borrow();
-        let scale = scale_factor(
+        let ranges: Vec<_> = s
+            .layout
+            .history_requirements(time, duration)
+            .into_iter()
+            .map(|r| [r.start, r.end])
+            .collect();
+        serde_json::to_string(&ranges).unwrap()
+    }
+    pub fn record_history_read(&self, start: f64, end: f64) -> Result<(), JsValue> {
+        self.0.borrow_mut().read_ranges.push((start, end));
+        self.update_telemetry()
+    }
+    /// Loading geometry follows the actual rendering traversal for every widget.
+    pub fn map_regions(&self, width: u32, height: u32, time: f64) -> String {
+        let s = self.0.borrow();
+        let scale = actionlay_layout::geom::scale_factor(
             layouts::scale_mode_for(width, height, &s.layout),
             width as f32,
             height as f32,
-            s.layout.design_aspect.unwrap_or(Aspect::WIDESCREEN).ratio(),
+            s.layout
+                .design_aspect
+                .unwrap_or(actionlay_layout::geom::Aspect::WIDESCREEN)
+                .ratio(),
         );
-        let regions: Vec<_> = s
-            .renderer
-            .hit_boxes()
-            .iter()
-            .filter_map(|hit| {
-                let mut nodes = s.layout.nodes.as_slice();
-                let mut widget = None;
-                for &index in &hit.path {
-                    let Node::Known(w) = nodes.get(index)? else {
-                        return None;
-                    };
-                    widget = Some(w);
-                    nodes = w.children();
-                }
-                let Some(Widget::Map(map)) = widget else {
-                    return None;
-                };
-                if !map.needs_full_track() && map.route_mode.unwrap_or_default() == MapRoute::None {
-                    return None;
-                }
-                Some([
-                    hit.rect.x * scale / width as f32,
-                    hit.rect.y * scale / height as f32,
-                    hit.rect.w * scale / width as f32,
-                    hit.rect.h * scale / height as f32,
-                ])
-            })
-            .collect();
+        let regions: Vec<_> = actionlay_render::loading::regions(
+            &s.layout,
+            &s.telemetry,
+            time,
+            s.video_duration,
+            s.renderer.hit_boxes(),
+        )
+        .into_iter()
+        .map(|r| {
+            [
+                r.rect.x as f64 * scale as f64 / width as f64,
+                r.rect.y as f64 * scale as f64 / height as f64,
+                r.rect.w as f64 * scale as f64 / width as f64,
+                r.rect.h as f64 * scale as f64 / height as f64,
+                r.fraction,
+            ]
+        })
+        .collect();
         serde_json::to_string(&regions).unwrap()
     }
     pub fn pending_maps(&self) -> usize {

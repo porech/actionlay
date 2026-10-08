@@ -508,7 +508,7 @@
   "Fit entire route": "Adatta all’intero percorso",
   "Route size": "Dimensione del percorso",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Usa l’intero percorso anche quando si disegna solo la parte già fatta. Durante il caricamento si usa lo zoom fisso.",
-  "Route data could not be fully loaded. Export was not started.": "Non è stato possibile caricare completamente i dati del percorso. L’esportazione non è iniziata.",
+  "Telemetry data could not be fully loaded. Export was not started.": "Non è stato possibile caricare completamente i dati telemetrici. L’esportazione non è iniziata.",
   "Export cancelled": "Esportazione annullata",
   "Advanced": "Avanzate",
   "Advanced…": "Avanzate…",
@@ -549,5 +549,10 @@
   "Resolution": "Risoluzione",
   "Set preset default": "Ripristina il valore del profilo",
   "Target bitrate": "Bitrate desiderato",
-  "Video bitrate (Mbps)": "Bitrate video (Mbps)"
+  "Video bitrate (Mbps)": "Bitrate video (Mbps)",
+  "Copy": "Copia",
+  "Paste": "Incolla",
+  "Lock selection": "Blocca selezione",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Trascina per ridimensionare il contenitore. Tieni premuto Shift per scalare anche tutti i figli.",
+  "Drag to resize": "Trascina per ridimensionare"
 }

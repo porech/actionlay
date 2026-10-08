@@ -5,12 +5,17 @@ import { resolve } from 'node:path';
 import { gpmfFixture } from '../gpmf-fixture.js';
 const telemetryFixture = resolve('test-results/telemetry.mp4');
 const fixture = resolve('test-results/source.mp4');
+const historyFixture = resolve('test-results/history.mp4');
 test.beforeAll(async () => {
   await mkdir('test-results', { recursive: true });
   execFileSync('ffmpeg', ['-hide_banner','-loglevel','error','-y','-f','lavfi','-i','testsrc2=size=320x180:rate=15','-f','lavfi','-i','sine=frequency=440:sample_rate=48000','-t','2','-c:v','libx264','-pix_fmt','yuv420p','-c:a','aac',fixture]);
   const metadata=resolve('test-results/metadata.mp4');
   await writeFile(metadata,gpmfFixture());
   execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-y','-i',fixture,'-i',metadata,'-map','0','-map','1:0','-c','copy','-tag:d','gpmd',telemetryFixture]);
+  const longVideo=resolve('test-results/long-source.mp4'), longMetadata=resolve('test-results/long-metadata.mp4');
+  await writeFile(longMetadata,gpmfFixture(250));
+  execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-y','-f','lavfi','-i','testsrc2=size=320x180:rate=15','-t','10','-c:v','libx264','-pix_fmt','yuv420p',longVideo]);
+  execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-y','-i',longVideo,'-i',longMetadata,'-map','0','-map','1:0','-c','copy','-tag:d','gpmd',historyFixture]);
 });
 async function ready(page) {
   await page.goto('./');
@@ -265,4 +270,95 @@ test('controls sit below the video and fullscreen hides controls and cursor afte
   const restored = await page.locator('#player-controls').boundingBox();
   const restoredArea = await page.locator('#video-area').boundingBox();
   expect(restored.y).toBeGreaterThanOrEqual(restoredArea.y+restoredArea.height);
+});
+
+test('copy sections from Training into Moto across editor sessions', async ({ page }) => {
+  await ready(page);
+  await page.locator('#layouts').selectOption('builtin:training');
+  await page.locator('#edit').click();
+  const canvas = page.locator('#editor-canvas');
+  await expect(canvas).toBeVisible();
+  await canvas.focus();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.press('ControlOrMeta+c');
+  await page.locator('#editor-close').click();
+  await page.locator('#layouts').selectOption('builtin:moto');
+  await page.locator('#edit').click();
+  await canvas.focus();
+  await page.keyboard.press('ControlOrMeta+v');
+  await page.locator('#editor-save').click();
+  await expect(page.locator('#status')).toContainText('saved and applied');
+  const layout = await page.evaluate(async () => {
+    const { Core } = await import('/web/pkg/actionlay_web.js');
+    const saved = JSON.parse(localStorage.getItem('actionlay.web.v1')).layouts[0];
+    const copy = new Core();
+    copy.load_layout(Uint8Array.from(atob(saved.bytes), c => c.charCodeAt(0)), 'copy.actionlay-layout');
+    const layout = JSON.parse(copy.layout_json());
+    copy.free();
+    return layout;
+  });
+  expect(layout.name).toBe('Moto');
+  expect(layout.nodes.filter(node => node.type === 'gradient_chart')).toHaveLength(1);
+  const section = layout.nodes.find(node => node.children?.some(child => child.type === 'zone_bar'));
+  expect(section).toBeDefined();
+  expect(section.children.filter(child => child.type === 'zone_bar')).toHaveLength(2);
+  expect(section.id).toBeUndefined();
+  expect(section.children.every(child => child.id === undefined)).toBe(true);
+});
+
+async function trackMetadataForExport(page, delay = 0) {
+  const worker=page.workers()[0];
+  await worker.evaluate(async delay => {
+    const read=Blob.prototype.arrayBuffer;
+    Blob.prototype.arrayBuffer=async function() { if(delay && this.size<1024) await new Promise(r=>setTimeout(r,delay)); return read.call(this); };
+    const {Core}=await import('/web/pkg/actionlay_web.js');
+    const add=Core.prototype.add_packet, render=Core.prototype.render;
+    self.packetTimes=[];
+    const handleMessage=self.onmessage;
+    self.onmessage=event => {
+      if(event.data.type==='export') self.recordExport=true;
+      return handleMessage(event);
+    };
+    Core.prototype.add_packet=function(pts,...args) { self.packetTimes.push(pts); return add.call(this,pts,...args); };
+    Core.prototype.render=function(...args) {
+      if(self.recordExport && self.firstExportPacketCount===undefined) self.firstExportPacketCount=new Set(self.packetTimes).size;
+      return render.apply(this,args);
+    };
+  }, delay);
+  return worker;
+}
+test('historical widgets have individual loading percentages; journey charts preload before export without a map', async ({page}) => {
+  await ready(page);
+  const worker=await trackMetadataForExport(page,30);
+  await page.locator('#layout-file').setInputFiles({name:'History.ovl.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({version:1,nodes:[
+    {type:'gradient_chart',metric:'alt',journey:true,size:[420,160]},
+    {type:'chart',metric:'speed',seconds:.2,size:[420,160],offset:[0,200]},
+  ]}))});
+  await page.locator('#video-file').setInputFiles(historyFixture);
+  await expect(page.locator('#map-loaders')).toBeVisible();
+  // The short window becomes ready while the independent journey read is ongoing.
+  await expect.poll(() => page.locator('.map-loader').count()).toBe(1);
+  await expect.poll(() => worker.evaluate(() => new Set(self.packetTimes).size)).toBeLessThan(250);
+  expect(await page.locator('.map-percent').textContent()).toMatch(/^\d+%$/);
+  await page.locator('#start').fill('0'); await page.locator('#end').fill('.3');
+  await page.evaluate(() => { window.showSaveFilePicker=undefined; });
+  const download=page.waitForEvent('download'); await page.locator('#export').click();
+  await expect(page.locator('#status')).toContainText('Export complete.',{timeout:60000});
+  await download;
+  expect(await worker.evaluate(() => self.firstExportPacketCount)).toBe(250);
+});
+test('past-only chart export reads as it advances and does not preload unrelated future telemetry', async ({page}) => {
+  await ready(page);
+  const worker=await trackMetadataForExport(page);
+  await page.locator('#layout-file').setInputFiles({name:'Window.ovl.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({version:1,nodes:[{type:'gradient_chart',metric:'alt',seconds:.2}]}))});
+  await page.locator('#video-file').setInputFiles(historyFixture);
+  await expect(page.locator('#status')).toHaveText('history.mp4');
+  await page.locator('#start').fill('.2'); await page.locator('#end').fill('.5');
+  await page.evaluate(() => { window.showSaveFilePicker=undefined; });
+  const download=page.waitForEvent('download'); await page.locator('#export').click();
+  await expect(page.locator('#status')).toContainText('Export complete.',{timeout:60000});
+  await download;
+  const read=await worker.evaluate(() => ({first:self.firstExportPacketCount,times:self.packetTimes}));
+  expect(read.first).toBeGreaterThan(0); expect(read.first).toBeLessThan(250);
+  expect(Math.max(...read.times)).toBeLessThan(1.1);
 });

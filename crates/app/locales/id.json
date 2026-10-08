@@ -508,7 +508,7 @@
   "Fit entire route": "Sesuaikan seluruh rute",
   "Route size": "Ukuran rute",
   "Uses the complete route, even when only the completed section is drawn. Fixed zoom is used while loading.": "Menggunakan seluruh rute meskipun hanya bagian yang selesai digambar. Zoom tetap digunakan saat memuat.",
-  "Route data could not be fully loaded. Export was not started.": "Data rute tidak dapat dimuat seluruhnya. Ekspor tidak dimulai.",
+  "Telemetry data could not be fully loaded. Export was not started.": "Data telemetri tidak dapat dimuat seluruhnya. Ekspor tidak dimulai.",
   "Export cancelled": "Ekspor dibatalkan",
   "Advanced": "Lanjutan",
   "Advanced…": "Lanjutan…",
@@ -549,5 +549,10 @@
   "Resolution": "Resolusi",
   "Set preset default": "Pulihkan nilai prasetel",
   "Target bitrate": "Target laju bit",
-  "Video bitrate (Mbps)": "Laju bit video (Mbps)"
+  "Video bitrate (Mbps)": "Laju bit video (Mbps)",
+  "Copy": "Salin",
+  "Paste": "Tempel",
+  "Lock selection": "Kunci pilihan",
+  "Drag to resize the container. Hold Shift to scale it with all its children.": "Seret untuk mengubah ukuran wadah. Tahan Shift untuk menskalakannya bersama semua elemen anak.",
+  "Drag to resize": "Seret untuk mengubah ukuran"
 }

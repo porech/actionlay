@@ -88,13 +88,13 @@ struct App {
     /// An overlay for the current video has reached the GPU.
     overlay_ready: bool,
     overlay_ms: Option<f32>,
+    loading_regions: Vec<actionlay_render::loading::LoadingRegion>,
     /// Render failures already reported in `failure_notice`.
     failures_seen: u64,
     layout_rev: u64,
     telemetry_rev: u64,
     /// The only live telemetry load: the one of the current video.
     telemetry_rx: Option<telemetry_load::StreamLoad>,
-    route_requested_until: f64,
     loaded_telemetry: Option<Arc<Telemetry>>,
     /// pts of the current video's frame on screen (None before its first frame): the
     /// overlay is rendered for this time.
@@ -1230,7 +1230,6 @@ impl App {
                 self.video_path = None;
                 self.title_dirty = true;
                 self.telemetry_rx = None;
-                self.route_requested_until = 0.0;
                 self.loaded_telemetry = None;
                 self.camera_telemetry = None;
                 self.activity = None;
@@ -1304,7 +1303,6 @@ impl App {
                 // the previous video's telemetry, notices and overlay are gone for good:
                 // its loader's result (if any) is discarded with the receiver
                 self.telemetry_rx = None;
-                self.route_requested_until = 0.0;
                 self.loaded_telemetry = None;
                 self.camera_telemetry = None;
                 self.activity = None;
@@ -1319,8 +1317,10 @@ impl App {
                 self.overlay_ready = false;
                 self.overlay_ms = None;
                 self.scheduler.reset();
-                self.overlay
-                    .set_telemetry(Some(Arc::new(Telemetry::empty(duration))), self.scale_mode);
+                self.overlay.set_telemetry(
+                    Some(Arc::new(Telemetry::pending(duration))),
+                    self.scale_mode,
+                );
                 self.telemetry_rev += 1;
                 self.source_settings = settings;
                 self.chapter_offer = offer;
@@ -1423,73 +1423,48 @@ impl App {
         {
             return;
         }
-        use actionlay_layout::model::{MapRoute, Node, Widget};
-        fn route(nodes: &[Node]) -> MapRoute {
-            let mut result = MapRoute::None;
-            for node in nodes {
-                if let Node::Known(widget) = node {
-                    if widget.common().visible == Some(false) {
-                        continue;
-                    }
-                    let mode = match widget {
-                        Widget::Map(map) if map.needs_full_track() => MapRoute::Full,
-                        Widget::Map(map) => map.route_mode.unwrap_or_default(),
-                        _ => route(widget.children()),
-                    };
-                    if mode == MapRoute::Full {
-                        return mode;
-                    }
-                    if mode == MapRoute::Past {
-                        result = mode;
-                    }
-                }
-            }
-            result
-        }
         let (Some(player), Some(load)) = (&self.player, &self.telemetry_rx) else {
             return;
         };
-        let nodes = self
+        if load
+            .route_progress()
+            .is_some_and(|p| p.finished && !p.decoded && !p.failed)
+        {
+            return;
+        }
+        if self
+            .camera_telemetry
+            .as_ref()
+            .is_some_and(|t| t.is_complete())
+        {
+            return;
+        }
+        let layout = self
             .editor
             .as_ref()
-            .map_or(&self.layout.nodes, |editor| &editor.draft.nodes);
-        let route_mode = route(nodes);
-        let end = match route_mode {
-            MapRoute::None => return,
-            MapRoute::Full => player.info().duration,
-            MapRoute::Past => self.shown_t.unwrap_or(0.0),
-        };
-        if end <= self.route_requested_until + 0.001 {
-            return;
-        }
-        // Full-route zoom needs a validated complete source. Past-only drawing
-        // can reuse the played prefix and backfill just its unread gaps.
-        if self.camera_telemetry.as_ref().is_some_and(|t| {
-            if route_mode == MapRoute::Full {
-                t.is_complete()
-            } else {
-                t.is_loaded_through(end)
-            }
-        }) {
-            return;
-        }
-        let Some(telemetry) = &self.camera_telemetry else {
-            return;
-        };
-        let ranges = if route_mode == MapRoute::Full {
-            vec![(0.0, end)]
+            .map_or(self.layout.as_ref(), |e| &e.draft);
+        let required =
+            layout.history_requirements(self.shown_t.unwrap_or(0.0), player.info().duration);
+        let full = required.iter().any(|r| r.full);
+        let ranges = if full {
+            vec![(0.0, player.info().duration)]
         } else {
-            telemetry
-                .unread_ranges(end)
+            required
                 .into_iter()
-                .filter_map(|(start, stop)| {
-                    let start = start.max(self.route_requested_until);
-                    (stop > start + 0.001).then_some((start, stop))
+                .flat_map(|range| {
+                    self.camera_telemetry
+                        .as_ref()
+                        .map_or_else(|| vec![(0.0, range.end)], |t| t.unread_ranges(range.end))
+                        .into_iter()
+                        .filter_map(move |(a, b)| {
+                            let a = a.max(range.start);
+                            (b > a + 0.001).then_some((a, b))
+                        })
                 })
-                .collect::<Vec<_>>()
+                .collect()
         };
-        if !ranges.is_empty() && load.request_route(player.timeline().clone(), ranges) {
-            self.route_requested_until = end;
+        if !ranges.is_empty() {
+            load.request_history(player.timeline().clone(), ranges, full);
         }
     }
 
@@ -1525,6 +1500,7 @@ impl App {
                 frame.pixmap.height(),
                 frame.render_ms
             );
+            self.loading_regions = frame.loading_regions;
             self.overlay_ms = Some(frame.render_ms);
             self.view.upload_overlay(frame.pixmap);
             self.overlay_ready = true;
@@ -1754,8 +1730,8 @@ impl eframe::App for App {
                 }
             }
         }
-        self.request_route_metadata();
         self.poll_telemetry();
+        self.request_route_metadata();
         self.poll_activity();
         let map_revision = self.overlay.maps().revision();
         if map_revision != self.map_revision {
@@ -1858,10 +1834,10 @@ impl eframe::App for App {
         }
         if let Some(mut editor) = self.editor.take() {
             editor.set_maps(self.overlay.maps().clone());
-            editor.map_progress = self
+            editor.history_progress = self
                 .telemetry_rx
                 .as_ref()
-                .map(|load| load.route_progress().unwrap_or_default());
+                .and_then(|load| load.route_progress());
             let video_size = self
                 .player
                 .as_ref()
@@ -1962,16 +1938,17 @@ impl eframe::App for App {
                 self.view
                     .show(ui, rect, video, self.overlay_visible && self.overlay_ready);
                 if self.overlay_visible
-                    && let (Some(video), Some(load)) = (video, &self.telemetry_rx)
+                    && let Some(video) = video
                 {
-                    map_loading::show(
+                    map_loading::show_regions(
                         ui,
-                        &self.layout,
                         video,
                         self.scale_mode,
-                        self.loaded_telemetry.as_deref(),
-                        self.shown_t.unwrap_or(0.0),
-                        load.route_progress(),
+                        &self.layout,
+                        &self.loading_regions,
+                        self.telemetry_rx
+                            .as_ref()
+                            .and_then(|load| load.route_progress()),
                     );
                 }
             });
@@ -2156,11 +2133,11 @@ fn main() -> eframe::Result {
                 overlay_visible: true,
                 overlay_ready: false,
                 overlay_ms: None,
+                loading_regions: Vec::new(),
                 failures_seen: 0,
                 layout_rev: 0,
                 telemetry_rev: 0,
                 telemetry_rx: None,
-                route_requested_until: 0.0,
                 loaded_telemetry: None,
                 egui_ctx: cc.egui_ctx.clone(),
                 shown_t: None,
