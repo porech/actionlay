@@ -110,6 +110,14 @@ rebuilding or replacing binaries. GitHub Pages can reuse an earlier deployment
 when main and a tag share a commit SHA; if verification detects stale files, run
 the workflow from a newer main commit and verify the public URLs again.
 
+For that recovery, make the newer commit on `main`, then dispatch
+`gh workflow run pages.yml --ref main`. This downloads the already published
+stable assets; it does not rebuild or replace the release packages. Wait for
+the workflow's **Verify published browser bundle** step to succeed before
+announcing the browser update. A documentation-only recovery commit can use
+`[skip ci]` to avoid an unnecessary native rebuild while the manually dispatched
+Pages workflow performs the publication checks.
+
 Pages artifacts use a unique name per workflow run and attempt. Before deploying,
 the job waits until GitHub's artifact listing contains the uploaded artifact ID.
 This avoids duplicate-name failures on retries and upload/list visibility races;
