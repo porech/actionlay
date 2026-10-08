@@ -263,6 +263,14 @@ jobs:
         shell: msys2 {0}
         run: make test
 
+      - name: Repeat buffering regressions (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: bash scripts/test-buffering-stability.sh
+      - name: Repeat buffering regressions (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: bash scripts/test-buffering-stability.sh
+
       - name: Upload golden image diffs
         if: failure()
         uses: actions/upload-artifact@v7
@@ -509,6 +517,7 @@ jobs:
         run: |
           python3 scripts/pages/test-verify-browser.py
           python3 scripts/pages/test-render-index.py
+          node --test scripts/pages/test-deploy.cjs
       - name: Install repository tools
         run: sudo apt-get update && sudo apt-get install -y apt-utils dpkg-dev createrepo-c rpm gnupg
       - name: Download current stable and development packages
@@ -603,9 +612,15 @@ jobs:
           exit 1
       - name: Deploy repositories
         id: deploy
-        uses: actions/deploy-pages@v5
+        uses: actions/github-script@v8
+        env:
+          PAGES_ARTIFACT_ID: ${{ steps.upload-pages.outputs.artifact_id }}
         with:
-          artifact_name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+          script: |
+            const { deploy } = require(`${process.env.GITHUB_WORKSPACE}/scripts/pages/deploy.cjs`);
+            await deploy({ github, core, context,
+              artifactId: process.env.PAGES_ARTIFACT_ID,
+              attempt: process.env.GITHUB_RUN_ATTEMPT });
       - name: Verify published browser bundle
         env:
           PAGES_URL: ${{ steps.deploy.outputs.page_url }}

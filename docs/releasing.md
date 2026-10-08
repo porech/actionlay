@@ -108,17 +108,15 @@ in main become public only with the next stable release. After deployment, CI ch
 entry assets and WASM against that archive, since a successful deployment alone
 does not prove the new files are being served. The same CI workflow can also be
 dispatched manually in **pages** mode to republish existing release assets without
-rebuilding or replacing binaries. GitHub Pages can reuse an earlier deployment
-when main and a tag share a commit SHA; if verification detects stale files, run
-the workflow from a newer main commit and verify the public URLs again.
-
-For that recovery, make the newer commit on `main`, then dispatch
+rebuilding or replacing binaries. Pages deployments use a unique build version derived from commit, run, attempt
+and artifact ID through the official Pages API; main and a tag sharing a commit
+therefore cannot reuse a previous deployment. The workflow checks the actual
+served bundle after every deployment. To republish an existing release, dispatch
 `gh workflow run ci.yml --ref main -f mode=pages`. This downloads the already published
 stable assets; it does not rebuild or replace the release packages. Wait for
 the workflow's **Verify published browser bundle** step to succeed before
-announcing the browser update. A documentation-only recovery commit can use
-`[skip ci]` to avoid an unnecessary native rebuild while the manually dispatched
-CI Pages job performs the publication checks.
+announcing the browser update. Repeated dispatches on the same commit use distinct
+deployment versions; a new commit is not required.
 
 Pages artifacts use a unique name per workflow run and attempt. Before deploying,
 the job waits until GitHub's artifact listing contains the uploaded artifact ID.

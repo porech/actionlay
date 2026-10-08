@@ -1601,17 +1601,45 @@ mod tests {
         wait(&player, 1.0);
     }
 
+    /// The test releases the read after observing the state it needs. Dropping
+    /// the handle also releases it, including when an assertion unwinds.
+    struct SourceStall {
+        trigger: Arc<AtomicBool>,
+        blocked: Arc<AtomicBool>,
+        gate: Arc<(Mutex<bool>, std::sync::Condvar)>,
+    }
+    impl SourceStall {
+        fn block(&self) {
+            *self.gate.0.lock().unwrap() = false;
+            self.trigger.store(true, Ordering::SeqCst);
+        }
+        fn release(&self) {
+            *self.gate.0.lock().unwrap() = true;
+            self.gate.1.notify_all();
+        }
+        fn is_blocked(&self) -> bool {
+            self.blocked.load(Ordering::SeqCst)
+        }
+    }
+    impl Drop for SourceStall {
+        fn drop(&mut self) {
+            self.release();
+        }
+    }
     struct SlowSource {
         file: std::fs::File,
-        stall: Arc<AtomicBool>,
+        trigger: Arc<AtomicBool>,
         blocked: Arc<AtomicBool>,
-        delay: Duration,
+        gate: Arc<(Mutex<bool>, std::sync::Condvar)>,
     }
     impl std::io::Read for SlowSource {
         fn read(&mut self, b: &mut [u8]) -> std::io::Result<usize> {
-            if self.stall.swap(false, Ordering::SeqCst) {
+            if self.trigger.swap(false, Ordering::SeqCst) {
                 self.blocked.store(true, Ordering::SeqCst);
-                std::thread::sleep(self.delay);
+                let mut released = self.gate.0.lock().unwrap();
+                while !*released {
+                    released = self.gate.1.wait(released).unwrap();
+                }
                 self.blocked.store(false, Ordering::SeqCst);
             }
             std::io::Read::read(&mut self.file, b)
@@ -1622,27 +1650,23 @@ mod tests {
             std::io::Seek::seek(&mut self.file, s)
         }
     }
-    fn slow_player(delay: Duration) -> Option<(Player, Arc<AtomicBool>, Arc<AtomicBool>)> {
-        let path = std::env::var_os("ACTIONLAY_SAMPLES")
-            .map(std::path::PathBuf::from)
-            .unwrap_or_else(|| {
-                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/synthetic")
-            })
-            .join("h264-1080p30-44k.mp4");
-        let Ok(file) = std::fs::File::open(path) else {
-            eprintln!("synthetic sample unavailable; skipping slow I/O test");
-            return None;
-        };
+    fn slow_player() -> (Player, SourceStall) {
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/source-buffering.mp4");
+        let file = std::fs::File::open(path).unwrap();
         crate::ffmpeg_info::init();
-        let stall = Arc::new(AtomicBool::new(false));
-        let blocked = Arc::new(AtomicBool::new(false));
+        let stall = SourceStall {
+            trigger: Arc::new(AtomicBool::new(false)),
+            blocked: Arc::new(AtomicBool::new(false)),
+            gate: Arc::new((Mutex::new(true), std::sync::Condvar::new())),
+        };
         let cancelled = Arc::new(AtomicBool::new(false));
-        let input = crate::input::open_source(
+        let input = crate::input::open_test_source(
             SlowSource {
                 file,
-                stall: stall.clone(),
-                blocked: blocked.clone(),
-                delay,
+                trigger: stall.trigger.clone(),
+                blocked: stall.blocked.clone(),
+                gate: stall.gate.clone(),
             },
             Some("sample.mp4"),
             cancelled.clone(),
@@ -1651,14 +1675,14 @@ mod tests {
         let p = Player::from_input(
             input,
             PlayerOptions {
-                prefer_hw: true,
+                prefer_hw: false,
                 audio: true,
                 ..Default::default()
             },
             cancelled,
         )
         .unwrap();
-        Some((p, stall, blocked))
+        (p, stall)
     }
     fn pump(p: &mut Player, until: impl Fn(&Player) -> bool, timeout: Duration) {
         let end = Instant::now() + timeout;
@@ -1929,9 +1953,7 @@ mod tests {
 
     #[test]
     fn background_audio_keeps_advancing_beyond_the_buffer_horizon() {
-        let Some((mut p, _, _)) = slow_player(Duration::ZERO) else {
-            return;
-        };
+        let (mut p, _stall) = slow_player();
         if !p.stats().audio_active {
             return;
         }
@@ -1949,8 +1971,7 @@ mod tests {
         );
         assert!(p.poll_frame().is_none(), "presented old background frames");
         let target = p.position();
-        // The fixture has an 8.3-second GOP. Software-only hosted runners
-        // must decode from the first keyframe to recover this four-second seek.
+        // Recover a four-second background seek through the software decoder.
         pump(
             &mut p,
             |p| !p.is_buffering() && !p.is_awaiting_frame(),
@@ -1962,21 +1983,15 @@ mod tests {
 
     #[test]
     fn closing_a_blocked_source_does_not_delay_the_next_files_metadata() {
-        let Some((mut p, stall, blocked)) = slow_player(Duration::from_secs(5)) else {
-            return;
-        };
+        let (mut p, stall) = slow_player();
         p.play();
         pump(
             &mut p,
             |p| !p.is_buffering() && p.buffered_seconds() > 2.5,
             Duration::from_secs(5),
         );
-        stall.store(true, Ordering::SeqCst);
-        pump(
-            &mut p,
-            |_| blocked.load(Ordering::SeqCst),
-            Duration::from_secs(5),
-        );
+        stall.block();
+        pump(&mut p, |_| stall.is_blocked(), Duration::from_secs(5));
         let start = Instant::now();
         drop(p);
         assert!(start.elapsed() < Duration::from_millis(200));
@@ -2004,16 +2019,14 @@ mod tests {
             Ok(TelemetryEvent::Packet { .. })
         ));
         assert!(
-            blocked.load(Ordering::SeqCst),
+            stall.is_blocked(),
             "old read completed before testing independence"
         );
     }
 
     #[test]
     fn cached_video_keeps_decoding_during_a_slow_source_read() {
-        let Some((mut p, stall, blocked)) = slow_player(Duration::from_millis(1200)) else {
-            return;
-        };
+        let (mut p, stall) = slow_player();
         p.play();
         // Begin measuring progress after audio output startup latency has
         // elapsed, with cached packets available for the simulated slow read.
@@ -2022,21 +2035,18 @@ mod tests {
             |p| !p.is_buffering() && p.position() > 0.4 && p.buffered_seconds() > 2.5,
             Duration::from_secs(5),
         );
-        stall.store(true, Ordering::SeqCst);
-        pump(
-            &mut p,
-            |_| blocked.load(Ordering::SeqCst),
-            Duration::from_secs(5),
-        );
+        stall.block();
+        pump(&mut p, |_| stall.is_blocked(), Duration::from_secs(5));
         let before = p.position();
         let presented = p.stats().presented;
-        let end = Instant::now() + Duration::from_millis(800);
-        while Instant::now() < end {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while p.position() < before + 0.6 && Instant::now() < deadline {
             p.poll_frame();
-            assert!(!p.is_buffering());
+            assert!(stall.is_blocked(), "read released before the observation");
+            assert!(!p.is_buffering(), "cached playback entered buffering");
             std::thread::sleep(POLL);
         }
-        assert!(p.position() > before + 0.5, "playback stopped for storage");
+        assert!(p.position() >= before + 0.6, "playback stopped for storage");
         assert!(
             p.stats().presented > presented + 12,
             "decoder stopped for storage"
@@ -2044,23 +2054,18 @@ mod tests {
     }
     #[test]
     fn underrun_resumes_without_seek_and_position_stays_monotonic() {
-        let Some((mut p, stall, blocked)) = slow_player(Duration::from_secs(5)) else {
-            return;
-        };
+        let (mut p, stall) = slow_player();
         p.play();
         pump(
             &mut p,
             |p| !p.is_buffering() && p.position() > 0.2 && p.buffered_seconds() > 2.5,
             Duration::from_secs(5),
         );
-        stall.store(true, Ordering::SeqCst);
-        pump(
-            &mut p,
-            |_| blocked.load(Ordering::SeqCst),
-            Duration::from_secs(5),
-        );
+        stall.block();
+        pump(&mut p, |_| stall.is_blocked(), Duration::from_secs(5));
         pump(&mut p, |p| p.is_buffering(), Duration::from_secs(5));
         let frozen = p.position();
+        stall.release();
         let mut previous = frozen;
         let deadline = Instant::now() + Duration::from_secs(8);
         while p.position() < frozen + 1.0 && Instant::now() < deadline {
@@ -2104,9 +2109,7 @@ mod tests {
 
     #[test]
     fn source_underrun_suspends_before_callback_silence_and_resumes_with_ready_samples() {
-        let Some((mut p, stall, blocked)) = slow_player(Duration::from_secs(5)) else {
-            return;
-        };
+        let (mut p, stall) = slow_player();
         if !p.stats().audio_active {
             return;
         }
@@ -2117,18 +2120,21 @@ mod tests {
             Duration::from_secs(5),
         );
         let initial = p.audio.as_ref().unwrap().lock().unwrap().diagnostics().1;
-        stall.store(true, Ordering::SeqCst);
-        pump(
-            &mut p,
-            |_| blocked.load(Ordering::SeqCst),
-            Duration::from_secs(5),
-        );
+        stall.block();
+        pump(&mut p, |_| stall.is_blocked(), Duration::from_secs(5));
         pump(&mut p, |p| p.is_buffering(), Duration::from_secs(5));
         let frozen = p.position();
+        stall.release();
         let generation = p.generation;
         pump(
             &mut p,
-            |p| !p.is_buffering() && p.position() > frozen + 0.4,
+            |p| {
+                !p.is_buffering()
+                    && p.position() > frozen + 0.4
+                    && p.stats()
+                        .av_offset
+                        .is_some_and(|offset| offset.abs() < 0.15)
+            },
             Duration::from_secs(10),
         );
         let underruns = p.audio.as_ref().unwrap().lock().unwrap().diagnostics().1;
@@ -2218,21 +2224,15 @@ mod tests {
 
     #[test]
     fn underrun_freezes_both_clocks_and_pause_cancels_autoresume() {
-        let Some((mut p, stall, blocked)) = slow_player(Duration::from_secs(5)) else {
-            return;
-        };
+        let (mut p, stall) = slow_player();
         p.play();
         pump(
             &mut p,
             |p| !p.is_buffering() && p.buffered_seconds() > 2.5,
             Duration::from_secs(5),
         );
-        stall.store(true, Ordering::SeqCst);
-        pump(
-            &mut p,
-            |_| blocked.load(Ordering::SeqCst),
-            Duration::from_secs(5),
-        );
+        stall.block();
+        pump(&mut p, |_| stall.is_blocked(), Duration::from_secs(5));
         pump(&mut p, |p| p.is_buffering(), Duration::from_secs(5));
         let at = p.position();
         let end = Instant::now() + Duration::from_millis(200);
@@ -2248,11 +2248,8 @@ mod tests {
         p.pause();
         assert!(p.is_paused());
         assert!(!p.is_buffering());
-        pump(
-            &mut p,
-            |_| !blocked.load(Ordering::SeqCst),
-            Duration::from_secs(5),
-        );
+        stall.release();
+        pump(&mut p, |_| !stall.is_blocked(), Duration::from_secs(5));
         for _ in 0..20 {
             p.poll_frame();
             std::thread::sleep(POLL);

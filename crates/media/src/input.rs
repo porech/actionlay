@@ -19,14 +19,14 @@ struct Block {
     offset: u64,
     data: Vec<u8>,
 }
-struct CachedReader<R> {
+struct CachedReader<R, const BLOCK_SIZE: usize = BLOCK_BYTES> {
     source: R,
     size: u64,
     position: u64,
     blocks: VecDeque<Block>,
     cancelled: Arc<AtomicBool>,
 }
-impl<R: Read + Seek> CachedReader<R> {
+impl<R: Read + Seek, const BLOCK_SIZE: usize> CachedReader<R, BLOCK_SIZE> {
     fn new(mut source: R, cancelled: Arc<AtomicBool>) -> io::Result<Self> {
         let size = source.seek(SeekFrom::End(0))?;
         Ok(Self {
@@ -38,7 +38,7 @@ impl<R: Read + Seek> CachedReader<R> {
         })
     }
 }
-impl<R: Read + Seek> Read for CachedReader<R> {
+impl<R: Read + Seek, const BLOCK_SIZE: usize> Read for CachedReader<R, BLOCK_SIZE> {
     fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
         if self.cancelled.load(Ordering::SeqCst) {
             return Err(io::Error::other("read cancelled"));
@@ -46,13 +46,13 @@ impl<R: Read + Seek> Read for CachedReader<R> {
         if output.is_empty() || self.position >= self.size {
             return Ok(0);
         }
-        let offset = self.position / BLOCK_BYTES as u64 * BLOCK_BYTES as u64;
+        let offset = self.position / BLOCK_SIZE as u64 * BLOCK_SIZE as u64;
         let block = if let Some(i) = self.blocks.iter().position(|b| b.offset == offset) {
             self.blocks.remove(i).unwrap()
         } else {
             let started = std::time::Instant::now();
             self.source.seek(SeekFrom::Start(offset))?;
-            let len = (self.size - offset).min(BLOCK_BYTES as u64) as usize;
+            let len = (self.size - offset).min(BLOCK_SIZE as u64) as usize;
             let mut data = vec![0; len];
             let mut got = 0;
             while got < len {
@@ -88,7 +88,7 @@ impl<R: Read + Seek> Read for CachedReader<R> {
         Ok(len)
     }
 }
-impl<R: Read + Seek> Seek for CachedReader<R> {
+impl<R: Read + Seek, const BLOCK_SIZE: usize> Seek for CachedReader<R, BLOCK_SIZE> {
     fn seek(&mut self, from: SeekFrom) -> io::Result<u64> {
         let position = match from {
             SeekFrom::Start(p) => i128::from(p),
@@ -115,9 +115,27 @@ pub(crate) fn open_source<R: Read + Seek + Send + 'static>(
     filename: Option<&str>,
     cancelled: Arc<AtomicBool>,
 ) -> Result<ffmpeg::format::context::Input, MediaError> {
-    let source =
-        CachedReader::new(source, cancelled.clone()).map_err(|e| MediaError::Io(e.to_string()))?;
-    let io = ffmpeg::format::context::StreamIo::from_read_seek_with_capacity(source, BLOCK_BYTES)?;
+    open_source_with_block_size::<R, BLOCK_BYTES>(source, filename, cancelled)
+}
+
+// Keep the same cache/demux path with smaller blocks for the compact test clip.
+#[cfg(test)]
+pub(crate) fn open_test_source<R: Read + Seek + Send + 'static>(
+    source: R,
+    filename: Option<&str>,
+    cancelled: Arc<AtomicBool>,
+) -> Result<ffmpeg::format::context::Input, MediaError> {
+    open_source_with_block_size::<R, { 16 * 1024 }>(source, filename, cancelled)
+}
+
+fn open_source_with_block_size<R: Read + Seek + Send + 'static, const BLOCK_SIZE: usize>(
+    source: R,
+    filename: Option<&str>,
+    cancelled: Arc<AtomicBool>,
+) -> Result<ffmpeg::format::context::Input, MediaError> {
+    let source = CachedReader::<R, BLOCK_SIZE>::new(source, cancelled.clone())
+        .map_err(|e| MediaError::Io(e.to_string()))?;
+    let io = ffmpeg::format::context::StreamIo::from_read_seek_with_capacity(source, BLOCK_SIZE)?;
     Ok(ffmpeg::format::input_from_stream_with_interrupt(
         io,
         filename,
@@ -151,7 +169,7 @@ mod tests {
             input: Cursor::new(vec![42; 3 * BLOCK_BYTES]),
             reads: vec![],
         };
-        let mut reader = CachedReader::new(source, Arc::new(AtomicBool::new(false))).unwrap();
+        let mut reader = CachedReader::<_>::new(source, Arc::new(AtomicBool::new(false))).unwrap();
         let mut b = [0; 16];
         for _ in 0..100 {
             reader.read_exact(&mut b).unwrap();
@@ -168,7 +186,7 @@ mod tests {
     #[test]
     fn cache_eviction_eof_and_cancellation() {
         let cancel = Arc::new(AtomicBool::new(false));
-        let mut reader = CachedReader::new(
+        let mut reader = CachedReader::<_>::new(
             Cursor::new(vec![7; (CACHE_BLOCKS + 1) * BLOCK_BYTES + 3]),
             cancel.clone(),
         )
