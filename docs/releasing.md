@@ -107,3 +107,9 @@ can also be dispatched manually to republish existing release assets without
 rebuilding or replacing binaries. GitHub Pages can reuse an earlier deployment
 when main and a tag share a commit SHA; if verification detects stale files, run
 the workflow from a newer main commit and verify the public URLs again.
+
+Pages artifacts use a unique name per workflow run and attempt. Before deploying,
+the job waits until GitHub's artifact listing contains the uploaded artifact ID.
+This avoids duplicate-name failures on retries and upload/list visibility races;
+a retry cannot choose an older attempt's Pages archive. The served browser bundle
+is still checked against the selected stable release after deployment.
