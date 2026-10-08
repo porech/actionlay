@@ -19,6 +19,8 @@ function fixture(statuses) {
       core: { getIDToken: async () => 'oidc', setOutput: (k, v) => { outputs[k] = v; }, info: () => {} },
       github: { request: async (route, payload) => {
         calls.push([route, payload]);
+        if (route.includes('/git/commits/')) return { data: { tree: { sha: 'source-tree' } } };
+        if (route.endsWith('/git/commits')) return { data: { sha: 'publication-commit' } };
         return { data: route.startsWith('GET') ? { status: statuses.shift() || 'queued' }
           : { id: 'deployment', page_url: 'https://example.invalid/' } };
       } },
@@ -30,8 +32,11 @@ test('waits for success before exposing URL', async () => {
   const f = fixture(['queued', 'succeed']);
   await deploy(f.options);
   assert.equal(f.outputs.page_url, 'https://example.invalid/');
-  assert.equal(f.calls[0][1].artifact_id, 10);
-  assert.equal(f.calls[0][1].pages_build_version, buildVersion('sha', 1, 1, 10));
+  assert.equal(f.calls[2][1].artifact_id, 10);
+  assert.equal(f.calls[2][1].pages_build_version, 'publication-commit');
+  assert.equal(f.calls[1][1].tree, 'source-tree');
+  assert.deepEqual(f.calls[1][1].parents, ['sha']);
+  assert.equal(f.calls.filter(([route]) => route.includes('/git/refs')).length, 0);
 });
 
 test('deployment failure stays a failure', async () => {

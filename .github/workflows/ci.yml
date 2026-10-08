@@ -504,7 +504,8 @@ jobs:
       cancel-in-progress: false
     runs-on: ubuntu-22.04
     permissions:
-      contents: read
+      # Create a unique publication commit object without moving branches/tags.
+      contents: write
       actions: read
       pages: write
       id-token: write

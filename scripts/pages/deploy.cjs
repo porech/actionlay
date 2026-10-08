@@ -9,10 +9,20 @@ async function deploy({ github, core, context, artifactId, attempt,
   timeout = 600_000, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
   now = Date.now }) {
   const repository = context.repo;
+  // Pages currently requires an existing Git commit despite documenting a
+  // generic build-version string. Create a unique commit object with the exact
+  // source tree; no branch/tag is updated and no additional CI run is triggered.
+  const { data: source } = await github.request('GET /repos/{owner}/{repo}/git/commits/{commit_sha}', {
+    ...repository, commit_sha: context.sha,
+  });
+  const { data: publication } = await github.request('POST /repos/{owner}/{repo}/git/commits', {
+    ...repository, tree: source.tree.sha, parents: [context.sha],
+    message: `Pages deployment ${buildVersion(context.sha, context.runId, attempt, artifactId)}`,
+  });
   const { data: deployment } = await github.request('POST /repos/{owner}/{repo}/pages/deployments', {
     ...repository,
     artifact_id: Number(artifactId),
-    pages_build_version: buildVersion(context.sha, context.runId, attempt, artifactId),
+    pages_build_version: publication.sha,
     oidc_token: await core.getIDToken(),
   });
   const deadline = now() + timeout;

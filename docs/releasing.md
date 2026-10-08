@@ -108,8 +108,10 @@ in main become public only with the next stable release. After deployment, CI ch
 entry assets and WASM against that archive, since a successful deployment alone
 does not prove the new files are being served. The same CI workflow can also be
 dispatched manually in **pages** mode to republish existing release assets without
-rebuilding or replacing binaries. Pages deployments use a unique build version derived from commit, run, attempt
-and artifact ID through the official Pages API; main and a tag sharing a commit
+rebuilding or replacing binaries. Pages deployments use a unique publication commit object with the exact source
+tree, derived from commit, run, attempt and artifact ID. The Pages API currently
+requires an existing commit SHA as build version. No branch or tag is moved;
+`contents: write` is scoped to the publication job for creating this object; main and a tag sharing a commit
 therefore cannot reuse a previous deployment. The workflow checks the actual
 served bundle after every deployment. To republish an existing release, dispatch
 `gh workflow run ci.yml --ref main -f mode=pages`. This downloads the already published
