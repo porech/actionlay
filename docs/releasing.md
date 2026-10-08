@@ -101,8 +101,10 @@ application does not depend on Python.
 
 Pages always reuses the latest stable release's browser archive; main builds never
 publish an untagged browser build. A stable tag changes the browser version;
-successful main builds refresh the download page and Linux repositories while
-keeping that stable browser version. After deployment, CI checks the served HTML,
+successful main builds refresh Linux repositories while keeping the browser and
+public installation instructions from the latest stable tag. Landing assets and
+the instructions renderer are restored from that tag before rendering, so edits
+in main become public only with the next stable release. After deployment, CI checks the served HTML,
 entry assets and WASM against that archive, since a successful deployment alone
 does not prove the new files are being served. The same CI workflow can also be
 dispatched manually in **pages** mode to republish existing release assets without
@@ -143,3 +145,22 @@ See [AUR maintainer setup](../packaging/aur/README.md). The user-facing Arch
 installation instructions should be added only after the first AUR submission is
 live. Packages installed via pacman use system-managed updates; portable copies
 remain eligible for in-app updates.
+
+## Signed Arch repository
+
+Starting with the next stable tag after 1.4.2, releases include the verified
+`actionlay-bin-*.pkg.tar.zst` package. The existing Pages job signs both packages
+and the pacman database with the same dedicated repository key used for APT/DNF.
+The stable repository is hosted under `/packages/stable/arch/x86_64/`.
+No AUR account or additional signing secret is needed. CI tests the recipe,
+installation/removal and a signed repository with a real pacman client using a
+temporary test key. The private production key never enters the Arch container.
+
+The public instructions include Arch only when the stable package, signed
+database and public key are available. Users enable the repository with
+`PackageRequired DatabaseRequired`; updates then come through pacman. The app
+recognizes pacman ownership and leaves updates to the package manager.
+
+AUR publication remains an optional separate distribution route, described in
+[packaging/aur/README.md](../packaging/aur/README.md). Registration is currently
+closed; enabling AUR publication is not required for the signed pacman repository.

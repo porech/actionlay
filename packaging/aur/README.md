@@ -61,3 +61,8 @@ The generated `.SRCINFO` comes from `makepkg --printsrcinfo`, rather than a seco
 hand-maintained metadata file. See the official
 [PKGBUILD reference](https://man.archlinux.org/man/PKGBUILD.5.en) and
 [makepkg reference](https://man.archlinux.org/man/makepkg.8.en).
+
+While AUR registration is closed, stable releases can use the signed pacman
+repository described in [docs/releasing.md](../../docs/releasing.md#signed-arch-repository).
+It uses the existing Linux repository signing key and does not require an AUR
+account. AUR publication remains disabled unless explicitly configured.

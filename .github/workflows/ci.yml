@@ -408,6 +408,8 @@ jobs:
         run: |
           version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)"
           bash scripts/verify-aur.sh arch-recipe "arch-dist/actionlay-$version-linux-x64.tar.gz" arch-verified
+      - name: Verify signed pacman repository with a real Arch client
+        run: bash scripts/pages/test-arch-repository.sh arch-verified
       - uses: actions/upload-artifact@v7
         with:
           name: aur-package-check
@@ -443,6 +445,14 @@ jobs:
         with:
           name: linux-native-packages
           path: dist
+      - uses: actions/download-artifact@v8
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: aur-package-check
+          path: arch-verified
+      - name: Include verified Arch package in stable releases
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: cp arch-verified/*.pkg.tar.zst dist/
       - name: Package browser application for stable tags only
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
@@ -496,7 +506,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Test browser publication verification
-        run: python3 scripts/pages/test-verify-browser.py
+        run: |
+          python3 scripts/pages/test-verify-browser.py
+          python3 scripts/pages/test-render-index.py
       - name: Install repository tools
         run: sudo apt-get update && sudo apt-get install -y apt-utils dpkg-dev createrepo-c rpm gnupg
       - name: Download current stable and development packages
@@ -515,6 +527,10 @@ jobs:
               gh release download "$tag" --pattern '*.deb' --pattern '*.rpm' --dir "packages/$channel"
             fi
           done
+          arch_count="$(gh release view "$stable" --json assets --jq '[.assets[].name | select(endswith(".pkg.tar.zst"))] | length')"
+          if [ "$arch_count" -gt 0 ]; then
+            gh release download "$stable" --pattern '*.pkg.tar.zst' --dir packages/stable
+          fi
       - name: Import dedicated repository signing key
         env:
           PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
@@ -538,6 +554,9 @@ jobs:
               gpg --verify "site/$channel/rpm/repodata/repomd.xml.asc" "site/$channel/rpm/repodata/repomd.xml"
             fi
           done
+          if compgen -G "packages/stable/*.pkg.tar.zst" > /dev/null; then
+            bash scripts/pages/build-arch-repository.sh packages/stable site/packages/stable/arch/x86_64
+          fi
           test -e site/nightly/apt/InRelease
       # Reuse the last stable tag's bundle, including on main/nightly runs.
       # Never build or publish the browser app from an untagged commit.
@@ -555,6 +574,9 @@ jobs:
             tar -xzf browser-release/actionlay-web-*.tar.gz -C site/web
             test -f site/web/index.html
           fi
+          # Public instructions/assets come from the released tag, even on main.
+          git fetch --no-tags origin "refs/tags/$stable:refs/tags/$stable"
+          git restore --source "$stable" -- scripts/pages/render-index.py scripts/pages/landing.html scripts/pages/landing.css scripts/pages/landing.js
           ACTIONLAY_STABLE_TAG="$stable" python3 scripts/pages/render-index.py site
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
