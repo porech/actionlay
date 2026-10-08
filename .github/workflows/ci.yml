@@ -434,85 +434,11 @@ jobs:
   linux-repositories:
     name: Linux package repositories
     needs: publish
-    concurrency:
-      group: actionlay-pages
-      cancel-in-progress: false
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    runs-on: ubuntu-22.04
+    uses: ./.github/workflows/pages.yml
     permissions:
       contents: read
       pages: write
       id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v7
-      - name: Install repository tools
-        run: sudo apt-get update && sudo apt-get install -y apt-utils dpkg-dev createrepo-c rpm gnupg
-      - name: Download current stable and development packages
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p packages/stable packages/nightly
-          stable="$(gh release view --json tagName --jq .tagName)"
-          for channel in stable nightly; do
-            tag="$stable"
-            if [ "$channel" = nightly ]; then tag=nightly; fi
-            # Older releases have no native packages yet. Do not advertise an
-            # unsigned or empty repository for those releases.
-            count="$(gh release view "$tag" --json assets --jq '[.assets[].name | select(endswith(".deb") or endswith(".rpm"))] | length')"
-            if [ "$count" -gt 0 ]; then
-              gh release download "$tag" --pattern '*.deb' --pattern '*.rpm' --dir "packages/$channel"
-            fi
-          done
-      - name: Import dedicated repository signing key
-        env:
-          PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-        run: |
-          test -n "$PRIVATE_KEY"
-          install -d -m 700 "$RUNNER_TEMP/actionlay-gnupg"
-          echo "GNUPGHOME=$RUNNER_TEMP/actionlay-gnupg" >> "$GITHUB_ENV"
-          printf '%s' "$PRIVATE_KEY" | gpg --homedir "$RUNNER_TEMP/actionlay-gnupg" --batch --import
-          gpg --homedir "$RUNNER_TEMP/actionlay-gnupg" --batch --import packaging/linux/repository-key.asc
-          fingerprint="$(gpg --homedir "$RUNNER_TEMP/actionlay-gnupg" --list-secret-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}')"
-          expected="$(gpg --show-keys --with-colons packaging/linux/repository-key.asc | awk -F: '/^fpr:/ {print $10; exit}')"
-          test "$fingerprint" = "$expected"
-          echo "GPG_FPR=$fingerprint" >> "$GITHUB_ENV"
-      - name: Build and verify signed repositories
-        run: |
-          mkdir -p site
-          for channel in stable nightly; do
-            if compgen -G "packages/$channel/*.deb" > /dev/null; then
-              bash scripts/pages/build-repositories.sh "packages/$channel" site "$channel"
-              gpg --verify "site/$channel/apt/InRelease"
-              gpg --verify "site/$channel/rpm/repodata/repomd.xml.asc" "site/$channel/rpm/repodata/repomd.xml"
-            fi
-          done
-          test -e site/nightly/apt/InRelease
-      # Reuse the last stable tag's bundle, including on main/nightly runs.
-      # Never build or publish the browser app from an untagged commit.
-      - name: Download stable browser release for Pages
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          stable="$(gh release view --json tagName --jq .tagName)"
-          count="$(gh release view "$stable" --json assets --jq '[.assets[].name | select(startswith("actionlay-web-") and endswith(".tar.gz"))] | length')"
-          if [ "$count" -gt 0 ]; then
-            test "$count" -eq 1
-            mkdir -p browser-release site/web
-            gh release download "$stable" --pattern 'actionlay-web-*.tar.gz' --dir browser-release
-            tar -xzf browser-release/actionlay-web-*.tar.gz -C site/web
-            test -f site/web/index.html
-          fi
-          python3 scripts/pages/render-index.py site
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: site
-      - name: Deploy repositories
-        id: deploy
-        uses: actions/deploy-pages@v5
-      - name: Remove temporary signing keyring
-        if: always()
-        run: rm -rf "$RUNNER_TEMP/actionlay-gnupg"
+    secrets:
+      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}

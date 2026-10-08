@@ -78,11 +78,13 @@ create duplicate per-user integration. Package install/remove refreshes MIME and
 desktop databases. The glibc 2.35 baseline supports Ubuntu 22.04+, Mint 21+,
 Debian 12+ and recent Fedora-compatible systems; it does not support musl Alpine.
 
-The `Linux package repositories` job in `ci.yml` runs after the release publication
-job succeeds and reconstructs both
+The `Linux package repositories` job in `ci.yml` calls the reusable `pages.yml`
+workflow after release publication succeeds and reconstructs both
 stable and nightly APT/DNF repositories from release assets. It verifies and signs
 metadata with the dedicated `GPG_PRIVATE_KEY` secret, signs RPM packages, then
-deploys GitHub Pages at <https://porech.github.io/actionlay/>. Repository deployment
+deploys GitHub Pages. Linux setup instructions live at
+<https://porech.github.io/actionlay/packages/>; existing `/stable/` and `/nightly/`
+repository URLs stay unchanged. The root is reserved for the project site. Repository deployment
 failures therefore fail the same CI run. The signing key and Pages permissions
 are scoped to this job; pull requests and non-release branches skip it. A release without
 native packages is not advertised as an available channel. The public key is
@@ -94,3 +96,12 @@ The macOS DMG background is in `assets/dmg`. Packaging writes Finder positions
 and the background alias directly using pinned `ds-store`/`mac-alias` tools in a
 temporary venv, without requiring Finder or UI scripting on CI. The installed
 application does not depend on Python.
+
+Pages always reuses the latest stable release's browser archive; main builds never
+publish an untagged browser build. After deployment, CI checks the served HTML,
+entry assets and WASM against that archive, since a successful deployment alone
+does not prove the new files are being served. The `Publish stable Pages` workflow
+can also be dispatched manually to republish existing release assets without
+rebuilding or replacing binaries. GitHub Pages can reuse an earlier deployment
+when main and a tag share a commit SHA; if verification detects stale files, run
+the workflow from a newer main commit and verify the public URLs again.
