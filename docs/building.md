@@ -255,9 +255,12 @@ Exports await backpressure instead of retaining all decoded frames. File-system
 export commits only on success and aborts on cancellation; the fallback is a
 bounded in-memory download. Native export has different format coverage and
 cancellation behavior, described in the README and [browser guide](web.md).
-Do not assume a feature in a shared crate is wired into both frontends: external
-activities, native camera formats and joined chapters currently have desktop
-playback support but are not connected in the browser shell.
+Do not assume a feature in a shared crate is wired into both frontends. Linked
+GPX/FIT/INSGPS activities are connected to desktop and browser preview/export;
+other embedded native-camera formats and joined chapters currently have desktop
+playback support but are not connected in the browser shell. The
+[activity source guide](activity-sources.md) documents discovery, matching,
+alignment, persistence, INSGPS records and regression coverage.
 
 ### Layouts, preferences and localization
 

@@ -74,9 +74,14 @@ selection, properties, dragging, resizing, grouping, and undo/redo; device file
 access uses upload/download rather than arbitrary paths.
 
 Video playback follows the browser's container/codec support. Embedded GoPro GPMF
-is extracted, including fragmented MP4 indexes. Other camera telemetry, linked
-GPX/FIT activities, automatic chapter discovery and joined timelines are not yet
-connected in the browser shell.
+is extracted, including fragmented MP4 indexes. ActionLay 1.4.0 also links
+GPX/FIT/INSGPS files, with multiple-file/folder matching, explicit candidate
+selection, UTC overrides and activity offsets. Linked data is used in preview
+and export, including after progressive camera metadata updates. See
+[linked activities](activity-sources.md) for the exact selection/alignment rules,
+storage behavior and sample-derived INSGPS format. Other embedded camera telemetry,
+automatic chapter discovery and joined timelines are not connected in the
+browser shell.
 
 Export supports H.264 or H.265 MP4 when the browser encoder supports the source
 resolution, either video with overlay or a solid-colour overlay. It keeps source
@@ -105,6 +110,10 @@ npm run test:browser
 Browser integration tests use the production bundle under `/web/`, including
 preferences and layout assets across reload, shared editor startup, draft discard,
 playback/seek, trimmed export with AAC audio, streamed export and cancellation.
+Source integration checks also cover timestamp matching against MP4 creation
+metadata, folder selection, ambiguous candidates, start fallback, translated
+warnings, saved offsets, and external telemetry surviving camera updates and
+unlinking.
 FFmpeg/ffprobe are used only to generate and inspect the test video, not by the
 web application. Existing native layout, rendering, telemetry and application
 checks remain part of desktop CI.

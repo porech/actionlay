@@ -61,6 +61,7 @@ fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Params {
     rows: [[f32; 4]; 3],
+    rotation: [u32; 4],
 }
 
 struct Textures {
@@ -85,6 +86,7 @@ struct Resources {
 type Pending = Arc<Mutex<Option<(Nv12Frame, ColorInfo)>>>;
 
 pub struct VideoView {
+    rotation: crate::rotation::Rotation,
     pending: Pending,
     size: Option<(u32, u32)>,
     overlay: PendingOverlay,
@@ -128,7 +130,7 @@ impl VideoView {
                 },
                 wgpu::BindGroupLayoutEntry {
                     binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -246,6 +248,7 @@ impl VideoView {
             overlay: None,
         });
         Self {
+            rotation: Default::default(),
             pending: Arc::new(Mutex::new(None)),
             size: None,
             overlay: Arc::new(Mutex::new(None)),
@@ -257,6 +260,10 @@ impl VideoView {
     pub fn upload(&mut self, frame: Nv12Frame, color: ColorInfo) {
         self.size = Some((frame.width, frame.height));
         *self.pending.lock().unwrap() = Some((frame, color));
+    }
+
+    pub fn set_rotation(&mut self, rotation: crate::rotation::Rotation) {
+        self.rotation = rotation;
     }
 
     /// Hide the previous video's frame immediately, including before a newly
@@ -292,7 +299,10 @@ impl VideoView {
     /// before the first frame). Pass the result to [`VideoView::show`] and use it for the
     /// overlay size.
     pub fn video_rect(&self, available: egui::Rect, ppp: f32) -> Option<egui::Rect> {
-        self.size.map(|(w, h)| video_rect_px(available, w, h, ppp))
+        self.size.map(|(w, h)| {
+            let [w, h] = self.rotation.dimensions(w, h);
+            video_rect_px(available, w, h, ppp)
+        })
     }
 
     /// Fills `rect` with black and draws the video in `video` (from
@@ -312,6 +322,7 @@ impl VideoView {
         ui.painter().add(egui_wgpu::Callback::new_paint_callback(
             target,
             Paint {
+                rotation: self.rotation,
                 pending: self.pending.clone(),
                 overlay: self.overlay.clone(),
                 recycled: self.recycled.clone(),
@@ -323,6 +334,7 @@ impl VideoView {
 }
 
 struct Paint {
+    rotation: crate::rotation::Rotation,
     pending: Pending,
     overlay: PendingOverlay,
     recycled: Recycled,
@@ -357,9 +369,16 @@ impl egui_wgpu::CallbackTrait for Paint {
                 0,
                 bytemuck::bytes_of(&Params {
                     rows: yuv_to_rgb(color),
+                    rotation: [self.rotation.turns(), 0, 0, 0],
                 }),
             );
         }
+        // Update even while paused: orientation does not require decoding a frame.
+        queue.write_buffer(
+            &res.params,
+            48,
+            bytemuck::bytes_of(&[self.rotation.turns(), 0u32, 0, 0]),
+        );
         if self.clear_overlay.swap(false, Ordering::AcqRel) {
             res.overlay = None;
         }
@@ -596,6 +615,18 @@ mod tests {
         for name in ["vs_main", "fs_main", "fs_main_srgb"] {
             assert!(entries.contains(&name), "{name} missing: {entries:?}");
         }
+    }
+
+    #[test]
+    fn oriented_video_shader_is_valid_wgsl() {
+        let module = naga::front::wgsl::parse_str(include_str!("yuv.wgsl")).expect("parses");
+        naga::valid::Validator::new(
+            naga::valid::ValidationFlags::all(),
+            naga::valid::Capabilities::all(),
+        )
+        .validate(&module)
+        .expect("validates");
+        assert_eq!(std::mem::size_of::<Params>(), 64);
     }
 
     /// Size of the viewport egui-wgpu gives the paint callback of `rect`.

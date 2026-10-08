@@ -81,6 +81,8 @@ pub struct WriterOptions {
     pub hardware: bool,
     pub encoding: EncodingSettings,
     pub dimensions: Option<[u32; 2]>,
+    /// RGBA canvas supplied to write(), after any video rotation.
+    pub input_dimensions: Option<[u32; 2]>,
     pub container: &'static str,
 }
 
@@ -393,8 +395,12 @@ impl Writer {
         }
         let mut scaler = scaling::Context::get(
             Pixel::RGBA,
-            decoder.width(),
-            decoder.height(),
+            settings
+                .input_dimensions
+                .unwrap_or([decoder.width(), decoder.height()])[0],
+            settings
+                .input_dimensions
+                .unwrap_or([decoder.width(), decoder.height()])[1],
             pixel,
             width,
             height,

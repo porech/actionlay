@@ -1,3 +1,9 @@
+> Historical milestone report. ActionLay 1.4.0 adds INSGPS parsing,
+> multiple-file/folder matching, single-file start fallback, browser activity
+> linking, linked-activity export and desktop video rotation. See the
+> [current activity source guide](activity-sources.md); export/browser limits
+> recorded below describe the original milestone implementation.
+
 # M6 implementation and validation
 
 GPX/FIT activities can be linked through File → Video sources… or dropped onto

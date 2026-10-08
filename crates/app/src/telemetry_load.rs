@@ -648,11 +648,12 @@ pub fn spawn_camera(
 pub fn spawn_activity(
     path: std::path::PathBuf,
     wake: impl Fn() + Send + 'static,
-) -> mpsc::Receiver<Result<actionlay_telemetry::external::Activity, String>> {
+) -> mpsc::Receiver<
+    Result<actionlay_telemetry::external::Activity, actionlay_telemetry::external::ExternalError>,
+> {
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
-        let result =
-            actionlay_telemetry::external::Activity::read(&path).map_err(|e| e.to_string());
+        let result = actionlay_telemetry::external::Activity::read(&path);
         if tx.send(result).is_ok() {
             wake();
         }

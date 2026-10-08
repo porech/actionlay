@@ -1,7 +1,7 @@
 import { createFile } from 'mp4box';
 // First read only the container index. Then read just the GPMF samples by offset.
 // The source video is never copied wholesale into JS or WASM memory.
-export async function openGpmf(file, core, duration, signal) {
+export async function openGpmf(file, core, duration, signal, onMetadata = () => {}) {
   const mp4 = createFile(false);
   let movie;
   let failure;
@@ -18,6 +18,10 @@ export async function openGpmf(file, core, duration, signal) {
   }
   mp4.flush();
   if (!movie) return null; // Non-MP4 playback can still work, without GoPro telemetry.
+  const date = [movie.videoTracks?.[0]?.created, movie.created]
+    .filter(value => value != null).map(value => value instanceof Date ? value : new Date(value))
+    .find(value => Number.isFinite(value.getTime()) && value.getUTCFullYear() >= 1970);
+  onMetadata(date?.toISOString() ?? null);
   const track = movie.tracks.find(t => t.codec === 'gpmd');
   if (!track) return null;
   const samples = mp4.getTrackById(track.id).samples;

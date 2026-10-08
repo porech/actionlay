@@ -4,6 +4,7 @@ struct Params {
     r: vec4<f32>,
     g: vec4<f32>,
     b: vec4<f32>,
+    rotation: vec4<u32>,
 };
 
 @group(0) @binding(0) var y_tex: texture_2d<f32>;
@@ -27,6 +28,12 @@ fn vs_main(@builtin(vertex_index) i: u32) -> VsOut {
     var out: VsOut;
     out.pos = vec4(c.x * 2.0 - 1.0, 1.0 - c.y * 2.0, 0.0, 1.0);
     out.uv = c;
+    switch params.rotation.x {
+        case 1u: { out.uv = vec2(c.y, 1.0 - c.x); }
+        case 2u: { out.uv = vec2(1.0 - c.x, 1.0 - c.y); }
+        case 3u: { out.uv = vec2(1.0 - c.y, c.x); }
+        default: {}
+    }
     return out;
 }
 

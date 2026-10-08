@@ -10,3 +10,11 @@ ffmpeg -f lavfi -i 'testsrc2=size=160x90:rate=10:duration=3' \
   -c:v libx264 -preset fast -crf 28 -pix_fmt yuv420p \
   -c:a aac -b:a 32k -shortest export-source.mp4
 ```
+
+`export-source-rotated.mp4` has the same encoded frames and audio, with a
+display matrix requesting 90° clockwise. Generated without re-encoding:
+
+```sh
+ffmpeg -display_rotation:v:0 -90 -i export-source.mp4 -map 0 -c copy \
+  export-source-rotated.mp4
+```

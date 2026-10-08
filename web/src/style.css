@@ -25,3 +25,7 @@ input[type=color]::-moz-color-swatch{border:0;border-radius:3px}
 
 #drop-hint{position:fixed;inset:12px;z-index:20;pointer-events:none;display:grid;place-items:center;border:3px dashed #70d5b6;border-radius:12px;background:rgba(15,24,29,.88)}
 #drop-hint span{padding:20px;text-align:center;font-size:24px;font-weight:600;color:#8adcc6}
+
+#activity-candidates { display:flex; flex-direction:column; gap:.5rem; }
+#activity-candidates button { overflow-wrap:anywhere; text-align:start; }
+#activity-candidates p, #activity-status { overflow-wrap:anywhere; }

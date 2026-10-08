@@ -14,8 +14,8 @@ or a separate overlay for your video editor. Free and open source.
 
 | System | Download | Install |
 |---|---|---|
-| macOS 12+, Apple Silicon **and Intel** | [Universal DMG](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.3.0-macos-universal.dmg) | Open the DMG and drag ActionLay to Applications |
-| Windows 10/11, 64-bit | [Windows installer](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.3.0-windows-x64-setup.exe) | Choose installation for yourself or everyone; desktop shortcut optional |
+| macOS 12+, Apple Silicon **and Intel** | [Universal DMG](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.4.0-macos-universal.dmg) | Open the DMG and drag ActionLay to Applications |
+| Windows 10/11, 64-bit | [Windows installer](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.4.0-windows-x64-setup.exe) | Choose installation for yourself or everyone; desktop shortcut optional |
 | Linux, 64-bit | [Package repositories and setup instructions](https://porech.github.io/actionlay/packages/) | Add the APT or DNF repository, then install `actionlay` |
 
 The **[latest release](https://github.com/porech/actionlay/releases/latest)** also
@@ -62,9 +62,9 @@ The web version has these limits:
   support. Video exports retain supported source AAC audio. Quality presets,
   advanced encoding controls, ProRes, transparent overlays and PNG sequences
   require desktop.
-- Telemetry currently comes from embedded GoPro GPMF. Linked GPX/FIT activities,
-  other camera telemetry and joined chapter timelines require desktop. The web
-  layout editor previews demonstration telemetry.
+- Telemetry comes from embedded GoPro GPMF or linked GPX/FIT/INSGPS activities.
+  Other embedded camera telemetry and joined chapter timelines require desktop.
+  The web layout editor previews demonstration telemetry.
 - Where direct file saving is unavailable, export uses an in-memory download
   limited to **256 MB**. Browser storage quotas can limit saved recent layouts.
 - Map providers must allow browser requests through CORS; the browser map cache
@@ -78,9 +78,14 @@ web app follows stable releases; development builds do not replace it.
 - **View telemetry while watching footage.** GoPro GPS, speed, altitude,
   acceleration, orientation and more appear in gauges, charts, maps and a G-meter.
   Missing data is shown as unavailable.
-- **Use GPX/FIT activities** from a bike computer or watch. Link them to a video,
-  align their timestamps and adjust the offset. Supported DJI/Insta360 files can
+- **Use GPX/FIT/INSGPS activities** from a bike computer, watch or Insta360 phone
+  app. Select one file, several files or a folder. Matching timestamps identify
+  candidates; ambiguous matches require a choice. Single files can fall back to
+  aligning starts, with an adjustable offset. Supported DJI/Insta360 videos can
   also supply native camera telemetry; coverage depends on the camera and firmware.
+- **Rotate footage on desktop.** Automatic respects video orientation metadata;
+  manual 0°, clockwise 90°, 180° and counterclockwise 90° choices apply to preview
+  and export.
 - **Watch in full screen.** Press F11 to enter; controls and the pointer hide
   after 3 seconds and reappear when you move the mouse. Escape exits. Window
   position, size and maximized state are remembered.
@@ -102,8 +107,12 @@ web app follows stable releases; development builds do not replace it.
 
 Open or drag a video into ActionLay. Choose **File → Select Layout…** to switch
 dashboards, or open the visual editor to create your own. The editor also works
-without a video. Drag a GPX/FIT file onto an open video or use **File → Video
-sources…** to link an activity and adjust alignment.
+without a video. Drag a GPX/FIT/INSGPS file or activity folder onto an open video,
+or use **File → Video sources…** to link activities and adjust alignment. In the
+browser, expand **Video sources** for file/folder selection and alignment controls.
+See [linked activities and video orientation](docs/activity-sources.md) for matching
+rules, offset examples, the INSGPS representation and verification. These source
+and orientation controls are available in ActionLay 1.4.0.
 
 Widgets that need historical telemetry show their own loading indicator and
 percentage until the required data is available, including after seeking.
@@ -162,9 +171,9 @@ green by default.
 Existing destinations are not overwritten. Cancellation keeps completed frames
 in a playable partial output.
 
-Export currently processes **one source file with embedded GoPro telemetry**.
-Linked activities, native-camera telemetry and joined chapter timelines are not
-included yet. Export uses eight-bit SDR decoding. Insta360 playback displays the
+Export currently processes **one source file with embedded GoPro telemetry and
+any linked GPX/FIT/INSGPS activity**. Other embedded native-camera telemetry and
+joined chapter timelines are not included yet. Export uses eight-bit SDR decoding. Insta360 playback displays the
 raw camera stream, without 360 stitching or reframing.
 
 ### Command-line tools
@@ -207,7 +216,7 @@ or GPL-3.0-or-later, at your option; see the [artwork licence and attribution](a
 The binaries include GPL-enabled FFmpeg,
 x264 and x265. Source revisions and build scripts are included in the repository;
 licence notices and source links accompany the downloads. Each release also
-includes the exact FFmpeg/x264/x265 sources in `third-party-sources-1.3.0.tar.gz`.
+includes the exact FFmpeg/x264/x265 sources in `third-party-sources-1.4.0.tar.gz`.
 
 ## Legal notice
 

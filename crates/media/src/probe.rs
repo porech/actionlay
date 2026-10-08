@@ -8,6 +8,8 @@ use crate::{MediaError, color::ColorInfo, ffmpeg_info};
 
 #[derive(Debug, Clone)]
 pub struct VideoInfo {
+    /// Display-matrix orientation, clockwise degrees (0, 90, 180, 270).
+    pub rotation: u16,
     pub stream_index: usize,
     pub codec: String,
     pub width: u32,
@@ -28,6 +30,7 @@ pub struct AudioInfo {
 
 #[derive(Debug, Clone)]
 pub struct MediaInfo {
+    pub creation_time: Option<String>,
     /// FFmpeg demuxer names and the ISO base-media major brand, when available.
     pub container: String,
     pub major_brand: Option<String>,
@@ -63,6 +66,7 @@ pub(crate) fn describe(input: &ffmpeg::format::context::Input) -> Result<MediaIn
     let rate = vstream.avg_frame_rate();
     let pixel = vdec.format();
     let video = VideoInfo {
+        rotation: stream_rotation(&vstream),
         stream_index: vstream.index(),
         codec: vdec
             .codec()
@@ -116,6 +120,11 @@ pub(crate) fn describe(input: &ffmpeg::format::context::Input) -> Result<MediaIn
             packet_count: usize::try_from(s.frames()).ok().filter(|n| *n > 0),
         });
     Ok(MediaInfo {
+        creation_time: vstream
+            .metadata()
+            .get("creation_time")
+            .map(str::to_owned)
+            .or_else(|| input.metadata().get("creation_time").map(str::to_owned)),
         container: input.format().name().to_owned(),
         major_brand: input.metadata().get("major_brand").map(str::to_owned),
         duration,
@@ -123,4 +132,31 @@ pub(crate) fn describe(input: &ffmpeg::format::context::Input) -> Result<MediaIn
         audio,
         telemetry,
     })
+}
+
+fn stream_rotation(stream: &ffmpeg::Stream<'_>) -> u16 {
+    let Some(data) = stream
+        .side_data()
+        .find(|d| d.kind() == ffmpeg::codec::packet::side_data::Type::DisplayMatrix)
+    else {
+        return 0;
+    };
+    if data.data().len() < 36 {
+        return 0;
+    }
+    // Copy into an aligned matrix; side-data byte pointers need not be aligned.
+    let matrix: [i32; 9] = std::array::from_fn(|i| {
+        i32::from_ne_bytes(data.data()[i * 4..i * 4 + 4].try_into().unwrap())
+    });
+    // SAFETY: matrix holds the nine native-endian elements required by FFmpeg.
+    let angle = unsafe { ffmpeg::ffi::av_display_rotation_get(matrix.as_ptr()) };
+    if !angle.is_finite() {
+        return 0;
+    }
+    let clockwise = (-angle).rem_euclid(360.0);
+    let quarter = (clockwise / 90.0).round();
+    if (clockwise - quarter * 90.0).abs() > 1.0 {
+        return 0;
+    }
+    ((quarter as u16) % 4) * 90
 }

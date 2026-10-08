@@ -41,9 +41,27 @@ mod video_view {
 fn error(e: impl std::fmt::Display) -> JsValue {
     JsValue::from_str(&e.to_string())
 }
+fn activity_error(e: actionlay_telemetry::external::ExternalError) -> JsValue {
+    match e {
+        actionlay_telemetry::external::ExternalError::Read(detail) => error(detail),
+        actionlay_telemetry::external::ExternalError::NoSamples => error("No timestamped samples."),
+        actionlay_telemetry::external::ExternalError::NoOverlap => {
+            error("No activity data at this offset.")
+        }
+        actionlay_telemetry::external::ExternalError::InvalidSync => {
+            error("Invalid activity offset")
+        }
+        other => error(other),
+    }
+}
 struct State {
     layout: Layout,
     telemetry: Telemetry,
+    camera_telemetry: Telemetry,
+    activity: Option<actionlay_telemetry::external::Activity>,
+    video_utc: Option<chrono::DateTime<chrono::Utc>>,
+    metadata_utc: Option<chrono::DateTime<chrono::Utc>>,
+    activity_offset: f64,
     packets: Vec<RawPacket>,
     renderer: Renderer,
     pixels: Option<Pixmap>,
@@ -71,6 +89,11 @@ impl Core {
         Self(Rc::new(RefCell::new(State {
             layout: actionlay_layout::default_layout(),
             telemetry: Telemetry::empty(0.0),
+            camera_telemetry: Telemetry::empty(0.0),
+            activity: None,
+            video_utc: None,
+            metadata_utc: None,
+            activity_offset: 0.0,
             packets: Vec::new(),
             renderer,
             pixels: None,
@@ -161,6 +184,11 @@ impl Core {
         s.read_ranges.clear();
         s.video_duration = duration;
         s.telemetry = Telemetry::pending(duration);
+        s.camera_telemetry = Telemetry::pending(duration);
+        s.activity = None;
+        s.video_utc = None;
+        s.metadata_utc = None;
+        s.activity_offset = 0.0;
     }
     pub fn add_packet(&self, pts: f64, duration: f64, data: &[u8]) {
         self.0.borrow_mut().packets.push(RawPacket {
@@ -173,12 +201,13 @@ impl Core {
         let mut s = self.0.borrow_mut();
         if !s.packets.is_empty() {
             s.packets.sort_by(|a, b| a.pts.total_cmp(&b.pts));
-            s.telemetry = Telemetry::from_gpmf_packets_progressive(&s.packets).map_err(error)?;
+            s.camera_telemetry =
+                Telemetry::from_gpmf_packets_progressive(&s.packets).map_err(error)?;
             let ranges = s.read_ranges.clone();
             let duration = s.video_duration;
-            s.telemetry.record_read_ranges(&ranges, duration);
+            s.camera_telemetry.record_read_ranges(&ranges, duration);
         }
-        Ok(())
+        s.refresh_sources().map(|_| ()).map_err(error)
     }
     pub fn finish_telemetry(&self, duration: f64) -> Result<usize, JsValue> {
         let mut s = self.0.borrow_mut();
@@ -190,11 +219,78 @@ impl Core {
         packets.sort_by(|a, b| a.pts.total_cmp(&b.pts));
         let count = packets.len();
         if count > 0 {
-            s.telemetry = Telemetry::from_gpmf_packets_with(&packets, &options).map_err(error)?;
+            s.camera_telemetry =
+                Telemetry::from_gpmf_packets_with(&packets, &options).map_err(error)?;
         } else {
-            s.telemetry = Telemetry::empty(duration);
+            s.camera_telemetry = Telemetry::empty(duration);
         }
+        s.refresh_sources().map_err(activity_error)?;
         Ok(count)
+    }
+
+    pub fn set_video_utc(&self, utc: Option<String>) -> Result<String, JsValue> {
+        let mut s = self.0.borrow_mut();
+        s.video_utc = utc
+            .filter(|u| !u.trim().is_empty())
+            .map(|u| {
+                chrono::DateTime::parse_from_rfc3339(u.trim())
+                    .map(|u| u.with_timezone(&chrono::Utc))
+            })
+            .transpose()
+            .map_err(|_| error("Invalid video UTC timestamp"))?;
+        s.refresh_sources().map_err(activity_error)
+    }
+
+    pub fn video_utc(&self) -> Option<String> {
+        let s = self.0.borrow();
+        s.origin().map(|t| t.to_rfc3339())
+    }
+
+    pub fn set_video_metadata_utc(&self, utc: Option<String>) -> Result<(), JsValue> {
+        let mut s = self.0.borrow_mut();
+        s.metadata_utc = utc
+            .map(|u| {
+                chrono::DateTime::parse_from_rfc3339(&u).map(|u| u.with_timezone(&chrono::Utc))
+            })
+            .transpose()
+            .map_err(error)?;
+        Ok(())
+    }
+
+    pub fn activity_summary(&self, name: &str, data: &[u8]) -> Result<String, JsValue> {
+        let activity = actionlay_telemetry::external::Activity::from_bytes(name, data)
+            .map_err(activity_error)?;
+        let s = self.0.borrow();
+        let (start, end) = activity.time_range();
+        Ok(serde_json::json!({"start":start.to_rfc3339(),"end":end.to_rfc3339(),"samples":activity.points.len(),"matches":activity.overlaps_video(s.origin(),s.video_duration),"videoUtc":s.origin().map(|t| t.to_rfc3339())}).to_string())
+    }
+
+    pub fn link_activity(&self, name: &str, data: &[u8], offset: f64) -> Result<String, JsValue> {
+        if !offset.is_finite() {
+            return Err(error("Invalid activity offset"));
+        }
+        let activity = actionlay_telemetry::external::Activity::from_bytes(name, data)
+            .map_err(activity_error)?;
+        let mut s = self.0.borrow_mut();
+        s.activity = Some(activity);
+        s.activity_offset = offset;
+        s.refresh_sources().map_err(activity_error)
+    }
+
+    pub fn set_activity_offset(&self, offset: f64) -> Result<String, JsValue> {
+        if !offset.is_finite() {
+            return Err(error("Invalid activity offset"));
+        }
+        let mut s = self.0.borrow_mut();
+        s.activity_offset = offset;
+        s.refresh_sources().map_err(activity_error)
+    }
+
+    pub fn unlink_activity(&self) {
+        let mut s = self.0.borrow_mut();
+        s.activity = None;
+        s.activity_offset = 0.0;
+        s.telemetry = s.camera_telemetry.clone();
     }
     /// Premultiplied RGBA from the same renderer used by desktop preview/export.
     pub fn render(&self, time: f64, width: u32, height: u32) -> Result<Vec<u8>, JsValue> {
@@ -359,6 +455,28 @@ impl Core {
         } else {
             actionlay_layout::package::attach(&mut s.layout, key, data.to_vec()).map_err(error)
         }
+    }
+}
+impl State {
+    fn origin(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        self.video_utc
+            .or_else(|| self.camera_telemetry.start_utc())
+            .or(self.metadata_utc)
+    }
+    fn refresh_sources(&mut self) -> Result<String, actionlay_telemetry::external::ExternalError> {
+        let mut telemetry = self.camera_telemetry.clone();
+        let mut fallback = false;
+        let mut samples = 0;
+        if let Some(activity) = &self.activity {
+            let (origin, uses_starts) = activity.sync_origin(self.origin(), self.video_duration);
+            let external =
+                activity.align(Some(origin), self.video_duration, self.activity_offset)?;
+            telemetry = telemetry.merge_external(&external, self.video_duration);
+            fallback = uses_starts;
+            samples = activity.points.len();
+        }
+        self.telemetry = telemetry;
+        Ok(serde_json::json!({"fallback":fallback,"samples":samples,"videoUtc":self.origin().map(|t| t.to_rfc3339())}).to_string())
     }
 }
 impl Core {

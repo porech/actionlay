@@ -5,6 +5,7 @@
 )]
 
 mod about;
+mod activity_sources;
 mod advanced;
 mod editor;
 mod export;
@@ -16,6 +17,7 @@ mod map_loading;
 mod menus;
 mod overlay;
 mod prefs;
+mod rotation;
 mod telemetry_load;
 mod transport;
 mod video_view;
@@ -59,10 +61,19 @@ struct App {
     select_sources: bool,
     camera_telemetry: Option<Arc<Telemetry>>,
     activity: Option<actionlay_telemetry::external::Activity>,
-    activity_rx:
-        Option<std::sync::mpsc::Receiver<Result<actionlay_telemetry::external::Activity, String>>>,
+    activity_rx: Option<
+        std::sync::mpsc::Receiver<
+            Result<
+                actionlay_telemetry::external::Activity,
+                actionlay_telemetry::external::ExternalError,
+            >,
+        >,
+    >,
     source_settings: prefs::SourceSettings,
     source_notice: Option<String>,
+    activity_scan: Option<std::sync::mpsc::Receiver<activity_sources::Scan>>,
+    activity_candidates: Vec<activity_sources::Candidate>,
+    activity_scan_errors: Vec<String>,
     chapter_offer: Option<usize>,
     audio_devices: Vec<String>,
     volume: f32,
@@ -123,10 +134,10 @@ impl App {
         if let Some(player) = &mut self.player {
             player.pause();
         }
-        let size = self
-            .player
-            .as_ref()
-            .map(|p| [p.info().video.width, p.info().video.height]);
+        let size = self.player.as_ref().map(|p| {
+            self.video_rotation()
+                .dimensions(p.info().video.width, p.info().video.height)
+        });
         self.select_layout = false;
         self.editor = Some(editor::Editor::new(
             if new {
@@ -844,10 +855,101 @@ impl App {
             self.save_prefs();
         }
     }
+
+    fn video_rotation(&self) -> rotation::Rotation {
+        self.source_settings
+            .rotation
+            .resolve(self.player.as_ref().map_or(0, |p| p.info().video.rotation))
+    }
+
+    fn video_utc(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        if !self.source_settings.video_utc.trim().is_empty() {
+            return chrono::DateTime::parse_from_rfc3339(self.source_settings.video_utc.trim())
+                .ok()
+                .map(|u| u.with_timezone(&chrono::Utc));
+        }
+        self.camera_telemetry
+            .as_ref()
+            .and_then(|t| t.start_utc())
+            .or_else(|| {
+                self.player
+                    .as_ref()?
+                    .info()
+                    .creation_time
+                    .as_deref()
+                    .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                    .filter(|u| u.timestamp() >= 0)
+                    .map(|u| u.with_timezone(&chrono::Utc))
+            })
+    }
+
+    fn scan_activities(&mut self, paths: Vec<PathBuf>) {
+        self.activity_rx = None;
+        self.activity_candidates.clear();
+        self.activity_scan_errors.clear();
+        let ctx = self.egui_ctx.clone();
+        self.activity_scan = Some(activity_sources::spawn(paths, move || {
+            ctx.request_repaint()
+        }));
+        self.source_notice = Some(crate::i18n::text("Reading activity…").into());
+    }
+
+    fn poll_activity_scan(&mut self) {
+        let Some(rx) = &self.activity_scan else {
+            return;
+        };
+        let Ok(scan) = rx.try_recv() else {
+            return;
+        };
+        self.activity_scan = None;
+        self.activity_scan_errors = scan.errors;
+        let origin = self.video_utc();
+        let duration = self.player.as_ref().map_or(0.0, |p| p.info().duration);
+        self.activity_candidates = scan
+            .candidates
+            .into_iter()
+            .filter(|c| c.activity.overlaps_video(origin, duration))
+            .collect();
+        if self.activity_candidates.len() == 1 {
+            let candidate = self.activity_candidates.pop().unwrap();
+            self.link_activity(candidate.path);
+        } else {
+            let notice = if origin.is_none() {
+                activity_sources::UNKNOWN_TIME
+            } else if self.activity_candidates.is_empty() {
+                activity_sources::NO_MATCH
+            } else {
+                activity_sources::CHOOSE
+            };
+            self.source_notice = Some(crate::i18n::text(notice).into());
+        }
+    }
+
+    fn refresh_rotation(&mut self) {
+        let rotation = self.video_rotation();
+        self.view.set_rotation(rotation);
+        if let Some(player) = &self.player {
+            let [width, height] =
+                rotation.dimensions(player.info().video.width, player.info().video.height);
+            self.scale_mode = layouts::scale_mode_for(width, height, &self.layout);
+            self.overlay
+                .set_layout(self.layout.clone(), self.scale_mode);
+            self.refresh_sources();
+        }
+        self.view.clear_overlay();
+        self.overlay_ready = false;
+        self.scheduler.reset();
+        self.layout_rev += 1;
+    }
     fn link_activity(&mut self, path: PathBuf) {
         if self.player.is_none() {
             self.error = Some("Open a video before linking an activity".into());
             return;
+        }
+        self.activity_scan = None;
+        self.activity_candidates.clear();
+        if self.source_settings.activity.as_ref() != Some(&path) {
+            self.source_settings.offset = 0.0;
         }
         self.activity = None;
         self.refresh_sources();
@@ -873,7 +975,7 @@ impl App {
                 self.save_sources();
             }
             Err(e) => {
-                self.source_notice = Some(e);
+                self.source_notice = Some(activity_sources::error(e));
             }
         }
     }
@@ -882,25 +984,26 @@ impl App {
             return;
         };
         let duration = player.info().duration;
+        if !self.source_settings.video_utc.trim().is_empty() && self.video_utc().is_none() {
+            self.source_notice = Some(crate::i18n::text("Invalid video UTC timestamp").into());
+            return;
+        }
         let mut tel = self
             .camera_telemetry
             .as_ref()
             .map_or_else(|| Telemetry::empty(duration), |t| (**t).clone());
         if let Some(activity) = &self.activity {
-            let origin = if self.source_settings.video_utc.trim().is_empty() {
-                tel.start_utc()
-            } else {
-                chrono::DateTime::parse_from_rfc3339(self.source_settings.video_utc.trim())
-                    .ok()
-                    .map(|u| u.with_timezone(&chrono::Utc))
-            };
-            match activity.align(origin, duration, self.source_settings.offset) {
+            let (origin, fallback) = activity.sync_origin(self.video_utc(), duration);
+            match activity.align(Some(origin), duration, self.source_settings.offset) {
                 Ok(external) => {
                     tel = tel.merge_external(&external, duration);
-                    self.source_notice =
-                        Some(format!("{} activity samples linked", activity.points.len()));
+                    self.source_notice = Some(if fallback {
+                        crate::i18n::text(activity_sources::FALLBACK).into()
+                    } else {
+                        format!("{} activity samples linked", activity.points.len())
+                    });
                 }
-                Err(e) => self.source_notice = Some(e.to_string()),
+                Err(e) => self.source_notice = Some(activity_sources::error(e)),
             }
         }
         let tel = Arc::new(tel);
@@ -914,39 +1017,83 @@ impl App {
         }
         let mut visible = true;
         let mut link = false;
+        let mut folder = false;
+        let mut chosen = None;
         let mut unlink = false;
         let mut changed = false;
         let mut mode_changed = false;
+        let mut rotation_changed = false;
         egui::Window::new(crate::i18n::text("Video sources")).open(&mut visible).default_width(550.0).show(ctx, |ui| {
             let Some(player) = &self.player else { ui.label(crate::i18n::ui_text(ui, "Open a video to link sources.")); return; };
             ui.label(crate::i18n::ui_text(ui, format!("{} video chapter(s)",player.timeline().chapters.len())));
+            ui.horizontal(|ui| {
+                ui.label(crate::i18n::ui_text(ui, "Video rotation"));
+                egui::ComboBox::from_id_salt("video-rotation").selected_text(crate::i18n::text(self.source_settings.rotation.label())).show_ui(ui, |ui| {
+                    for rotation in rotation::Rotation::ALL {
+                        rotation_changed |= ui.selectable_value(&mut self.source_settings.rotation, rotation, crate::i18n::text(rotation.label())).changed();
+                    }
+                });
+            });
             mode_changed = ui.checkbox(&mut self.source_settings.open_alone,crate::i18n::ui_text(ui, "Open this file alone (disable automatic chapters)")).changed();
             ui.add_enabled_ui(!self.source_settings.open_alone, |ui| {
                 mode_changed |= ui.checkbox(&mut self.source_settings.load_sequence,crate::i18n::ui_text(ui, "Load the complete GoPro sequence from its first chapter")).changed();
             });
             ui.separator();
             if let Some(path) = &self.source_settings.activity { ui.label(crate::i18n::user_text(ui, path.display().to_string())); }
-            ui.horizontal(|ui| { link = ui.button(crate::i18n::ui_text(ui, "Link GPX/FIT…")).clicked(); unlink = ui.add_enabled(self.source_settings.activity.is_some(),egui::Button::new(crate::i18n::text("Unlink"))).clicked(); });
+            ui.horizontal(|ui| { link = ui.button(crate::i18n::ui_text(ui, "Link GPX/FIT/INSGPS…")).clicked(); folder = ui.button(crate::i18n::ui_text(ui, "Activity folder…")).clicked(); unlink = ui.add_enabled(self.source_settings.activity.is_some(),egui::Button::new(crate::i18n::text("Unlink"))).clicked(); });
             changed |= ui.add(egui::DragValue::new(&mut self.source_settings.offset).speed(0.1).suffix(crate::i18n::ui_text(ui, " s")).prefix(crate::i18n::ui_text(ui, "Activity offset "))).changed();
             ui.small(crate::i18n::ui_text(ui, "Positive offset moves activity data later in the video."));
             ui.label(crate::i18n::ui_text(ui, "UTC of the first video frame (optional if the camera has GPS)"));
             changed |= ui.add(egui::TextEdit::singleline(&mut self.source_settings.video_utc).hint_text(crate::i18n::ui_text(ui, "2026-09-27T12:15:30Z"))).changed();
             if let Some(utc) = self.camera_telemetry.as_ref().and_then(|t|t.start_utc()) { ui.small(crate::i18n::ui_text(ui, format!("Camera UTC: {utc}"))); }
             if let Some(notice) = &self.source_notice { ui.label(crate::i18n::ui_text(ui, notice)); }
+            egui::ScrollArea::vertical().max_height(220.0).show(ui, |ui| {
+                for (index, candidate) in self.activity_candidates.iter().enumerate() {
+                    let (start, end) = candidate.activity.time_range();
+                    if ui.button(format!("{}\n{start} — {end}", candidate.path.display())).clicked() { chosen = Some(index); }
+                }
+                for error in &self.activity_scan_errors { ui.label(crate::i18n::user_text(ui, format!("{}: {error}", crate::i18n::text("Activity file could not be read")))); }
+            });
             ui.small(crate::i18n::ui_text(ui, "Links and offsets are remembered for this video. External data fills available metrics; camera data fills its gaps."));
         });
         self.select_sources = visible;
+        if rotation_changed {
+            self.refresh_rotation();
+            self.save_sources();
+            self.export_dialog = None;
+        }
         if link
-            && let Some(path) = rfd::FileDialog::new()
+            && let Some(paths) = rfd::FileDialog::new()
                 .set_title(crate::i18n::native_text("Link activity"))
-                .add_filter(crate::i18n::native_text("Activity"), &["gpx", "fit"])
-                .pick_file()
+                .add_filter(
+                    crate::i18n::native_text("Activity"),
+                    &["gpx", "fit", "insgps"],
+                )
+                .pick_files()
         {
-            self.link_activity(path);
+            if paths.len() == 1 {
+                self.link_activity(paths.into_iter().next().unwrap());
+            } else {
+                self.scan_activities(paths);
+            }
+        }
+        if folder
+            && let Some(path) = rfd::FileDialog::new()
+                .set_title(crate::i18n::native_text("Activity folder…"))
+                .pick_folder()
+        {
+            self.scan_activities(vec![path]);
+        }
+        if let Some(index) = chosen {
+            let candidate = self.activity_candidates.remove(index);
+            self.link_activity(candidate.path);
         }
         if unlink {
             self.activity = None;
             self.activity_rx = None;
+            self.activity_scan = None;
+            self.activity_candidates.clear();
+            self.activity_scan_errors.clear();
             self.source_settings.activity = None;
             self.source_notice = None;
             changed = true;
@@ -1140,7 +1287,8 @@ impl App {
                         duration,
                         export::InputProperties::new(
                             self.player.as_ref().expect("export player").info(),
-                        ),
+                        )
+                        .with_rotation(self.video_rotation()),
                     ));
                 }
             }
@@ -1234,6 +1382,9 @@ impl App {
                 self.camera_telemetry = None;
                 self.activity = None;
                 self.activity_rx = None;
+                self.activity_scan = None;
+                self.activity_candidates.clear();
+                self.activity_scan_errors.clear();
                 self.source_notice = None;
                 self.chapter_offer = None;
                 self.video_notice = None;
@@ -1282,8 +1433,9 @@ impl App {
                 let info = p.info();
                 let metadata = info.telemetry.clone();
                 let duration = info.duration;
-                self.scale_mode =
-                    layouts::scale_mode_for(info.video.width, info.video.height, &self.layout);
+                let rotation = settings.rotation.resolve(info.video.rotation);
+                let [width, height] = rotation.dimensions(info.video.width, info.video.height);
+                self.scale_mode = layouts::scale_mode_for(width, height, &self.layout);
                 log::info!(
                     "{}: {}x{} video, overlay scale mode {:?}",
                     path.display(),
@@ -1298,6 +1450,7 @@ impl App {
                 self.save_prefs();
                 self.title_dirty = true;
                 self.view.clear_video();
+                self.view.set_rotation(rotation);
                 self.scrub = Default::default();
                 self.error = None;
                 // the previous video's telemetry, notices and overlay are gone for good:
@@ -1307,6 +1460,9 @@ impl App {
                 self.camera_telemetry = None;
                 self.activity = None;
                 self.activity_rx = None;
+                self.activity_scan = None;
+                self.activity_candidates.clear();
+                self.activity_scan_errors.clear();
                 self.source_notice = None;
                 self.video_notice = self.player.as_ref().and_then(|p| {
                     (p.info().audio.is_some() && !p.stats().audio_active).then(|| {
@@ -1407,7 +1563,8 @@ impl App {
         let layout = Arc::new(styled);
         self.scale_mode = self.player.as_ref().map_or(ScaleMode::Height, |p| {
             let v = &p.info().video;
-            layouts::scale_mode_for(v.width, v.height, &layout)
+            let [width, height] = self.video_rotation().dimensions(v.width, v.height);
+            layouts::scale_mode_for(width, height, &layout)
         });
         log::info!("layout changed, overlay scale mode {:?}", self.scale_mode);
         self.overlay.set_layout(layout.clone(), self.scale_mode);
@@ -1720,19 +1877,35 @@ impl eframe::App for App {
                 .map(|f| f.path().to_path_buf())
                 .collect()
         });
+        let mut activities = Vec::new();
         for path in dropped {
+            if path.is_dir() {
+                activities.push(path);
+                continue;
+            }
             match layouts::classify(path) {
                 layouts::Dropped::Layout(p) => self.open_layout(p),
                 layouts::Dropped::Video(p) => self.open(p),
-                layouts::Dropped::Activity(p) => {
-                    self.link_activity(p);
-                    self.select_sources = true;
+                layouts::Dropped::Activity(p) => activities.push(p),
+            }
+        }
+        if !activities.is_empty() {
+            if self.player.is_none() {
+                self.error =
+                    Some(crate::i18n::text("Open a video before linking an activity").into());
+            } else {
+                if activities.len() == 1 && !activities[0].is_dir() {
+                    self.link_activity(activities.remove(0));
+                } else {
+                    self.scan_activities(activities);
                 }
+                self.select_sources = true;
             }
         }
         self.poll_telemetry();
         self.request_route_metadata();
         self.poll_activity();
+        self.poll_activity_scan();
         let map_revision = self.overlay.maps().revision();
         if map_revision != self.map_revision {
             self.map_revision = map_revision;
@@ -1838,10 +2011,10 @@ impl eframe::App for App {
                 .telemetry_rx
                 .as_ref()
                 .and_then(|load| load.route_progress());
-            let video_size = self
-                .player
-                .as_ref()
-                .map(|p| [p.info().video.width, p.info().video.height]);
+            let video_size = self.player.as_ref().map(|p| {
+                self.video_rotation()
+                    .dimensions(p.info().video.width, p.info().video.height)
+            });
             let action = ui
                 .add_enabled_ui(self.pending_edit_action.is_none(), |ui| {
                     editor.ui(
@@ -2110,6 +2283,9 @@ fn main() -> eframe::Result {
                 camera_telemetry: None,
                 activity: None,
                 activity_rx: None,
+                activity_scan: None,
+                activity_candidates: Vec::new(),
+                activity_scan_errors: Vec::new(),
                 source_settings: Default::default(),
                 source_notice: None,
                 chapter_offer: None,

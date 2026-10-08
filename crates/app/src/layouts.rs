@@ -21,7 +21,7 @@ pub fn classify(path: PathBuf) -> Dropped {
         || actionlay_layout::package::is_package(&path)
     {
         Dropped::Layout(path)
-    } else if name.ends_with(".gpx") || name.ends_with(".fit") {
+    } else if name.ends_with(".gpx") || name.ends_with(".fit") || name.ends_with(".insgps") {
         Dropped::Activity(path)
     } else {
         Dropped::Video(path)

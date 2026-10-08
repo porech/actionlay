@@ -86,6 +86,10 @@ pub struct InputProperties {
     pub bit_rate: usize,
 }
 impl InputProperties {
+    pub fn with_rotation(mut self, rotation: crate::rotation::Rotation) -> Self {
+        self.dimensions = rotation.dimensions(self.dimensions[0], self.dimensions[1]);
+        self
+    }
     pub fn new(info: &actionlay_media::probe::MediaInfo) -> Self {
         Self {
             dimensions: [info.video.width, info.video.height],
@@ -205,6 +209,12 @@ impl Settings {
 }
 #[derive(Clone)]
 pub struct Request {
+    pub activity: Option<(
+        actionlay_telemetry::external::Activity,
+        chrono::DateTime<chrono::Utc>,
+        f64,
+    )>,
+    pub rotation: crate::rotation::Rotation,
     pub source: PathBuf,
     pub output: PathBuf,
     pub layout: Arc<Layout>,
@@ -394,7 +404,9 @@ pub fn run(
     request.layout = capture_export_units(&request.layout, actionlay_render::regional::current());
     let started = Instant::now();
     let info = actionlay_media::probe::probe(&request.source)?;
-    let input = InputProperties::new(&info);
+    let rotation = request.rotation.resolve(info.video.rotation);
+    let input = InputProperties::new(&info).with_rotation(rotation);
+    let [canvas_width, canvas_height] = input.dimensions;
     let container = request.settings.resolved_container(&input);
     request.settings.format = request.settings.resolved_format(&input);
     let dimensions = request.settings.resolution.unwrap_or(input.dimensions);
@@ -500,6 +512,20 @@ pub fn run(
             }
         }
     };
+    let external = request
+        .activity
+        .as_ref()
+        .map(|(activity, origin, offset)| {
+            activity
+                .align(Some(*origin), info.duration, *offset)
+                .map(Arc::new)
+        })
+        .transpose()?;
+    let telemetry = if let Some(external) = &external {
+        telemetry.merge_external(external, info.duration)
+    } else {
+        telemetry
+    };
     let telemetry = Arc::new(telemetry);
     notify(Progress {
         status: "Exporting · …".into(),
@@ -541,7 +567,7 @@ pub fn run(
         let full_telemetry = telemetry.clone();
         let duration = info.duration;
         let decoder = scope.spawn(move || -> Result<()> {
-            let mut progressive = if full_required {
+            let mut progressive = if full_required || info.telemetry.is_none() {
                 None
             } else {
                 Some(ExportTelemetry::open(&source, duration, c.clone())?)
@@ -581,23 +607,38 @@ pub fn run(
             let settings = request.settings.clone();
             let scale = request.scale;
             let color = info.video.color;
+            let external = external.clone();
             scope.spawn(move || {
                 let mut renderer = Renderer::new();
                 renderer.set_maps(maps);
                 renderer.set_scale_mode(scale);
                 let mut target =
-                    Pixmap::new(info.video.width, info.video.height).expect("probed dimensions");
+                    Pixmap::new(canvas_width, canvas_height).expect("probed dimensions");
                 while let Ok((index, frame, telemetry)) = jobs.recv() {
                     let pixels = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        let telemetry = if let Some(external) = &external {
+                            telemetry.merge_external(external, info.duration)
+                        } else {
+                            (*telemetry).clone()
+                        };
                         renderer.render_telemetry_into(&layout, &telemetry, frame.pts, &mut target);
                         let background = if settings.mode == Mode::Video {
-                            Some(media::rgba(&frame, color))
+                            Some(rotation.rgba(
+                                media::rgba(&frame, color),
+                                frame.width,
+                                frame.height,
+                            ))
                         } else {
                             None
                         };
-                        composite(target.data(), background.as_deref(), &settings)
+                        Ok::<_, anyhow::Error>(composite(
+                            target.data(),
+                            background.as_deref(),
+                            &settings,
+                        ))
                     }))
-                    .map_err(|_| anyhow::anyhow!("overlay renderer failed"));
+                    .map_err(|_| anyhow::anyhow!("overlay renderer failed"))
+                    .and_then(|result| result);
                     if results.send((index, frame.pts, pixels)).is_err() {
                         break;
                     }
@@ -624,7 +665,8 @@ pub fn run(
                                 &media::WriterOptions {
                                     hardware: request.settings.hardware,
                                     encoding: request.settings.encoding,
-                                    dimensions: request.settings.resolution,
+                                    dimensions: Some(dimensions),
+                                    input_dimensions: Some(input.dimensions),
                                     container: container.muxer(),
                                 },
                                 t,
@@ -635,15 +677,12 @@ pub fn run(
                         }
                     }
                     if let Some(writer) = &mut writer {
-                        writer.write(&pixels, info.video.width, info.video.height, t)?;
+                        writer.write(&pixels, canvas_width, canvas_height, t)?;
                     } else {
                         let pixels = if dimensions != input.dimensions {
-                            let source = image::RgbaImage::from_raw(
-                                info.video.width,
-                                info.video.height,
-                                pixels,
-                            )
-                            .ok_or_else(|| anyhow::anyhow!("invalid RGBA frame size"))?;
+                            let source =
+                                image::RgbaImage::from_raw(canvas_width, canvas_height, pixels)
+                                    .ok_or_else(|| anyhow::anyhow!("invalid RGBA frame size"))?;
                             image::imageops::resize(
                                 &source,
                                 dimensions[0],
@@ -788,6 +827,8 @@ mod tests {
     use super::*;
     fn request(output: PathBuf) -> Request {
         Request {
+            activity: None,
+            rotation: Default::default(),
             source: Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/export-source.mp4"),
             output,
             layout: Arc::new(crate::editor::Editor::blank()),
@@ -878,6 +919,94 @@ mod tests {
             [input.video.width, input.video.height]
         );
         assert_eq!(info.video.codec, input.video.codec);
+    }
+
+    #[test]
+    fn rotation_exports_oriented_pixels_dimensions_and_upright_overlay() {
+        use crate::rotation::Rotation;
+        let dir = tempfile::tempdir().unwrap();
+        for rotation in [
+            Rotation::None,
+            Rotation::Clockwise90,
+            Rotation::HalfTurn,
+            Rotation::CounterClockwise90,
+        ] {
+            let mut req = request(dir.path().join(format!("rotation-{}", rotation.turns())));
+            req.rotation = rotation;
+            req.settings.format = Format::Png;
+            req.layout = Arc::new(Layout::from_json(r#"{"version":1,"nodes":[{"type":"text","text":"UP","position":[5,5],"font_size":12}]}"#).unwrap().layout);
+            let info = actionlay_media::probe::probe(&req.source).unwrap();
+            let [w, h] = rotation.dimensions(info.video.width, info.video.height);
+            let mut first = None;
+            media::decode(
+                &req.source,
+                req.start,
+                req.end.unwrap(),
+                Arc::new(AtomicBool::new(false)),
+                |frame| {
+                    if first.is_none() {
+                        first = Some(frame);
+                    }
+                    Ok(())
+                },
+            )
+            .unwrap();
+            let frame = first.unwrap();
+            let mut overlay = Pixmap::new(w, h).unwrap();
+            let mut renderer = Renderer::new();
+            renderer.set_scale_mode(req.scale);
+            renderer.render_telemetry_into(
+                &req.layout,
+                &Telemetry::empty(info.duration),
+                frame.pts,
+                &mut overlay,
+            );
+            let background = rotation.rgba(
+                media::rgba(&frame, info.video.color),
+                frame.width,
+                frame.height,
+            );
+            let expected = composite(overlay.data(), Some(&background), &req.settings);
+            let output = req.output.clone();
+            run(req, Arc::new(AtomicBool::new(false)), |_| {}).unwrap();
+            let image = image::open(output.join("frame-000000.png"))
+                .unwrap()
+                .into_rgba8();
+            assert_eq!(image.dimensions(), (w, h));
+            assert_eq!(image.into_raw(), expected);
+        }
+        // Encoded output swaps dimensions and does not carry the old matrix.
+        let mut req = request(dir.path().join("clockwise.mp4"));
+        req.rotation = Rotation::Clockwise90;
+        let output = req.output.clone();
+        run(req, Arc::new(AtomicBool::new(false)), |_| {}).unwrap();
+        let info = actionlay_media::probe::probe(&output).unwrap();
+        assert_eq!([info.video.width, info.video.height], [90, 160]);
+        assert_eq!(info.video.rotation, 0);
+        assert!(info.audio.is_some());
+    }
+
+    #[test]
+    fn automatic_rotation_follows_metadata_and_manual_choice_overrides_it() {
+        use crate::rotation::Rotation;
+        let dir = tempfile::tempdir().unwrap();
+        for (rotation, expected) in [
+            (Rotation::Automatic, [90, 160]),
+            (Rotation::None, [160, 90]),
+            (Rotation::HalfTurn, [160, 90]),
+        ] {
+            let mut req = request(dir.path().join(format!("{rotation:?}.mp4")));
+            req.source = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixtures/export-source-rotated.mp4");
+            req.rotation = rotation;
+            let input = actionlay_media::probe::probe(&req.source).unwrap();
+            assert_eq!(input.video.rotation, 90);
+            let output = req.output.clone();
+            run(req, Arc::new(AtomicBool::new(false)), |_| {}).unwrap();
+            let result = actionlay_media::probe::probe(&output).unwrap();
+            assert_eq!([result.video.width, result.video.height], expected);
+            assert_eq!(result.video.rotation, 0);
+        }
     }
 
     #[test]
@@ -1123,6 +1252,39 @@ mod tests {
         let probe = actionlay_media::probe::probe(&output).unwrap();
         assert!(probe.duration > 0.2 && probe.duration < 0.5);
         assert!(probe.audio.is_some());
+    }
+    #[test]
+    fn linked_activity_export_matches_preview_with_offset() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut req = request(dir.path().join("activity"));
+        let activity = actionlay_telemetry::external::Activity::from_gpx(std::io::Cursor::new(r#"<gpx><trk><trkseg><trkpt lat="45" lon="7"><time>2026-07-29T14:30:04Z</time><speed>10</speed></trkpt><trkpt lat="45" lon="7"><time>2026-07-29T14:30:06Z</time><speed>10</speed></trkpt></trkseg></trk></gpx>"#)).unwrap();
+        let origin = activity.points[0].utc;
+        let tel = activity.align(Some(origin), 3.0, 0.2).unwrap();
+        req.activity = Some((activity, origin, 0.2));
+        req.layout = Arc::new(Layout::from_json(r#"{"version":1,"nodes":[{"type":"metric","metric":"speed","pos":[50,50],"size":100}]}"#).unwrap().layout);
+        req.settings.mode = Mode::Transparent;
+        req.settings.format = Format::Png;
+        let output = req.output.clone();
+        let layout = req.layout.clone();
+        run(req, Arc::new(AtomicBool::new(false)), |_| {}).unwrap();
+        let mut renderer = Renderer::new();
+        let mut target = Pixmap::new(160, 90).unwrap();
+        renderer.render_telemetry_into(&layout, &tel, 0.4, &mut target);
+        let expected = composite(
+            target.data(),
+            None,
+            &Settings {
+                mode: Mode::Transparent,
+                ..Default::default()
+            },
+        );
+        let actual = image::open(output.join("frame-000000.png"))
+            .unwrap()
+            .to_rgba8();
+        assert_eq!(actual.as_raw(), &expected);
+        let mut empty = Pixmap::new(160, 90).unwrap();
+        renderer.render_telemetry_into(&layout, &Telemetry::empty(3.0), 0.4, &mut empty);
+        assert_ne!(target.data(), empty.data());
     }
     #[test]
     fn png_pixels_match_preview_with_partial_opacity() {

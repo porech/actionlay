@@ -20,7 +20,7 @@ test.beforeAll(async () => {
 async function ready(page) {
   await page.goto('./');
   await expect(page.locator('#status')).toContainText('Ready.', { timeout: 60_000 });
-  await page.locator('summary').click();
+  await page.locator('summary[data-i18n="Preferences"]').click();
   await page.locator('#maps').uncheck();
 }
 test('persist preferences, edit/import/download layout with assets, restore after reload', async ({ page }) => {
@@ -124,7 +124,7 @@ test('fullscreen includes overlay; background appears only in solid mode with de
   await page.locator('#mode').selectOption('solid');
   await expect(page.locator('#color-control')).toBeVisible();
   await expect(page.locator('#color')).toHaveValue('#00ff00');
-  await expect(page.locator('.hint')).toContainText('Export to device');
+  await expect(page.locator('#export-panel .hint')).toContainText('Export to device');
   await page.locator('#video-file').setInputFiles(fixture);
   await expect(page.locator('#status')).toHaveText('source.mp4');
   await page.locator('#fullscreen').click();
@@ -142,7 +142,7 @@ test('browser Italian is automatic and an explicit language survives reload', as
   await expect(page.locator('html')).toHaveAttribute('lang','it');
   await expect(page.locator('header small')).toHaveText('Your videos. Your telemetry. No strings attached.');
   await expect(page.locator('#export')).toHaveText('Esporta sul dispositivo');
-  await page.locator('summary').click();
+  await page.locator('summary[data-i18n="Preferences"]').click();
   await expect(page.locator('#language')).toHaveValue('system');
   await page.locator('#language').selectOption('en');
   await expect(page.locator('html')).toHaveAttribute('lang','en');

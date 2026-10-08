@@ -460,6 +460,12 @@ impl crate::App {
                     .map_or_else(|| self.layout.clone(), |e| Arc::new(e.draft.clone()));
                 if let Some(source) = self.video_path.clone() {
                     let request = Request {
+                        activity: self.activity.as_ref().map(|activity| {
+                            let duration = self.player.as_ref().unwrap().info().duration;
+                            let (origin, _) = activity.sync_origin(self.video_utc(), duration);
+                            (activity.clone(), origin, self.source_settings.offset)
+                        }),
+                        rotation: self.source_settings.rotation,
                         source,
                         output,
                         layout,
@@ -551,6 +557,9 @@ impl crate::App {
     about = "Export using the same renderer as the desktop preview"
 )]
 struct Args {
+    /// Clockwise video rotation; auto follows the source display matrix.
+    #[arg(long, value_enum, default_value = "auto")]
+    rotation: crate::rotation::Rotation,
     #[arg(long)]
     layout: Option<PathBuf>,
     #[arg(long)]
@@ -601,6 +610,8 @@ pub fn cli() -> anyhow::Result<()> {
         || {},
     );
     let request = Request {
+        activity: None,
+        rotation: args.rotation,
         source: args.video,
         output: args.out,
         layout: Arc::new(layout),

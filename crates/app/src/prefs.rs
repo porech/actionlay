@@ -300,6 +300,21 @@ mod tests {
     }
 
     #[test]
+    fn video_rotation_defaults_to_automatic_and_is_remembered() {
+        use crate::rotation::Rotation;
+        let old: SourceSettings =
+            serde_json::from_str(r#"{"video_utc":"2026-08-30T14:25:05.701Z"}"#).unwrap();
+        assert_eq!(old.rotation, Rotation::Automatic);
+        let settings = SourceSettings {
+            rotation: Rotation::Clockwise90,
+            ..old
+        };
+        let restored: SourceSettings =
+            serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+        assert_eq!(restored, settings);
+    }
+
+    #[test]
     fn default_path_is_in_the_config_dir() {
         let p = default_path().expect("a config dir exists on desktop OSes");
         assert!(p.ends_with("prefs.json"));
@@ -313,6 +328,7 @@ mod tests {
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SourceSettings {
+    pub rotation: crate::rotation::Rotation,
     pub activity: Option<PathBuf>,
     pub offset: f64,
     pub video_utc: String,

@@ -1,4 +1,5 @@
 import './style.css';
+import { planActivities } from './sources.js';
 import { initializeVideoDrop } from './drop.js';
 import { setLanguage, t } from './i18n.js';
 import { initializePlayer, refreshPlayer } from './player.js';
@@ -41,6 +42,61 @@ let currentName = 'Layout';
 let videoUrl;
 let generation = 0;
 let sourceGeneration = 0;
+let activityGeneration = 0;
+let activityFile;
+let activityInfo;
+let activityNotice;
+let videoIdentity;
+let activitySettings = {};
+const FALLBACK = 'Timestamps could not be matched. Starts were aligned. Adjust the activity offset if needed.';
+function activityStatus(message, parameters = {}, error = false) {
+  activityNotice = {message,parameters,error};
+  const element = $('activity-status'); element.textContent = t(message, parameters); element.classList.toggle('error', error);
+}
+function showActivityInfo(info) {
+  activityInfo = info;
+  activityStatus(info.fallback ? FALLBACK : '{} activity samples linked', {samples:info.samples});
+}
+function saveActivitySettings() {
+  if (!videoIdentity) return;
+  activitySettings = { utc:$('video-utc').value, offset:Number($('activity-offset').value), activity:activityFile ? `${activityFile.name}|${activityFile.size}|${activityFile.lastModified}` : null };
+  const sources = {...state.preferences.videoSources, [videoIdentity]:activitySettings};
+  // Keep the browser's small per-video settings bounded; file contents are never stored.
+  const entries = Object.entries(sources).slice(-100);
+  try { persist({...state, preferences:{...state.preferences, videoSources:Object.fromEntries(entries)}}); }
+  catch (error) { status(error.message, true); }
+}
+async function linkActivity(file) {
+  const mine = sourceGeneration, request = ++activityGeneration;
+  const identity = `${file.name}|${file.size}|${file.lastModified}`;
+  const offset = activitySettings.activity === identity ? activitySettings.offset ?? 0 : 0;
+  const info = await rpc('activity-link', {file, offset, videoKey:mine});
+  if (mine !== sourceGeneration || request !== activityGeneration) return;
+  activityFile = file; $('activity-offset').value = String(offset);
+  $('activity-candidates').replaceChildren();
+  showActivityInfo(info); saveActivitySettings(); lastTime = -1;
+}
+async function selectActivities(files, strict = false) {
+  if (loading || !$('video').src) throw new Error('Open a video before linking an activity');
+  const mine = sourceGeneration, request = ++activityGeneration;
+  $('activity-candidates').replaceChildren(); activityStatus('Reading activity…');
+  const {videoUtc} = await rpc('activity-context', {videoKey:mine});
+  const plan = await planActivities(files, async file => { try { return await rpc('activity-summary', {file, videoKey:mine}); } catch (error) { throw new Error(t(error.message)); } }, strict, videoUtc);
+  if (mine !== sourceGeneration || request !== activityGeneration) return;
+  if (plan.selected) { await linkActivity(plan.selected.file); return; }
+  activityInfo = null;
+  activityStatus(plan.message, {}, true);
+  for (const candidate of plan.candidates) {
+    const button = document.createElement('button'); button.type = 'button';
+    button.textContent = `${candidate.file.webkitRelativePath || candidate.file.name} · ${candidate.start} — ${candidate.end}`;
+    button.onclick = guarded(() => linkActivity(candidate.file));
+    $('activity-candidates').append(button);
+  }
+  for (const error of plan.errors) {
+    const element = document.createElement('p'); element.textContent = `${t('Activity file could not be read')}: ${error}`;
+    $('activity-candidates').append(element);
+  }
+}
 let layoutRevision = 0;
 let loading = false;
 let mapRegions = [];
@@ -87,6 +143,7 @@ async function configure() {
   updateExportControls();
   refreshPlayer();
   updateLayouts();
+  if (activityNotice) activityStatus(activityNotice.message, activityNotice.parameters, activityNotice.error);
   layoutRevision++;
   lastTime = -1;
 }
@@ -121,6 +178,12 @@ function setBusy(busy) {
 async function openVideo(file) {
   if (!file) return;
   const mine = ++sourceGeneration;
+  activityGeneration++; activityFile = null; activityInfo = null; activityNotice = null;
+  videoIdentity = `${file.name}|${file.size}|${file.lastModified}`;
+  activitySettings = state.preferences.videoSources?.[videoIdentity] ?? {};
+  $('activity-offset').value = String(activitySettings.offset ?? 0);
+  $('video-utc').value = activitySettings.utc ?? '';
+  $('activity-candidates').replaceChildren(); $('activity-status').textContent = '';
   generation++;
   loading = true; lastTime = -1; mediaTime = undefined;
   worker.postMessage({ type: 'close' });
@@ -147,7 +210,8 @@ async function openVideo(file) {
     $('start').value = '0'; $('end').value = String(video.duration);
     $('player-controls').hidden = false;
     refreshPlayer();
-    await rpc('open', { file, duration: video.duration });
+    await rpc('open', { file, duration: video.duration, videoKey:mine });
+    if (activitySettings.utc) await rpc('video-utc', {utc:activitySettings.utc,videoKey:mine});
     if (mine !== sourceGeneration) return;
     status(file.name);
     $('export').disabled = false;
@@ -234,6 +298,31 @@ initializeVideoDrop({
   reject: () => status('Drop a video file to open it.', true),
 });
 $('video-file').onchange = guarded(event => openVideo(event.target.files[0]));
+$('activity-file').onchange = guarded(async event => { const files = [...event.target.files]; event.target.value = ''; if (files.length) await selectActivities(files); });
+$('activity-folder').onchange = guarded(async event => { const files = [...event.target.files]; event.target.value = ''; if (files.length) await selectActivities(files, true); });
+$('activity-offset').onchange = guarded(async () => {
+  if (loading || !$('video').src) throw new Error('Open a video before linking an activity');
+  const mine = sourceGeneration;
+  const info = await rpc('activity-offset', {offset:$('activity-offset').valueAsNumber,videoKey:mine});
+  if (mine !== sourceGeneration) return;
+  if (activityFile) showActivityInfo(info);
+  saveActivitySettings(); lastTime = -1;
+});
+$('video-utc').onchange = guarded(async () => {
+  if (loading || !$('video').src) throw new Error('Open a video before linking an activity');
+  const mine = sourceGeneration;
+  const info = await rpc('video-utc', {utc:$('video-utc').value,videoKey:mine});
+  if (mine !== sourceGeneration) return;
+  if (activityFile) showActivityInfo(info);
+  saveActivitySettings(); lastTime = -1;
+});
+$('activity-unlink').onclick = guarded(async () => {
+  if (loading || !$('video').src) throw new Error('Open a video before linking an activity');
+  activityGeneration++;
+  await rpc('activity-unlink', {videoKey:sourceGeneration});
+  activityFile = null; activityInfo = null; activityNotice = null; $('activity-offset').value = '0';
+  $('activity-status').textContent = ''; $('activity-candidates').replaceChildren(); saveActivitySettings(); lastTime = -1;
+});
 $('layout-file').onchange = guarded(async event => {
   const file = event.target.files[0]; if (!file || !confirmDiscard()) return;
   if (file.size > 128 * 1024 * 1024) throw new Error('Layout package exceeds 128 MB.');

@@ -16,6 +16,8 @@ pub enum ExternalError {
     InvalidSync,
     #[error("the activity does not overlap the video at this sync offset")]
     NoOverlap,
+    #[error("Invalid INSGPS records")]
+    InvalidInsgps,
 }
 
 #[derive(Debug, Clone)]
@@ -34,16 +36,142 @@ pub struct Activity {
 impl Activity {
     pub fn read(path: &Path) -> Result<Self, ExternalError> {
         let file = std::fs::File::open(path).map_err(|e| ExternalError::Read(e.to_string()))?;
-        match path
+        if file
+            .metadata()
+            .map_err(|e| ExternalError::Read(e.to_string()))?
+            .len()
+            > 64 * 1024 * 1024
+        {
+            return Err(ExternalError::Read("Activity file exceeds 64 MB".into()));
+        }
+        let extension = path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        match extension.as_str() {
+            "gpx" => Self::from_gpx(std::io::BufReader::new(file)),
+            "fit" => Self::from_fit(file),
+            "insgps" => {
+                use std::io::Read;
+                let mut data = Vec::new();
+                file.take(64 * 1024 * 1024 + 1)
+                    .read_to_end(&mut data)
+                    .map_err(|e| ExternalError::Read(e.to_string()))?;
+                Self::from_insgps(&data)
+            }
+            _ => Err(ExternalError::Read(
+                "expected a .gpx, .fit or .insgps file".into(),
+            )),
+        }
+    }
+
+    /// Shared native/WASM entry point; never reads a whole video into memory.
+    pub fn from_bytes(name: &str, data: &[u8]) -> Result<Self, ExternalError> {
+        if data.len() > 64 * 1024 * 1024 {
+            return Err(ExternalError::Read("Activity file exceeds 64 MB".into()));
+        }
+        match Path::new(name)
             .extension()
             .and_then(|s| s.to_str())
             .unwrap_or("")
             .to_ascii_lowercase()
             .as_str()
         {
-            "gpx" => Self::from_gpx(std::io::BufReader::new(file)),
-            "fit" => Self::from_fit(file),
-            _ => Err(ExternalError::Read("expected a .gpx or .fit file".into())),
+            "gpx" => Self::from_gpx(std::io::Cursor::new(data)),
+            "fit" => Self::from_fit(std::io::Cursor::new(data)),
+            "insgps" => Self::from_insgps(data),
+            _ => Err(ExternalError::Read(
+                "expected a .gpx, .fit or .insgps file".into(),
+            )),
+        }
+    }
+
+    /// Insta360 phone GPS: packed little-endian 53-byte records, speed in m/s.
+    pub fn from_insgps(data: &[u8]) -> Result<Self, ExternalError> {
+        if data.is_empty() {
+            return Err(ExternalError::NoSamples);
+        }
+        if data.len() > 64 * 1024 * 1024 || !data.len().is_multiple_of(53) {
+            return Err(ExternalError::InvalidInsgps);
+        }
+        let mut points = Vec::with_capacity(data.len() / 53);
+        for record in data.as_chunks::<53>().0 {
+            let seconds = u64::from_le_bytes(record[..8].try_into().unwrap());
+            let millis = u16::from_le_bytes(record[8..10].try_into().unwrap());
+            if seconds > i64::MAX as u64
+                || millis > 999
+                || !matches!(record[10], b'A' | b'V')
+                || !matches!(record[19], b'N' | b'S')
+                || !matches!(record[28], b'E' | b'W')
+            {
+                return Err(ExternalError::InvalidInsgps);
+            }
+            let utc = DateTime::from_timestamp(seconds as i64, u32::from(millis) * 1_000_000)
+                .ok_or(ExternalError::InvalidInsgps)?;
+            let number =
+                |offset| f64::from_le_bytes(record[offset..offset + 8].try_into().unwrap());
+            let mut values =
+                BTreeMap::from([(Metric::GpsLock, if record[10] == b'A' { 3.0 } else { 0.0 })]);
+            if record[10] == b'A' {
+                values.extend([
+                    (
+                        Metric::Lat,
+                        number(11).abs() * if record[19] == b'S' { -1.0 } else { 1.0 },
+                    ),
+                    (
+                        Metric::Lon,
+                        number(20).abs() * if record[28] == b'W' { -1.0 } else { 1.0 },
+                    ),
+                    (Metric::Speed, number(29)),
+                    (Metric::Cog, number(37)),
+                    (Metric::Alt, number(45)),
+                ]);
+            }
+            points.push(ActivityPoint {
+                utc,
+                segment: 0,
+                values,
+            });
+        }
+        Self::validated(points, Vec::new())
+    }
+
+    pub fn time_range(&self) -> (DateTime<Utc>, DateTime<Utc>) {
+        (self.points[0].utc, self.points.last().unwrap().utc)
+    }
+
+    /// Selection ignores the user's offset; it must not silently pick another file.
+    pub fn overlaps_video(&self, video_utc: Option<DateTime<Utc>>, duration: f64) -> bool {
+        let Some(start) = video_utc else {
+            return false;
+        };
+        if !duration.is_finite() || duration <= 0.0 {
+            return false;
+        }
+        let Some(end) = crate::extract::add_seconds(start, duration) else {
+            return false;
+        };
+        // Use samples, rather than just the outer range (which may span a long gap).
+        self.points.iter().any(|p| p.utc >= start && p.utc < end)
+            || self.points.windows(2).any(|p| {
+                p[0].segment == p[1].segment
+                    && p[1].utc > start
+                    && p[0].utc < end
+                    && (p[1].utc - p[0].utc).as_seconds_f64() <= crate::series::MAX_BRIDGE
+            })
+    }
+
+    /// Only explicit single-file links may fall back to aligning the starts.
+    pub fn sync_origin(
+        &self,
+        video_utc: Option<DateTime<Utc>>,
+        duration: f64,
+    ) -> (DateTime<Utc>, bool) {
+        if self.overlaps_video(video_utc, duration) {
+            (video_utc.unwrap(), false)
+        } else {
+            (self.points[0].utc, true)
         }
     }
 
