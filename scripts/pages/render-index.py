@@ -16,6 +16,7 @@ shutil.copy2(root / 'assets/icons/actionlay-256.png', packages / 'actionlay.png'
 web_link = ('<p><a href="../web/">Open ActionLay in your browser</a> — local video playback, telemetry dashboards, layout editing and video export.</p>\n'
             if (site / 'web/index.html').is_file() else '')
 sections = []
+arch_available = False
 for channel, label in [('stable', 'Stable releases'), ('nightly', 'Development builds')]:
     if not (site / channel / 'apt/InRelease').exists():
         sections.append(f'<section><h2>{label}</h2><p>Available after the first release with native packages. For now, use the development channel below.</p></section>')
@@ -31,6 +32,7 @@ sudo dnf install actionlay'''
     arch = ''
     repo = site / 'packages' / channel / 'arch/x86_64'
     if channel == 'stable' and all((repo / name).is_file() for name in ['actionlay.db', 'actionlay.db.sig', 'key.asc']) and any((package.with_name(package.name + '.sig')).is_file() for package in repo.glob('*.pkg.tar.zst')):
+        arch_available = True
         fingerprint = '12D5224D1FA9E29427D423C7655BFFFFD179A76F'
         arch_url = f'https://porech.github.io/actionlay/packages/{channel}/arch/x86_64'
         instructions = f"""curl -fsSL {arch_url}/key.asc -o /tmp/actionlay-repository-key.asc
@@ -44,12 +46,14 @@ Server = {arch_url}
 sudo pacman -Syu actionlay-bin"""
         arch = '<h3>Arch Linux (x86_64)</h3><pre>' + html.escape(instructions) + '</pre><p>Updates are delivered by pacman together with system updates.</p>'
     sections.append(f'<section><h2>{label}</h2><h3>Ubuntu 22.04+, Linux Mint 21+, Debian 12+</h3><pre>{html.escape(apt)}</pre><h3>Fedora and compatible RPM distributions (glibc 2.35+)</h3><pre>{html.escape(dnf)}</pre>{arch}</section>')
+repository_names = 'APT, DNF and pacman' if arch_available else 'APT and DNF'
+arch_removal = '\n# or\nsudo pacman -R actionlay-bin' if arch_available else ''
 (packages / 'index.html').write_text('''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ActionLay packages</title>
 <style>body{font:16px/1.6 system-ui,sans-serif;background:#edf2ed;color:#153c3b;max-width:900px;margin:48px auto;padding:0 24px}header{display:flex;align-items:center;gap:24px}header img{width:112px}h1{font-size:40px;margin:0}section{background:white;border:1px solid #d3ded6;border-radius:18px;padding:24px;margin:24px 0}pre{overflow:auto;background:#102c32;color:#e3f2e7;border-radius:10px;padding:18px;font-size:13px}a{color:#226e58}footer{font-size:14px}</style>
 <header><img src="actionlay.png" alt="ActionLay gecko"><div><h1>ActionLay packages</h1><p>Your videos. Your telemetry. No strings attached.</p></div></header>
-<p>Signed APT and DNF repositories for 64-bit Linux. Packages add ActionLay to your applications menu and Open With without changing your default player. Choose one channel.</p>
-''' + web_link + ''.join(sections) + '''<section><h2>Remove ActionLay</h2><pre>sudo apt remove actionlay\n# or\nsudo dnf remove actionlay</pre><p>To stop receiving updates, also remove the repository configuration file added above.</p></section>
-<footer><a href="https://github.com/porech/actionlay">Source, licence and documentation</a> · <a href="https://github.com/porech/actionlay/releases">Windows installer and universal macOS DMG</a><p>APT and DNF verify signatures using the repository key. Original gecko photograph and artwork: Alessandro Rinaldi, CC BY-SA 4.0 or GPL-3.0-or-later.</p></footer></html>''', encoding='utf-8')
+<p>Signed ''' + repository_names + ''' repositories for 64-bit Linux. Packages add ActionLay to your applications menu and Open With without changing your default player. Choose one channel.</p>
+''' + web_link + ''.join(sections) + '''<section><h2>Remove ActionLay</h2><pre>sudo apt remove actionlay\n# or\nsudo dnf remove actionlay''' + arch_removal + '''</pre><p>To stop receiving updates, also remove the repository configuration file added above.</p></section>
+<footer><a href="https://github.com/porech/actionlay">Source, licence and documentation</a> · <a href="https://github.com/porech/actionlay/releases">Windows installer and universal macOS DMG</a><p>''' + repository_names + ''' verify signatures using the repository key. Original gecko photograph and artwork: Alessandro Rinaldi, CC BY-SA 4.0 or GPL-3.0-or-later.</p></footer></html>''', encoding='utf-8')
 
 # Landing assets are separate from the browser bundle and desktop builds.
 for name in ['landing.css', 'landing.js']:
