@@ -1,7 +1,7 @@
 # ActionLay
 
 [![Release](https://img.shields.io/github/v/release/porech/actionlay)](https://github.com/porech/actionlay/releases/latest)
-[![CI](https://github.com/porech/actionlay/actions/workflows/ci.yml/badge.svg)](https://github.com/porech/actionlay/actions/workflows/ci.yml)
+[![CI](https://github.com/porech/actionlay/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/porech/actionlay/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
 [![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
 
 <img src="assets/icons/actionlay-256.png" width="128" alt="ActionLay gecko icon" align="right">
