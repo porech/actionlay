@@ -3,6 +3,19 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Work to run
+        type: choice
+        default: build
+        options:
+          - build
+          - pages
+          - aur
+      release_tag:
+        description: Stable tag to publish in aur mode (later than v1.4.2)
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -13,13 +26,14 @@ concurrency:
 
 jobs:
   web:
+    if: ${{ inputs.mode != 'pages' && inputs.mode != 'aur' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.98.1
         with:
           targets: wasm32-unknown-unknown
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -31,6 +45,8 @@ jobs:
         run: cargo install wasm-bindgen-cli --version 0.2.129 --locked
       - name: Build isolated browser application
         run: bash scripts/build-web.sh
+      - name: Test AUR recipe generation
+        run: python3 scripts/test-prepare-aur.py
       - name: Check backend isolation
         run: bash scripts/check-backend-isolation.sh
       - name: Install media fixture tools
@@ -47,6 +63,7 @@ jobs:
           path: web/dist
 
   build-test:
+    if: ${{ inputs.mode != 'pages' && inputs.mode != 'aur' }}
     strategy:
       fail-fast: false
       matrix:
@@ -372,8 +389,34 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  package-arch:
+    name: Check Arch/AUR package
+    needs: build-test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: actionlay-x86_64-unknown-linux-gnu
+          path: binaries
+      - name: Prepare checksum-pinned AUR recipe from tested binaries
+        run: |
+          python3 scripts/package-release.py --target linux --binaries binaries --output arch-dist
+          version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)"
+          python3 scripts/prepare-aur.py --version "$version" --archive "arch-dist/actionlay-$version-linux-x64.tar.gz" --output arch-recipe
+      - name: Build, lint, install, reinstall and remove the Arch package
+        run: |
+          version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)"
+          bash scripts/verify-aur.sh arch-recipe "arch-dist/actionlay-$version-linux-x64.tar.gz" arch-verified
+      - uses: actions/upload-artifact@v7
+        with:
+          name: aur-package-check
+          path: arch-verified
+          include-hidden-files: true
+          if-no-files-found: error
+
   package:
-    needs: [build-test, web, package-windows, package-linux]
+    needs: [build-test, web, package-windows, package-linux, package-arch]
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: macos-14
     steps:
@@ -432,14 +475,175 @@ jobs:
         run: bash scripts/publish-release.sh
 
   linux-repositories:
-    name: Linux package repositories
+    name: Publish Pages and Linux repositories
     needs: publish
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    uses: ./.github/workflows/pages.yml
+    if: >-
+      always() && !cancelled() && inputs.mode != 'aur' &&
+      ((needs.publish.result == 'success') ||
+       (github.event_name == 'workflow_dispatch' && inputs.mode == 'pages'))
+    concurrency:
+      group: actionlay-pages
+      cancel-in-progress: false
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
       actions: read
       pages: write
       id-token: write
-    secrets:
-      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Test browser publication verification
+        run: python3 scripts/pages/test-verify-browser.py
+      - name: Install repository tools
+        run: sudo apt-get update && sudo apt-get install -y apt-utils dpkg-dev createrepo-c rpm gnupg
+      - name: Download current stable and development packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p packages/stable packages/nightly
+          stable="$(gh release view --json tagName --jq .tagName)"
+          for channel in stable nightly; do
+            tag="$stable"
+            if [ "$channel" = nightly ]; then tag=nightly; fi
+            # Older releases have no native packages yet. Do not advertise an
+            # unsigned or empty repository for those releases.
+            count="$(gh release view "$tag" --json assets --jq '[.assets[].name | select(endswith(".deb") or endswith(".rpm"))] | length')"
+            if [ "$count" -gt 0 ]; then
+              gh release download "$tag" --pattern '*.deb' --pattern '*.rpm' --dir "packages/$channel"
+            fi
+          done
+      - name: Import dedicated repository signing key
+        env:
+          PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          test -n "$PRIVATE_KEY"
+          install -d -m 700 "$RUNNER_TEMP/actionlay-gnupg"
+          echo "GNUPGHOME=$RUNNER_TEMP/actionlay-gnupg" >> "$GITHUB_ENV"
+          printf '%s' "$PRIVATE_KEY" | gpg --homedir "$RUNNER_TEMP/actionlay-gnupg" --batch --import
+          gpg --homedir "$RUNNER_TEMP/actionlay-gnupg" --batch --import packaging/linux/repository-key.asc
+          fingerprint="$(gpg --homedir "$RUNNER_TEMP/actionlay-gnupg" --list-secret-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}')"
+          expected="$(gpg --show-keys --with-colons packaging/linux/repository-key.asc | awk -F: '/^fpr:/ {print $10; exit}')"
+          test "$fingerprint" = "$expected"
+          echo "GPG_FPR=$fingerprint" >> "$GITHUB_ENV"
+      - name: Build and verify signed repositories
+        run: |
+          mkdir -p site
+          for channel in stable nightly; do
+            if compgen -G "packages/$channel/*.deb" > /dev/null; then
+              bash scripts/pages/build-repositories.sh "packages/$channel" site "$channel"
+              gpg --verify "site/$channel/apt/InRelease"
+              gpg --verify "site/$channel/rpm/repodata/repomd.xml.asc" "site/$channel/rpm/repodata/repomd.xml"
+            fi
+          done
+          test -e site/nightly/apt/InRelease
+      # Reuse the last stable tag's bundle, including on main/nightly runs.
+      # Never build or publish the browser app from an untagged commit.
+      - name: Download stable browser release for Pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          stable="$(gh release view --json tagName --jq .tagName)"
+          echo "Publishing browser bundle from $stable"
+          count="$(gh release view "$stable" --json assets --jq '[.assets[].name | select(startswith("actionlay-web-") and endswith(".tar.gz"))] | length')"
+          if [ "$count" -gt 0 ]; then
+            test "$count" -eq 1
+            mkdir -p browser-release site/web
+            gh release download "$stable" --pattern 'actionlay-web-*.tar.gz' --dir browser-release
+            tar -xzf browser-release/actionlay-web-*.tar.gz -C site/web
+            test -f site/web/index.html
+          fi
+          ACTIONLAY_STABLE_TAG="$stable" python3 scripts/pages/render-index.py site
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        id: upload-pages
+        with:
+          name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+          path: site
+      # Upload completion can precede visibility in the REST list used by deploy-pages.
+      # Unique attempt names also prevent retries from selecting older artifacts.
+      - name: Wait for Pages artifact visibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGES_ARTIFACT_NAME: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+          PAGES_ARTIFACT_ID: ${{ steps.upload-pages.outputs.artifact_id }}
+        run: |
+          for attempt in {1..12}; do
+            found="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" --jq ".artifacts[] | select(.id == $PAGES_ARTIFACT_ID) | .name")"
+            if [ "$found" = "$PAGES_ARTIFACT_NAME" ]; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Pages artifact did not become visible within 60 seconds" >&2
+          exit 1
+      - name: Deploy repositories
+        id: deploy
+        uses: actions/deploy-pages@v5
+        with:
+          artifact_name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Verify published browser bundle
+        env:
+          PAGES_URL: ${{ steps.deploy.outputs.page_url }}
+        run: |
+          if [ -f site/web/index.html ]; then
+            python3 scripts/pages/verify-browser.py site/web "${PAGES_URL%/}/web/"
+          fi
+      - name: Remove temporary signing keyring
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/actionlay-gnupg"
+
+  publish-aur:
+    name: Publish stable AUR recipe
+    needs: publish
+    if: >-
+      always() && !cancelled() &&
+      ((needs.publish.result == 'success' && startsWith(github.ref, 'refs/tags/v') && vars.AUR_PUBLISH_ENABLED == 'true') ||
+       (github.event_name == 'workflow_dispatch' && inputs.mode == 'aur'))
+    runs-on: ubuntu-22.04
+    concurrency:
+      group: actionlay-aur
+      cancel-in-progress: false
+    env:
+      AUR_PUBLISH_ENABLED: ${{ vars.AUR_PUBLISH_ENABLED }}
+      GH_TOKEN: ${{ github.token }}
+      AUR_TAG: ${{ inputs.release_tag || github.ref_name }}
+      AUR_GIT_NAME: ${{ vars.AUR_GIT_NAME }}
+      AUR_GIT_EMAIL: ${{ vars.AUR_GIT_EMAIL }}
+    steps:
+      - name: Validate the requested stable release
+        run: |
+          python3 - <<'PY'
+          import os, re
+          tag = os.environ['AUR_TAG']
+          if os.environ['AUR_PUBLISH_ENABLED'] != 'true':
+              raise SystemExit('Configure AUR credentials and enable AUR_PUBLISH_ENABLED first')
+          if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+', tag) or tuple(map(int, tag[1:].split('.'))) <= (1, 4, 2):
+              raise SystemExit('AUR publication starts after v1.4.2')
+          PY
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$AUR_TAG" --jq '(.draft == false and .prerelease == false)' | grep -Fx true
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.AUR_TAG }}
+      - name: Prepare recipe from the immutable published archive
+        run: |
+          gh release download "$AUR_TAG" --repo "$GITHUB_REPOSITORY" --pattern "actionlay-${AUR_TAG#v}-linux-x64.tar.gz" --pattern SHA256SUMS --dir release-assets
+          python3 scripts/prepare-aur.py --version "${AUR_TAG#v}" --archive "release-assets/actionlay-${AUR_TAG#v}-linux-x64.tar.gz" --checksums release-assets/SHA256SUMS --output aur-recipe
+      - name: Verify the published release package on Arch
+        run: bash scripts/verify-aur.sh aur-recipe "release-assets/actionlay-${AUR_TAG#v}-linux-x64.tar.gz" aur-verified
+      - name: Configure AUR SSH identity
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          AUR_SSH_KNOWN_HOSTS: ${{ vars.AUR_SSH_KNOWN_HOSTS }}
+        run: |
+          test -n "$AUR_SSH_PRIVATE_KEY"
+          test -n "$AUR_SSH_KNOWN_HOSTS"
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur_key
+          printf '%s\n' "$AUR_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host aur.archlinux.org\n  IdentityFile ~/.ssh/aur_key\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' > ~/.ssh/config
+      - name: Publish validated PKGBUILD and SRCINFO
+        run: bash scripts/publish-aur.sh aur-verified

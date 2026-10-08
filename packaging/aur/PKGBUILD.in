@@ -1,0 +1,28 @@
+# Maintainer: ActionLay maintainers
+# Generated from a tested, versioned ActionLay Linux release asset.
+pkgname=actionlay-bin
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc='Action-camera telemetry dashboards and video export'
+arch=('x86_64')
+url='https://github.com/porech/actionlay'
+license=('GPL-3.0-or-later' 'CC-BY-SA-4.0')
+depends=('glibc' 'gcc-libs' 'hicolor-icon-theme' 'desktop-file-utils' 'shared-mime-info' 'alsa-lib' 'libva' 'libdrm' 'libxkbcommon' 'libx11' 'wayland')
+optdepends=('vulkan-driver: Vulkan rendering backend' 'mesa: OpenGL rendering backend')
+provides=("actionlay=${pkgver}")
+conflicts=('actionlay' 'actionlay-git')
+options=('!strip' '!debug')
+source=("https://github.com/porech/actionlay/releases/download/v${pkgver}/actionlay-${pkgver}-linux-x64.tar.gz"
+        'actionlay-camera-video.xml')
+sha256sums=('@ARCHIVE_SHA256@' '@MIME_SHA256@')
+
+package() {
+    install -Dm755 "${srcdir}/ActionLay/actionlay" "${pkgdir}/usr/bin/actionlay"
+    install -Dm755 "${srcdir}/ActionLay/actionlay-telemetry" "${pkgdir}/usr/bin/actionlay-telemetry"
+    install -Dm644 "${srcdir}/ActionLay/actionlay.desktop" "${pkgdir}/usr/share/applications/org.ActionLay.ActionLay.desktop"
+    printf '\nX-ActionLay-Managed=true\n' >> "${pkgdir}/usr/share/applications/org.ActionLay.ActionLay.desktop"
+    install -Dm644 "${srcdir}/ActionLay/actionlay.png" "${pkgdir}/usr/share/icons/hicolor/256x256/apps/actionlay.png"
+    install -Dm644 "${srcdir}/actionlay-camera-video.xml" "${pkgdir}/usr/share/mime/packages/actionlay-camera-video.xml"
+    install -d "${pkgdir}/usr/share/licenses/${pkgname}"
+    cp -a "${srcdir}/ActionLay/Licenses/." "${pkgdir}/usr/share/licenses/${pkgname}/"
+}

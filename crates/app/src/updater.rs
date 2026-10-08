@@ -57,8 +57,8 @@ fn probe_availability() -> Availability {
 #[cfg(target_os = "linux")]
 fn system_managed(exe: &Path) -> bool {
     // Inspect ownership of THIS executable: a portable copy alongside an APT
-    // installation must still update itself. Includes local DEBs and RPMs.
-    [("dpkg-query", "-S"), ("rpm", "-qf")]
+    // installation must still update itself. Includes local DEBs, RPMs and AUR packages installed with pacman.
+    [("dpkg-query", "-S"), ("rpm", "-qf"), ("pacman", "-Qo")]
         .iter()
         .any(|(program, flag)| {
             std::process::Command::new(program)

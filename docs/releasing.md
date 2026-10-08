@@ -78,8 +78,8 @@ create duplicate per-user integration. Package install/remove refreshes MIME and
 desktop databases. The glibc 2.35 baseline supports Ubuntu 22.04+, Mint 21+,
 Debian 12+ and recent Fedora-compatible systems; it does not support musl Alpine.
 
-The `Linux package repositories` job in `ci.yml` calls the reusable `pages.yml`
-workflow after release publication succeeds and reconstructs both
+The **Publish Pages and Linux repositories** job is part of `ci.yml`. After
+release publication succeeds, it reconstructs both
 stable and nightly APT/DNF repositories from release assets. It verifies and signs
 metadata with the dedicated `GPG_PRIVATE_KEY` secret, signs RPM packages, then
 deploys GitHub Pages. Linux setup instructions live at
@@ -104,22 +104,42 @@ publish an untagged browser build. A stable tag changes the browser version;
 successful main builds refresh the download page and Linux repositories while
 keeping that stable browser version. After deployment, CI checks the served HTML,
 entry assets and WASM against that archive, since a successful deployment alone
-does not prove the new files are being served. The `Publish stable Pages` workflow
-can also be dispatched manually to republish existing release assets without
+does not prove the new files are being served. The same CI workflow can also be
+dispatched manually in **pages** mode to republish existing release assets without
 rebuilding or replacing binaries. GitHub Pages can reuse an earlier deployment
 when main and a tag share a commit SHA; if verification detects stale files, run
 the workflow from a newer main commit and verify the public URLs again.
 
 For that recovery, make the newer commit on `main`, then dispatch
-`gh workflow run pages.yml --ref main`. This downloads the already published
+`gh workflow run ci.yml --ref main -f mode=pages`. This downloads the already published
 stable assets; it does not rebuild or replace the release packages. Wait for
 the workflow's **Verify published browser bundle** step to succeed before
 announcing the browser update. A documentation-only recovery commit can use
 `[skip ci]` to avoid an unnecessary native rebuild while the manually dispatched
-Pages workflow performs the publication checks.
+CI Pages job performs the publication checks.
 
 Pages artifacts use a unique name per workflow run and attempt. Before deploying,
 the job waits until GitHub's artifact listing contains the uploaded artifact ID.
 This avoids duplicate-name failures on retries and upload/list visibility races;
 a retry cannot choose an older attempt's Pages archive. The served browser bundle
 is still checked against the selected stable release after deployment.
+
+
+## Arch/AUR preparation
+
+The **Check Arch/AUR package** job creates `actionlay-bin` from the tested Linux
+portable binaries, with SHA-256-pinned sources. It builds with `makepkg` as a
+non-root user in an Arch container, runs `namcap`, installs/reinstalls/removes with
+pacman, checks executable dependencies, desktop/MIME registration and notices,
+and uploads a preview recipe including `.SRCINFO`. This check gates release
+packaging. The preview archive is generated before publication; its recipe must
+not be submitted to AUR because final release archive checksums can differ.
+
+AUR submission starts with a stable release after 1.4.2 and is initially disabled.
+Once configured, the **Publish stable AUR recipe** job downloads the immutable
+published archive, verifies `SHA256SUMS`, regenerates the recipe and `.SRCINFO`,
+repeats the Arch checks, then commits only recipe files to the AUR Git repository.
+See [AUR maintainer setup](../packaging/aur/README.md). The user-facing Arch
+installation instructions should be added only after the first AUR submission is
+live. Packages installed via pacman use system-managed updates; portable copies
+remain eligible for in-app updates.
