@@ -575,5 +575,7 @@
   "Activity offset": "Aktiivisuuden siirtymä",
   "Video UTC": "Video UTC",
   "No timestamped samples.": "Ei aikaleimattuja näytteitä.",
-  "No activity data at this offset.": "Ei aktiviteettitietoja tällä aikasiirtymällä."
+  "No activity data at this offset.": "Ei aktiviteettitietoja tällä aikasiirtymällä.",
+  "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Yksi tiedosto: käytä yhteensopivia aikaleimoja, muuten kohdista alut. Säädä aikasiirtymää tarvittaessa.",
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Useita tiedostoja tai kansio: etsi automaattisesti videon aikaan sopivat aktiviteetit. Yksi osuma liitetään; useista on valittava yksi. Jos osumia ei ole, näytetään varoitus."
 }

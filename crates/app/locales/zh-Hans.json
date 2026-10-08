@@ -575,5 +575,7 @@
   "Activity offset": "活动偏移量",
   "Video UTC": "视频 UTC",
   "No timestamped samples.": "没有带时间戳的采样。",
-  "No activity data at this offset.": "此偏移处没有活动数据。"
+  "No activity data at this offset.": "此偏移处没有活动数据。",
+  "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "单个文件：使用兼容的时间戳，否则对齐起点。如有需要，请调整偏移。",
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "多个文件或文件夹：自动查找与视频时间匹配的活动。一个匹配项会自动关联；多个匹配项需要选择。没有匹配项时显示警告。"
 }

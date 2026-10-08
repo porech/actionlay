@@ -575,5 +575,7 @@
   "Activity offset": "Помак активности",
   "Video UTC": "Видео UTC",
   "No timestamped samples.": "Нема узорака са временском ознаком.",
-  "No activity data at this offset.": "Нема података активности при овом помаку."
+  "No activity data at this offset.": "Нема података активности при овом помаку.",
+  "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Једна датотека: користите одговарајуће временске ознаке, иначе поравнајте почетке. По потреби подесите помак.",
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Више датотека или фасцикла: аутоматски пронађите активности које одговарају времену видеа. Једно поклапање се повезује; више поклапања захтева избор. Без поклапања се приказује упозорење."
 }

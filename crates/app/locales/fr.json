@@ -575,5 +575,7 @@
   "Activity offset": "Décalage de l’activité",
   "Video UTC": "Vidéo UTC",
   "No timestamped samples.": "Aucun échantillon horodaté.",
-  "No activity data at this offset.": "Aucune donnée d’activité à ce décalage."
+  "No activity data at this offset.": "Aucune donnée d’activité à ce décalage.",
+  "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Fichier unique : utilisez les horodatages compatibles, sinon alignez les débuts. Ajustez le décalage si nécessaire.",
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Plusieurs fichiers ou un dossier : recherchez automatiquement les activités correspondant à l’heure de la vidéo. Une correspondance est liée ; plusieurs nécessitent un choix. Aucune correspondance produit un avertissement."
 }

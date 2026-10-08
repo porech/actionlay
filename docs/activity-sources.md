@@ -10,7 +10,9 @@ Open a video first. On desktop, use **File → Video sources…**, then
 **Link GPX/FIT/INSGPS…** or **Activity folder…**. You can also drop activity files
 or a folder onto an open video. In the browser, expand **Video sources** and use
 the corresponding file or folder selector. Both frontends accept GPX, FIT and
-Insta360 phone `.insgps` files, including uppercase extensions.
+Insta360 phone `.insgps` files, including uppercase extensions. Before the
+selection controls, both interfaces explain single-file alignment and automatic
+matching for multiple files/folders, including the one/many/no-match outcomes.
 
 Linked telemetry is used in playback and export. Available activity values take
 precedence; camera telemetry fills the activity's gaps. Linking a GPS activity

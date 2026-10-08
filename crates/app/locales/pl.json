@@ -575,5 +575,7 @@
   "Activity offset": "Przesunięcie działania",
   "Video UTC": "Wideo UTC",
   "No timestamped samples.": "Brak próbek ze znacznikiem czasu.",
-  "No activity data at this offset.": "Brak danych aktywności przy tym przesunięciu."
+  "No activity data at this offset.": "Brak danych aktywności przy tym przesunięciu.",
+  "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Jeden plik: użyj zgodnych znaczników czasu, a w przeciwnym razie wyrównaj początki. W razie potrzeby dostosuj przesunięcie.",
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Wiele plików lub folder: automatycznie znajdź aktywności pasujące do czasu filmu. Jeden wynik zostanie powiązany; kilka wymaga wyboru. Brak wyników powoduje ostrzeżenie."
 }

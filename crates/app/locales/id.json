@@ -575,5 +575,7 @@
   "Activity offset": "Offset aktivitas",
   "Video UTC": "Video UTC",
   "No timestamped samples.": "Tidak ada sampel dengan stempel waktu.",
-  "No activity data at this offset.": "Tidak ada data aktivitas pada offset ini."
+  "No activity data at this offset.": "Tidak ada data aktivitas pada offset ini.",
+  "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Satu file: gunakan stempel waktu yang cocok, jika tidak sejajarkan awal. Sesuaikan offset jika diperlukan.",
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Beberapa file atau folder: cari otomatis aktivitas yang cocok dengan waktu video. Satu kecocokan ditautkan; beberapa memerlukan pilihan. Tanpa kecocokan, peringatan ditampilkan."
 }

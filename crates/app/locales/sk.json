@@ -575,5 +575,7 @@
   "Activity offset": "Posun aktivity",
   "Video UTC": "Video UTC",
   "No timestamped samples.": "Žiadne vzorky s časovou pečiatkou.",
-  "No activity data at this offset.": "Pri tomto posune nie sú žiadne údaje aktivity."
+  "No activity data at this offset.": "Pri tomto posune nie sú žiadne údaje aktivity.",
+  "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Jeden súbor: použite zodpovedajúce časové pečiatky, inak zarovnajte začiatky. V prípade potreby upravte posun.",
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Viac súborov alebo priečinok: automaticky vyhľadajte aktivity zodpovedajúce času videa. Jedna zhoda sa prepojí; viac zhôd vyžaduje výber. Žiadna zhoda zobrazí upozornenie."
 }

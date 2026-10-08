@@ -23,7 +23,9 @@ desktop and web, linked telemetry in exports and desktop video rotation controls
 - **Remember source settings:** desktop retains links and alignment per video.
   The browser retains alignment settings, but videos and activity files must be
   selected again after reloading.
-- New controls and actionable warnings are translated in all 34 languages.
+- Source selection explains single-file alignment and automatic discovery from
+  multiple files or a folder before you choose. The guidance, new controls and
+  actionable warnings are translated in all 34 languages.
 
 ### Desktop video rotation
 

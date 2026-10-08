@@ -575,5 +575,7 @@
   "Activity offset": "Activiteitsverschuiving",
   "Video UTC": "video UTC",
   "No timestamped samples.": "Geen monsters met tijdstempel.",
-  "No activity data at this offset.": "Geen activiteitsgegevens bij deze verschuiving."
+  "No activity data at this offset.": "Geen activiteitsgegevens bij deze verschuiving.",
+  "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Eén bestand: gebruik passende tijdstempels, anders worden de beginpunten uitgelijnd. Pas de verschuiving zo nodig aan.",
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Meerdere bestanden of een map: zoek automatisch activiteiten die bij de videotijd passen. Eén overeenkomst wordt gekoppeld; bij meerdere kiest u zelf. Geen overeenkomst geeft een waarschuwing."
 }

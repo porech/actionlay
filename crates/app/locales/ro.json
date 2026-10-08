@@ -575,5 +575,7 @@
   "Activity offset": "Compensare activitate",
   "Video UTC": "Video UTC",
   "No timestamped samples.": "Nu există eșantioane cu marcaj temporal.",
-  "No activity data at this offset.": "Nu există date de activitate la acest decalaj."
+  "No activity data at this offset.": "Nu există date de activitate la acest decalaj.",
+  "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Un singur fișier: utilizați marcaje temporale compatibile, altfel aliniați începuturile. Ajustați decalajul dacă este necesar.",
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Mai multe fișiere sau un dosar: găsiți automat activități care corespund orei videoclipului. O potrivire este asociată; mai multe necesită o alegere. Lipsa potrivirilor produce un avertisment."
 }

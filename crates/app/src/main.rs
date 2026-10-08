@@ -1039,6 +1039,8 @@ impl App {
                 mode_changed |= ui.checkbox(&mut self.source_settings.load_sequence,crate::i18n::ui_text(ui, "Load the complete GoPro sequence from its first chapter")).changed();
             });
             ui.separator();
+            ui.label(crate::i18n::ui_text(ui, "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed."));
+            ui.label(crate::i18n::ui_text(ui, "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning."));
             if let Some(path) = &self.source_settings.activity { ui.label(crate::i18n::user_text(ui, path.display().to_string())); }
             ui.horizontal(|ui| { link = ui.button(crate::i18n::ui_text(ui, "Link GPX/FIT/INSGPS…")).clicked(); folder = ui.button(crate::i18n::ui_text(ui, "Activity folder…")).clicked(); unlink = ui.add_enabled(self.source_settings.activity.is_some(),egui::Button::new(crate::i18n::text("Unlink"))).clicked(); });
             changed |= ui.add(egui::DragValue::new(&mut self.source_settings.offset).speed(0.1).suffix(crate::i18n::ui_text(ui, " s")).prefix(crate::i18n::ui_text(ui, "Activity offset "))).changed();

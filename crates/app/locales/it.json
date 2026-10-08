@@ -575,5 +575,7 @@
   "Activity offset": "Offset attività",
   "Video UTC": "Video UTC",
   "No timestamped samples.": "Nessun campione con timestamp.",
-  "No activity data at this offset.": "Nessun dato dell’attività a questo offset."
+  "No activity data at this offset.": "Nessun dato dell’attività a questo offset.",
+  "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "File singolo: usa i timestamp se compatibili; altrimenti allinea gli inizi. Se necessario, regola l’offset.",
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Più file o una cartella: cerca automaticamente le attività compatibili con l’orario del video. Se ne trova una, la collega; se ne trova più di una, ti chiede di scegliere. Se non ne trova, mostra un avviso."
 }

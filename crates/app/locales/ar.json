@@ -575,5 +575,7 @@
   "Activity offset": "إزاحة النشاط",
   "Video UTC": "فيديو UTC",
   "No timestamped samples.": "لا توجد عينات بطوابع زمنية.",
-  "No activity data at this offset.": "لا توجد بيانات نشاط عند هذه الإزاحة."
+  "No activity data at this offset.": "لا توجد بيانات نشاط عند هذه الإزاحة.",
+  "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "ملف واحد: استخدم الطوابع الزمنية المتوافقة، وإلا فحاذِ البدايات. اضبط الإزاحة عند الحاجة.",
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "عدة ملفات أو مجلد: ابحث تلقائيًا عن الأنشطة المطابقة لوقت الفيديو. تُربط المطابقة الوحيدة؛ وتتطلب المطابقات المتعددة اختيارًا. يظهر تحذير عند عدم وجود مطابقة."
 }

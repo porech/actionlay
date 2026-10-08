@@ -575,5 +575,7 @@
   "Activity offset": "アクティビティ オフセット",
   "Video UTC": "動画 UTC",
   "No timestamped samples.": "タイムスタンプ付きのサンプルがありません。",
-  "No activity data at this offset.": "このオフセットにアクティビティデータがありません。"
+  "No activity data at this offset.": "このオフセットにアクティビティデータがありません。",
+  "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "ファイル1つ：一致するタイムスタンプを使用し、一致しない場合は開始点を揃えます。必要に応じてオフセットを調整してください。",
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "複数のファイルまたはフォルダー：動画の時刻に一致するアクティビティを自動検索します。1つならリンクし、複数なら選択を求めます。一致がなければ警告を表示します。"
 }

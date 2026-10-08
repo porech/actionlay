@@ -575,5 +575,7 @@
   "Activity offset": "Etkinlik ofseti",
   "Video UTC": "Video UTC",
   "No timestamped samples.": "Zaman damgalı örnek yok.",
-  "No activity data at this offset.": "Bu zaman kaymasında etkinlik verisi yok."
+  "No activity data at this offset.": "Bu zaman kaymasında etkinlik verisi yok.",
+  "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Tek dosya: uyumlu zaman damgalarını kullanın, aksi halde başlangıçları hizalayın. Gerekirse zaman kaymasını ayarlayın.",
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Birden fazla dosya veya klasör: video zamanıyla eşleşen etkinlikleri otomatik bulun. Tek eşleşme bağlanır; birden fazla eşleşmede seçim gerekir. Eşleşme yoksa uyarı gösterilir."
 }

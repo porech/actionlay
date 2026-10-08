@@ -575,5 +575,7 @@
   "Activity offset": "Смещение активности",
   "Video UTC": "Видео UTC",
   "No timestamped samples.": "Нет отсчётов с временными метками.",
-  "No activity data at this offset.": "Нет данных активности при этом сдвиге."
+  "No activity data at this offset.": "Нет данных активности при этом сдвиге.",
+  "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Один файл: используйте совместимые временные метки, иначе выровняйте начала. При необходимости настройте сдвиг.",
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Несколько файлов или папка: автоматически найдите активности, соответствующие времени видео. Одна привязывается; при нескольких требуется выбор. Если совпадений нет, появится предупреждение."
 }

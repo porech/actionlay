@@ -575,5 +575,7 @@
   "Activity offset": "Aktivitetsforskyvning",
   "Video UTC": "Video UTC",
   "No timestamped samples.": "Ingen målinger med tidsstempel.",
-  "No activity data at this offset.": "Ingen aktivitetsdata ved denne forskyvningen."
+  "No activity data at this offset.": "Ingen aktivitetsdata ved denne forskyvningen.",
+  "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Én fil: bruk samsvarende tidsstempler, ellers justeres startpunktene. Tilpass forskyvningen ved behov.",
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Flere filer eller en mappe: finn automatisk aktiviteter som samsvarer med videoens tidspunkt. Ett treff kobles til; flere krever et valg. Ingen treff gir en advarsel."
 }

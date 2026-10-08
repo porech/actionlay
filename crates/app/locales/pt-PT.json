@@ -575,5 +575,7 @@
   "Activity offset": "Deslocamento de atividade",
   "Video UTC": "Vídeo UTC",
   "No timestamped samples.": "Nenhuma amostra com data e hora.",
-  "No activity data at this offset.": "Nenhum dado de atividade neste desfasamento."
+  "No activity data at this offset.": "Nenhum dado de atividade neste desfasamento.",
+  "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Ficheiro único: utilize datas e horas compatíveis; caso contrário, alinhe os inícios. Ajuste o desfasamento se necessário.",
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Vários ficheiros ou uma pasta: encontre automaticamente atividades que correspondam à hora do vídeo. Uma correspondência é associada; várias exigem uma escolha. Nenhuma correspondência gera um aviso."
 }
