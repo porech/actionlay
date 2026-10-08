@@ -50,5 +50,5 @@ else:
 if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?', version):
     raise ValueError(f'Invalid stable release version: {version}')
 landing = (root / 'scripts/pages/landing.html').read_text()
-web_button = '<a class="button secondary" href="web/">Try it in your browser <span aria-hidden="true">→</span></a>' if (site / 'web/index.html').is_file() else ''
+web_button = '<a class="button secondary" href="web/" target="_blank" rel="noopener noreferrer">Try it in your browser <span aria-hidden="true">→</span></a>' if (site / 'web/index.html').is_file() else ''
 (site / 'index.html').write_text(landing.replace('@@VERSION@@', html.escape(version)).replace('@@WEB_LINK@@', web_button), encoding='utf-8')
