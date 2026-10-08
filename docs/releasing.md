@@ -100,7 +100,9 @@ temporary venv, without requiring Finder or UI scripting on CI. The installed
 application does not depend on Python.
 
 Pages always reuses the latest stable release's browser archive; main builds never
-publish an untagged browser build. After deployment, CI checks the served HTML,
+publish an untagged browser build. A stable tag changes the browser version;
+successful main builds refresh the download page and Linux repositories while
+keeping that stable browser version. After deployment, CI checks the served HTML,
 entry assets and WASM against that archive, since a successful deployment alone
 does not prove the new files are being served. The `Publish stable Pages` workflow
 can also be dispatched manually to republish existing release assets without
