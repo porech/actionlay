@@ -34,7 +34,7 @@ ActionLay 1.3.0 introduces a browser version, lets you copy whole dashboard sect
 
 - **Windows 10/11 x64:** use [`actionlay-1.3.0-windows-x64-setup.exe`](https://github.com/porech/actionlay/releases/download/v1.3.0/actionlay-1.3.0-windows-x64-setup.exe).
 - **macOS 12 or newer, Apple Silicon and Intel:** use [`actionlay-1.3.0-macos-universal.dmg`](https://github.com/porech/actionlay/releases/download/v1.3.0/actionlay-1.3.0-macos-universal.dmg), then drag ActionLay to Applications.
-- **Linux x64:** follow the [signed APT/DNF repository instructions](https://porech.github.io/actionlay/), using the stable channel. Ubuntu 22.04+, Mint 21+, Debian 12+ and Fedora-compatible systems with glibc 2.35+ are supported. A graphics backend compatible with wgpu is required.
+- **Linux x64:** follow the [signed APT/DNF repository instructions](https://porech.github.io/actionlay/packages/), using the stable channel. Ubuntu 22.04+, Mint 21+, Debian 12+ and Fedora-compatible systems with glibc 2.35+ are supported. A graphics backend compatible with wgpu is required.
 
 Portable Windows ZIP and Linux tar.gz builds, native DEB/RPM packages, dependency sources, the browser bundle and `SHA256SUMS` are also attached. The telemetry CLI is included; on macOS it is inside `ActionLay.app/Contents/MacOS/`.
 

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Render the package repository's small installation guide."""
+"""Render the project landing page and Linux installation guide."""
 import html
 import pathlib
+import os
+import re
 import shutil
 import sys
 
@@ -34,17 +36,19 @@ sudo dnf install actionlay'''
 ''' + web_link + ''.join(sections) + '''<section><h2>Remove ActionLay</h2><pre>sudo apt remove actionlay\n# or\nsudo dnf remove actionlay</pre><p>To stop receiving updates, also remove the repository configuration file added above.</p></section>
 <footer><a href="https://github.com/porech/actionlay">Source, licence and documentation</a> · <a href="https://github.com/porech/actionlay/releases">Windows installer and universal macOS DMG</a><p>APT and DNF verify signatures using the repository key. Original gecko photograph and artwork: Alessandro Rinaldi, CC BY-SA 4.0 or GPL-3.0-or-later.</p></footer></html>''', encoding='utf-8')
 
-# Keep the project root independent from the Linux installation guide.
-web_navigation = '<li><a href="web/">Open ActionLay in your browser</a></li>' if (site / 'web/index.html').is_file() else ''
-(site / 'index.html').write_text(
-    '<!doctype html><html lang="en"><meta charset="utf-8">'
-    '<meta name="viewport" content="width=device-width,initial-scale=1">'
-    '<title>ActionLay</title><style>body{font:18px/1.6 system-ui,sans-serif;'
-    'max-width:720px;margin:64px auto;padding:0 24px;color:#153c3b}'
-    'a{color:#226e58}</style><h1>ActionLay</h1>'
-    '<p>Your videos. Your telemetry. No strings attached.</p><ul>'
-    + web_navigation
-    + '<li><a href="https://github.com/porech/actionlay/releases/latest">Download ActionLay</a></li>'
-    '<li><a href="packages/">Linux package repositories</a></li>'
-    '<li><a href="https://github.com/porech/actionlay">Source and documentation</a></li>'
-    '</ul></html>', encoding='utf-8')
+# Landing assets are separate from the browser bundle and desktop builds.
+for name in ['landing.css', 'landing.js']:
+    shutil.copy2(root / 'scripts/pages' / name, site / name)
+shutil.copy2(root / 'assets/site/gecko.png', site / 'gecko.png')
+shutil.copy2(root / 'assets/icons/actionlay-256.png', site / 'actionlay.png')
+shutil.copy2(root / 'assets/social/github-preview.png', site / 'social.png')
+tag = os.environ.get('ACTIONLAY_STABLE_TAG')
+if tag:
+    version = tag.removeprefix('v')
+else:
+    version = re.search(r'^version = "([^"\n]+)"', (root / 'Cargo.toml').read_text(), re.MULTILINE).group(1)
+if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?', version):
+    raise ValueError(f'Invalid stable release version: {version}')
+landing = (root / 'scripts/pages/landing.html').read_text()
+web_button = '<a class="button secondary" href="web/">Try it in your browser <span aria-hidden="true">→</span></a>' if (site / 'web/index.html').is_file() else ''
+(site / 'index.html').write_text(landing.replace('@@VERSION@@', html.escape(version)).replace('@@WEB_LINK@@', web_button), encoding='utf-8')

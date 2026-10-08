@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#102c32">
+  <meta name="description" content="Your videos. Your telemetry. No strings attached. Free, open-source telemetry overlays for your action-camera footage.">
+  <meta property="og:title" content="ActionLay — Your videos. Your telemetry. No strings attached.">
+  <meta property="og:image" content="https://porech.github.io/actionlay/social.png">
+  <meta property="og:description" content="Customizable telemetry overlays for your action-camera footage. Free and open source, on desktop and in your browser.">
+  <title>ActionLay — Your videos. Your telemetry. No strings attached.</title>
+  <link rel="icon" href="actionlay.png">
+  <link rel="stylesheet" href="landing.css">
+  <script src="landing.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <a class="brand" href="./" aria-label="ActionLay home"><img src="actionlay.png" width="36" height="36" alt="">ActionLay</a>
+      <a class="source" href="https://github.com/porech/actionlay">View on GitHub <span aria-hidden="true">↗</span></a>
+    </header>
+    <main>
+      <section class="hero" aria-labelledby="payoff">
+        <div class="intro">
+          <p class="eyebrow"><span></span> Free &amp; open source</p>
+          <h1 id="payoff">Your videos.<br>Your telemetry.<br><em>No strings attached.</em></h1>
+          <p class="description">Give your footage the full story. Add speed, altitude, maps and more to your action-camera videos, with layouts you can make your own.</p>
+          <div class="actions">
+            <a class="button primary" id="download" href="https://github.com/porech/actionlay/releases/latest">Download ActionLay <span aria-hidden="true">↓</span></a>
+            @@WEB_LINK@@
+          </div>
+          <p class="download-note" id="download-note">Desktop release @@VERSION@@ · macOS, Windows &amp; Linux</p>
+          <details class="alternatives">
+            <summary>All platforms &amp; other downloads</summary>
+            <div class="platforms">
+              <a href="https://github.com/porech/actionlay/releases/latest/download/actionlay-@@VERSION@@-macos-universal.dmg"><strong>macOS</strong><span>Universal DMG · Apple Silicon &amp; Intel · macOS 12+</span></a>
+              <a href="https://github.com/porech/actionlay/releases/latest/download/actionlay-@@VERSION@@-windows-x64-setup.exe"><strong>Windows</strong><span>64-bit installer · Windows 10/11</span></a>
+              <a href="packages/"><strong>Linux</strong><span>64-bit · signed APT &amp; DNF repositories</span></a>
+              <a href="https://github.com/porech/actionlay/releases/latest"><strong>All release assets <span aria-hidden="true">↗</span></strong><span>Portable builds, individual packages &amp; checksums</span></a>
+            </div>
+          </details>
+        </div>
+        <div class="mascot">
+          <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+          <img src="gecko.png" width="1024" height="1024" alt="The ActionLay gecko, with golden eyes and a long curling tail" fetchpriority="high">
+          <span class="mascot-label">A little gecko. A bigger picture.</span>
+        </div>
+      </section>
+      <section class="features" aria-label="What you can do">
+        <article><span class="number">01</span><h2>See the ride.</h2><p>Bring your footage and telemetry together. Gauges, charts and maps put every moment in context.</p></article>
+        <article><span class="number">02</span><h2>Make it yours.</h2><p>Choose a layout or build your own. Move, group and customize widgets to tell your story.</p></article>
+        <article><span class="number">03</span><h2>Take it with you.</h2><p>Export your video with its overlays. Your footage is processed locally, on your device.</p></article>
+      </section>
+      <p class="web-note">The browser edition supports GoPro telemetry and MP4 export, subject to browser codec support. For more formats and advanced export options, use the desktop app. <a href="https://github.com/porech/actionlay/blob/main/docs/web.md">Compare capabilities <span aria-hidden="true">↗</span></a></p>
+    </main>
+    <footer><span>ActionLay · Free software, GPL-3.0-or-later</span><a href="https://github.com/porech/actionlay">Code &amp; documentation</a><a href="packages/">Linux packages</a><a href="https://github.com/porech/actionlay/blob/main/assets/icons/README.md">Gecko artwork: Alessandro Rinaldi</a></footer>
+  </div>
+</body>
+</html>

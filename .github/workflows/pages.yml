@@ -82,7 +82,7 @@ jobs:
             tar -xzf browser-release/actionlay-web-*.tar.gz -C site/web
             test -f site/web/index.html
           fi
-          python3 scripts/pages/render-index.py site
+          ACTIONLAY_STABLE_TAG="$stable" python3 scripts/pages/render-index.py site
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:

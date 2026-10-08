@@ -16,7 +16,7 @@ or a separate overlay for your video editor. Free and open source.
 |---|---|---|
 | macOS 12+, Apple Silicon **and Intel** | [Universal DMG](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.3.0-macos-universal.dmg) | Open the DMG and drag ActionLay to Applications |
 | Windows 10/11, 64-bit | [Windows installer](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.3.0-windows-x64-setup.exe) | Choose installation for yourself or everyone; desktop shortcut optional |
-| Linux, 64-bit | [Package repositories and setup instructions](https://porech.github.io/actionlay/) | Add the APT or DNF repository, then install `actionlay` |
+| Linux, 64-bit | [Package repositories and setup instructions](https://porech.github.io/actionlay/packages/) | Add the APT or DNF repository, then install `actionlay` |
 
 The **[latest release](https://github.com/porech/actionlay/releases/latest)** also
 includes standalone Windows/Linux builds, individual DEB/RPM packages, the
@@ -47,6 +47,31 @@ ActionLay detects installer/package registrations and does not offer a duplicate
 registration. Keep portable copies in a permanent location; launching a registered
 copy after moving it updates its path. Linux desktop menus may need a new login
 if the MIME/desktop database update tools are unavailable.
+
+## Web version
+
+**[Open ActionLay in your browser](https://porech.github.io/actionlay/web/)** — no
+installation required. Open a video from your device, view its telemetry, edit
+layouts and export the result. Video processing stays on your device. Preferences
+and recent layouts are kept in browser localStorage; layouts can also be imported
+and downloaded as files. Videos must be selected again after reloading.
+
+The web version has these limits:
+
+- Playback and H.264/H.265 MP4 export depend on the browser's codec and WebCodecs
+  support. Video exports retain supported source AAC audio. Quality presets,
+  advanced encoding controls, ProRes, transparent overlays and PNG sequences
+  require desktop.
+- Telemetry currently comes from embedded GoPro GPMF. Linked GPX/FIT activities,
+  other camera telemetry and joined chapter timelines require desktop. The web
+  layout editor previews demonstration telemetry.
+- Where direct file saving is unavailable, export uses an in-memory download
+  limited to **256 MB**. Browser storage quotas can limit saved recent layouts.
+- Map providers must allow browser requests through CORS; the browser map cache
+  is temporary and does not provide the desktop's persistent offline cache.
+
+See [browser capabilities and limitations](docs/web.md) for details. The hosted
+web app follows stable releases; development builds do not replace it.
 
 ## What you can do
 
@@ -141,15 +166,6 @@ Export currently processes **one source file with embedded GoPro telemetry**.
 Linked activities, native-camera telemetry and joined chapter timelines are not
 included yet. Export uses eight-bit SDR decoding. Insta360 playback displays the
 raw camera stream, without 360 stitching or reframing.
-
-### Browser build
-
-An initial browser version shares the Rust telemetry, overlay renderer and visual
-layout editor. It supports local video playback, GoPro telemetry, browser-backed
-MP4 export, layout import/download, and preferences/recent layouts in localStorage.
-See [browser build, deployment and current limitations](docs/web.md). The Pages
-workflow deploys the latest stable tag under `/web/` alongside the Linux
-repositories; commits on `main` test the web app without publishing it.
 
 ### Command-line tools
 

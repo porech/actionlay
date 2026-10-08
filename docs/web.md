@@ -5,8 +5,8 @@ ActionLay Web is a static application in `web/`, backed by the target-isolated
 `actionlay-web-VERSION.tar.gz` as a release asset. The Pages job installs that
 released bundle at `/actionlay/web/`, alongside the signed Linux repositories.
 Nightly/main deployments reuse the latest stable browser bundle; they never
-publish an untagged web build. The web link appears after the first stable tag
-containing the bundle.
+publish an untagged web build. Open the hosted application at
+<https://porech.github.io/actionlay/web/>.
 
 ## Build and run
 
@@ -82,7 +82,9 @@ Export supports H.264 or H.265 MP4 when the browser encoder supports the source
 resolution, either video with overlay or a solid-colour overlay. It keeps source
 AAC audio for video exports. Audio packets are copied; a trim can have an audio
 boundary offset of up to one packet. Other audio codecs produce a clear error.
-ProRes, transparent output and PNG sequences remain desktop features.
+Quality presets, advanced encoding controls, ProRes, transparent output and PNG
+sequences remain desktop features. The browser remembers the selected export mode
+and codec in localStorage.
 
 Where direct file saving is available, export streams into a filesystem transaction; success
 commits it and cancellation aborts it, preserving an existing destination. Other

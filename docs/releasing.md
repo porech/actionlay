@@ -84,7 +84,9 @@ stable and nightly APT/DNF repositories from release assets. It verifies and sig
 metadata with the dedicated `GPG_PRIVATE_KEY` secret, signs RPM packages, then
 deploys GitHub Pages. Linux setup instructions live at
 <https://porech.github.io/actionlay/packages/>; existing `/stable/` and `/nightly/`
-repository URLs stay unchanged. The root is reserved for the project site. Repository deployment
+repository URLs stay unchanged; place any new repository paths under `/packages/`.
+The root hosts the project landing page, with platform recommendations based on
+the latest stable release, independently of the tag-built browser bundle. Repository deployment
 failures therefore fail the same CI run. The signing key and Pages permissions
 are scoped to this job; pull requests and non-release branches skip it. A release without
 native packages is not advertised as an available channel. The public key is
