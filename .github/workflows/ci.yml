@@ -50,7 +50,22 @@ jobs:
       - name: Check backend isolation
         run: bash scripts/check-backend-isolation.sh
       - name: Install media fixture tools
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+        timeout-minutes: 10
+        run: |
+          # The Azure mirror has occasionally downloaded at ~100 KiB/s. Use
+          # Ubuntu's official mirror with the same signed package metadata.
+          for source in /etc/apt/sources.list /etc/apt/sources.list.d/*.sources; do
+            if [ -f "$source" ]; then
+              sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' "$source"
+            fi
+          done
+          sudo tee /etc/apt/apt.conf.d/80-actionlay-ci >/dev/null <<'APT'
+          Acquire::Retries "3";
+          Acquire::http::Timeout "30";
+          Acquire::https::Timeout "30";
+          APT
+          sudo apt-get update
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg
       - name: Test browser persistence and media
         run: |
           npm --prefix web test
