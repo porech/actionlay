@@ -578,5 +578,21 @@
   "No activity data at this offset.": "אין נתוני פעילות בהיסט זה.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "קובץ יחיד: השתמשו בחותמות זמן תואמות, אחרת יישרו את ההתחלות. התאימו את ההיסט לפי הצורך.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "מספר קבצים או תיקייה: חפשו אוטומטית פעילויות התואמות לזמן הסרטון. התאמה יחידה מקושרת; מספר התאמות מחייב בחירה. כשאין התאמה מוצגת אזהרה.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "המדדים כבר חולצו מהסרטון. ניתן להחליף אותם על ידי בחירת קובץ מקור."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "המדדים כבר חולצו מהסרטון. ניתן להחליף אותם על ידי בחירת קובץ מקור.",
+  "Automatic updates": "עדכונים אוטומטיים",
+  "Automatic updates are disabled in development builds.": "עדכונים אוטומטיים מושבתים בגרסאות פיתוח.",
+  "ActionLay updates will be downloaded automatically with system updates.": "עדכוני ActionLay יורדו אוטומטית יחד עם עדכוני המערכת.",
+  "Automatic updates are unavailable on this platform.": "עדכונים אוטומטיים אינם זמינים בפלטפורמה זו.",
+  "Check for updates at startup": "בדיקת עדכונים בעת ההפעלה",
+  "Ask again for the skipped version": "שאל שוב לגבי הגרסה שדולגה",
+  "A new version of ActionLay is available. Update now?": "גרסה חדשה של ActionLay זמינה. לעדכן עכשיו?",
+  "ActionLay will restart after the update.": "ActionLay יופעל מחדש לאחר העדכון.",
+  "Yes": "כן",
+  "Not now": "לא עכשיו",
+  "Skip this version": "דלג על גרסה זו",
+  "Don't ask again": "אל תשאל שוב",
+  "Save your layout and finish exporting before updating.": "שמור את הפריסה וסיים את הייצוא לפני העדכון.",
+  "Downloading update…": "מוריד עדכון…",
+  "Preparing update…": "מכין עדכון…",
+  "The update failed. Please try again later.": "העדכון נכשל. נסה שוב מאוחר יותר."
 }

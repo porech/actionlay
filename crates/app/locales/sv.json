@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Inga aktivitetsdata vid denna förskjutning.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "En fil: använd matchande tidsstämplar, annars justeras startpunkterna. Anpassa förskjutningen vid behov.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Flera filer eller en mapp: hitta automatiskt aktiviteter som matchar videons tid. En träff länkas; flera kräver ett val. Ingen träff ger en varning.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Mätvärdena har redan hämtats från videon. Du kan skriva över dem genom att välja en källfil."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Mätvärdena har redan hämtats från videon. Du kan skriva över dem genom att välja en källfil.",
+  "Automatic updates": "Automatiska uppdateringar",
+  "Automatic updates are disabled in development builds.": "Automatiska uppdateringar är avstängda i utvecklingsversioner.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Uppdateringar för ActionLay hämtas automatiskt tillsammans med systemuppdateringar.",
+  "Automatic updates are unavailable on this platform.": "Automatiska uppdateringar är inte tillgängliga på denna plattform.",
+  "Check for updates at startup": "Sök efter uppdateringar vid start",
+  "Ask again for the skipped version": "Fråga igen om den överhoppade versionen",
+  "A new version of ActionLay is available. Update now?": "En ny version av ActionLay är tillgänglig. Uppdatera nu?",
+  "ActionLay will restart after the update.": "ActionLay startas om efter uppdateringen.",
+  "Yes": "Ja",
+  "Not now": "Inte nu",
+  "Skip this version": "Hoppa över den här versionen",
+  "Don't ask again": "Fråga inte igen",
+  "Save your layout and finish exporting before updating.": "Spara layouten och slutför exporten innan du uppdaterar.",
+  "Downloading update…": "Hämtar uppdatering…",
+  "Preparing update…": "Förbereder uppdatering…",
+  "The update failed. Please try again later.": "Uppdateringen misslyckades. Försök igen senare."
 }

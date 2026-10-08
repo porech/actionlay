@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Brak danych aktywności przy tym przesunięciu.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Jeden plik: użyj zgodnych znaczników czasu, a w przeciwnym razie wyrównaj początki. W razie potrzeby dostosuj przesunięcie.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Wiele plików lub folder: automatycznie znajdź aktywności pasujące do czasu filmu. Jeden wynik zostanie powiązany; kilka wymaga wyboru. Brak wyników powoduje ostrzeżenie.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Dane pomiarowe zostały już wyodrębnione z filmu. Możesz je zastąpić, wybierając plik źródłowy."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Dane pomiarowe zostały już wyodrębnione z filmu. Możesz je zastąpić, wybierając plik źródłowy.",
+  "Automatic updates": "Automatyczne aktualizacje",
+  "Automatic updates are disabled in development builds.": "Automatyczne aktualizacje są wyłączone w wersjach rozwojowych.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Aktualizacje ActionLay będą pobierane automatycznie wraz z aktualizacjami systemu.",
+  "Automatic updates are unavailable on this platform.": "Automatyczne aktualizacje są niedostępne na tej platformie.",
+  "Check for updates at startup": "Sprawdzaj aktualizacje przy uruchamianiu",
+  "Ask again for the skipped version": "Zapytaj ponownie o pominiętą wersję",
+  "A new version of ActionLay is available. Update now?": "Dostępna jest nowa wersja ActionLay. Zaktualizować teraz?",
+  "ActionLay will restart after the update.": "ActionLay uruchomi się ponownie po aktualizacji.",
+  "Yes": "Tak",
+  "Not now": "Nie teraz",
+  "Skip this version": "Pomiń tę wersję",
+  "Don't ask again": "Nie pytaj ponownie",
+  "Save your layout and finish exporting before updating.": "Zapisz układ i zakończ eksport przed aktualizacją.",
+  "Downloading update…": "Pobieranie aktualizacji…",
+  "Preparing update…": "Przygotowywanie aktualizacji…",
+  "The update failed. Please try again later.": "Aktualizacja nie powiodła się. Spróbuj ponownie później."
 }

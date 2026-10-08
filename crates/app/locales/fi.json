@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Ei aktiviteettitietoja tällä aikasiirtymällä.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Yksi tiedosto: käytä yhteensopivia aikaleimoja, muuten kohdista alut. Säädä aikasiirtymää tarvittaessa.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Useita tiedostoja tai kansio: etsi automaattisesti videon aikaan sopivat aktiviteetit. Yksi osuma liitetään; useista on valittava yksi. Jos osumia ei ole, näytetään varoitus.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Mittaritiedot on jo poimittu videosta. Voit korvata ne valitsemalla lähdetiedoston."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Mittaritiedot on jo poimittu videosta. Voit korvata ne valitsemalla lähdetiedoston.",
+  "Automatic updates": "Automaattiset päivitykset",
+  "Automatic updates are disabled in development builds.": "Automaattiset päivitykset on poistettu käytöstä kehitysversioissa.",
+  "ActionLay updates will be downloaded automatically with system updates.": "ActionLayn päivitykset ladataan automaattisesti järjestelmäpäivitysten yhteydessä.",
+  "Automatic updates are unavailable on this platform.": "Automaattiset päivitykset eivät ole käytettävissä tällä alustalla.",
+  "Check for updates at startup": "Tarkista päivitykset käynnistettäessä",
+  "Ask again for the skipped version": "Kysy uudelleen ohitetusta versiosta",
+  "A new version of ActionLay is available. Update now?": "ActionLaysta on saatavilla uusi versio. Päivitetäänkö nyt?",
+  "ActionLay will restart after the update.": "ActionLay käynnistyy uudelleen päivityksen jälkeen.",
+  "Yes": "Kyllä",
+  "Not now": "Ei nyt",
+  "Skip this version": "Ohita tämä versio",
+  "Don't ask again": "Älä kysy uudelleen",
+  "Save your layout and finish exporting before updating.": "Tallenna asettelu ja viimeistele vienti ennen päivitystä.",
+  "Downloading update…": "Ladataan päivitystä…",
+  "Preparing update…": "Valmistellaan päivitystä…",
+  "The update failed. Please try again later.": "Päivitys epäonnistui. Yritä myöhemmin uudelleen."
 }

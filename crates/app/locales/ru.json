@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Нет данных активности при этом сдвиге.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Один файл: используйте совместимые временные метки, иначе выровняйте начала. При необходимости настройте сдвиг.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Несколько файлов или папка: автоматически найдите активности, соответствующие времени видео. Одна привязывается; при нескольких требуется выбор. Если совпадений нет, появится предупреждение.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Метрики уже извлечены из видео. Вы можете заменить их, выбрав исходный файл."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Метрики уже извлечены из видео. Вы можете заменить их, выбрав исходный файл.",
+  "Automatic updates": "Автоматические обновления",
+  "Automatic updates are disabled in development builds.": "Автоматические обновления отключены в сборках для разработки.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Обновления ActionLay будут загружаться автоматически вместе с обновлениями системы.",
+  "Automatic updates are unavailable on this platform.": "Автоматические обновления недоступны на этой платформе.",
+  "Check for updates at startup": "Проверять обновления при запуске",
+  "Ask again for the skipped version": "Снова спрашивать о пропущенной версии",
+  "A new version of ActionLay is available. Update now?": "Доступна новая версия ActionLay. Обновить сейчас?",
+  "ActionLay will restart after the update.": "ActionLay перезапустится после обновления.",
+  "Yes": "Да",
+  "Not now": "Не сейчас",
+  "Skip this version": "Пропустить эту версию",
+  "Don't ask again": "Больше не спрашивать",
+  "Save your layout and finish exporting before updating.": "Сохраните макет и завершите экспорт перед обновлением.",
+  "Downloading update…": "Загрузка обновления…",
+  "Preparing update…": "Подготовка обновления…",
+  "The update failed. Please try again later.": "Не удалось выполнить обновление. Повторите попытку позже."
 }

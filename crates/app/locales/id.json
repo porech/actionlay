@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Tidak ada data aktivitas pada offset ini.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Satu file: gunakan stempel waktu yang cocok, jika tidak sejajarkan awal. Sesuaikan offset jika diperlukan.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Beberapa file atau folder: cari otomatis aktivitas yang cocok dengan waktu video. Satu kecocokan ditautkan; beberapa memerlukan pilihan. Tanpa kecocokan, peringatan ditampilkan.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metrik sudah diekstrak dari video. Anda dapat menimpanya dengan memilih berkas sumber."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metrik sudah diekstrak dari video. Anda dapat menimpanya dengan memilih berkas sumber.",
+  "Automatic updates": "Pembaruan otomatis",
+  "Automatic updates are disabled in development builds.": "Pembaruan otomatis dinonaktifkan pada versi pengembangan.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Pembaruan ActionLay akan diunduh otomatis bersama pembaruan sistem.",
+  "Automatic updates are unavailable on this platform.": "Pembaruan otomatis tidak tersedia pada platform ini.",
+  "Check for updates at startup": "Periksa pembaruan saat mulai",
+  "Ask again for the skipped version": "Tanyakan lagi untuk versi yang dilewati",
+  "A new version of ActionLay is available. Update now?": "Versi baru ActionLay tersedia. Perbarui sekarang?",
+  "ActionLay will restart after the update.": "ActionLay akan dimulai ulang setelah pembaruan.",
+  "Yes": "Ya",
+  "Not now": "Tidak sekarang",
+  "Skip this version": "Lewati versi ini",
+  "Don't ask again": "Jangan tanyakan lagi",
+  "Save your layout and finish exporting before updating.": "Simpan tata letak dan selesaikan ekspor sebelum memperbarui.",
+  "Downloading update…": "Mengunduh pembaruan…",
+  "Preparing update…": "Menyiapkan pembaruan…",
+  "The update failed. Please try again later.": "Pembaruan gagal. Silakan coba lagi nanti."
 }

@@ -578,5 +578,21 @@
   "No activity data at this offset.": "このオフセットにアクティビティデータがありません。",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "ファイル1つ：一致するタイムスタンプを使用し、一致しない場合は開始点を揃えます。必要に応じてオフセットを調整してください。",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "複数のファイルまたはフォルダー：動画の時刻に一致するアクティビティを自動検索します。1つならリンクし、複数なら選択を求めます。一致がなければ警告を表示します。",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "メトリクスはすでに動画から抽出されています。ソースファイルを選択すると上書きできます。"
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "メトリクスはすでに動画から抽出されています。ソースファイルを選択すると上書きできます。",
+  "Automatic updates": "自動更新",
+  "Automatic updates are disabled in development builds.": "開発ビルドでは自動更新が無効です。",
+  "ActionLay updates will be downloaded automatically with system updates.": "ActionLayの更新はシステム更新とともに自動的にダウンロードされます。",
+  "Automatic updates are unavailable on this platform.": "このプラットフォームでは自動更新を利用できません。",
+  "Check for updates at startup": "起動時に更新を確認する",
+  "Ask again for the skipped version": "スキップしたバージョンについて再度確認する",
+  "A new version of ActionLay is available. Update now?": "ActionLayの新しいバージョンがあります。今すぐ更新しますか？",
+  "ActionLay will restart after the update.": "更新後にActionLayが再起動します。",
+  "Yes": "はい",
+  "Not now": "今はしない",
+  "Skip this version": "このバージョンをスキップ",
+  "Don't ask again": "今後確認しない",
+  "Save your layout and finish exporting before updating.": "更新する前にレイアウトを保存し、書き出しを完了してください。",
+  "Downloading update…": "更新をダウンロード中…",
+  "Preparing update…": "更新を準備中…",
+  "The update failed. Please try again later.": "更新に失敗しました。後でもう一度お試しください。"
 }

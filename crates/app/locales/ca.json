@@ -578,5 +578,21 @@
   "No activity data at this offset.": "No hi ha dades d’activitat amb aquest desfasament.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Un sol fitxer: utilitza marques de temps compatibles; altrament, alinea els inicis. Ajusta el desfasament si cal.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Diversos fitxers o una carpeta: cerca automàticament activitats que coincideixin amb l’hora del vídeo. Una coincidència s’enllaça; diverses requereixen triar. Si no n’hi ha cap, es mostra un avís.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Les mètriques ja s’han extret del vídeo. Pots sobreescriure-les triant un fitxer font."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Les mètriques ja s’han extret del vídeo. Pots sobreescriure-les triant un fitxer font.",
+  "Automatic updates": "Actualitzacions automàtiques",
+  "Automatic updates are disabled in development builds.": "Les actualitzacions automàtiques estan desactivades a les versions de desenvolupament.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Les actualitzacions d’ActionLay es baixaran automàticament amb les del sistema.",
+  "Automatic updates are unavailable on this platform.": "Les actualitzacions automàtiques no estan disponibles en aquesta plataforma.",
+  "Check for updates at startup": "Cerca actualitzacions en iniciar",
+  "Ask again for the skipped version": "Torna a preguntar per la versió omesa",
+  "A new version of ActionLay is available. Update now?": "Hi ha una nova versió d’ActionLay disponible. Vols actualitzar ara?",
+  "ActionLay will restart after the update.": "ActionLay es reiniciarà després de l’actualització.",
+  "Yes": "Sí",
+  "Not now": "Ara no",
+  "Skip this version": "Omet aquesta versió",
+  "Don't ask again": "No tornis a preguntar",
+  "Save your layout and finish exporting before updating.": "Desa el disseny i acaba l’exportació abans d’actualitzar.",
+  "Downloading update…": "Baixant l’actualització…",
+  "Preparing update…": "Preparant l’actualització…",
+  "The update failed. Please try again later.": "L’actualització ha fallat. Torna-ho a provar més tard."
 }

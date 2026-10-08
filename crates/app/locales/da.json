@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Ingen aktivitetsdata ved denne forskydning.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Én fil: brug matchende tidsstempler, ellers justeres startpunkterne. Tilpas forskydningen om nødvendigt.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Flere filer eller en mappe: find automatisk aktiviteter, der matcher videoens tidspunkt. Ét match tilknyttes; flere kræver et valg. Ingen match giver en advarsel.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metrikkerne er allerede udtrukket fra videoen. Du kan overskrive dem ved at vælge en kildefil."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metrikkerne er allerede udtrukket fra videoen. Du kan overskrive dem ved at vælge en kildefil.",
+  "Automatic updates": "Automatiske opdateringer",
+  "Automatic updates are disabled in development builds.": "Automatiske opdateringer er deaktiveret i udviklingsversioner.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Opdateringer til ActionLay hentes automatisk sammen med systemopdateringer.",
+  "Automatic updates are unavailable on this platform.": "Automatiske opdateringer er ikke tilgængelige på denne platform.",
+  "Check for updates at startup": "Søg efter opdateringer ved start",
+  "Ask again for the skipped version": "Spørg igen om den oversprungne version",
+  "A new version of ActionLay is available. Update now?": "En ny version af ActionLay er tilgængelig. Opdater nu?",
+  "ActionLay will restart after the update.": "ActionLay genstarter efter opdateringen.",
+  "Yes": "Ja",
+  "Not now": "Ikke nu",
+  "Skip this version": "Spring denne version over",
+  "Don't ask again": "Spørg ikke igen",
+  "Save your layout and finish exporting before updating.": "Gem dit layout og afslut eksporten før opdateringen.",
+  "Downloading update…": "Henter opdatering…",
+  "Preparing update…": "Forbereder opdatering…",
+  "The update failed. Please try again later.": "Opdateringen mislykkedes. Prøv igen senere."
 }

@@ -578,5 +578,21 @@
   "No activity data at this offset.": "No activity data at this offset.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metrics have already been extracted from the video. You can override them by choosing a source file."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metrics have already been extracted from the video. You can override them by choosing a source file.",
+  "Automatic updates": "Automatic updates",
+  "Automatic updates are disabled in development builds.": "Automatic updates are disabled in development builds.",
+  "ActionLay updates will be downloaded automatically with system updates.": "ActionLay updates will be downloaded automatically with system updates.",
+  "Automatic updates are unavailable on this platform.": "Automatic updates are unavailable on this platform.",
+  "Check for updates at startup": "Check for updates at startup",
+  "Ask again for the skipped version": "Ask again for the skipped version",
+  "A new version of ActionLay is available. Update now?": "A new version of ActionLay is available. Update now?",
+  "ActionLay will restart after the update.": "ActionLay will restart after the update.",
+  "Yes": "Yes",
+  "Not now": "Not now",
+  "Skip this version": "Skip this version",
+  "Don't ask again": "Don't ask again",
+  "Save your layout and finish exporting before updating.": "Save your layout and finish exporting before updating.",
+  "Downloading update…": "Downloading update…",
+  "Preparing update…": "Preparing update…",
+  "The update failed. Please try again later.": "The update failed. Please try again later."
 }

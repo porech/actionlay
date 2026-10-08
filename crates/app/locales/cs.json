@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Při tomto posunu nejsou žádná data aktivity.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Jeden soubor: použijte odpovídající časová razítka, jinak zarovnejte začátky. V případě potřeby upravte posun.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Více souborů nebo složka: automaticky vyhledejte aktivity odpovídající času videa. Jedna shoda se propojí; více shod vyžaduje výběr. Žádná shoda zobrazí varování.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metriky již byly získány z videa. Můžete je přepsat výběrem zdrojového souboru."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metriky již byly získány z videa. Můžete je přepsat výběrem zdrojového souboru.",
+  "Automatic updates": "Automatické aktualizace",
+  "Automatic updates are disabled in development builds.": "Automatické aktualizace jsou ve vývojových verzích vypnuté.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Aktualizace ActionLay se budou stahovat automaticky spolu s aktualizacemi systému.",
+  "Automatic updates are unavailable on this platform.": "Automatické aktualizace nejsou na této platformě dostupné.",
+  "Check for updates at startup": "Kontrolovat aktualizace při spuštění",
+  "Ask again for the skipped version": "Znovu se zeptat na přeskočenou verzi",
+  "A new version of ActionLay is available. Update now?": "Je dostupná nová verze ActionLay. Aktualizovat nyní?",
+  "ActionLay will restart after the update.": "ActionLay se po aktualizaci restartuje.",
+  "Yes": "Ano",
+  "Not now": "Teď ne",
+  "Skip this version": "Přeskočit tuto verzi",
+  "Don't ask again": "Už se neptat",
+  "Save your layout and finish exporting before updating.": "Před aktualizací uložte rozvržení a dokončete export.",
+  "Downloading update…": "Stahování aktualizace…",
+  "Preparing update…": "Příprava aktualizace…",
+  "The update failed. Please try again later.": "Aktualizace se nezdařila. Zkuste to později znovu."
 }

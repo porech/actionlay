@@ -16,6 +16,8 @@ pub struct Appearance {
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Prefs {
+    #[serde(default)]
+    pub updates: crate::updater::Preferences,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub window: Option<crate::window::Geometry>,
     #[serde(default)]

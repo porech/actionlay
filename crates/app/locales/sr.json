@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Нема података активности при овом помаку.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Једна датотека: користите одговарајуће временске ознаке, иначе поравнајте почетке. По потреби подесите помак.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Више датотека или фасцикла: аутоматски пронађите активности које одговарају времену видеа. Једно поклапање се повезује; више поклапања захтева избор. Без поклапања се приказује упозорење.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Мерни подаци су већ издвојени из видео-снимка. Можете их заменити избором изворне датотеке."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Мерни подаци су већ издвојени из видео-снимка. Можете их заменити избором изворне датотеке.",
+  "Automatic updates": "Аутоматска ажурирања",
+  "Automatic updates are disabled in development builds.": "Аутоматска ажурирања су онемогућена у развојним верзијама.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Ажурирања за ActionLay ће се аутоматски преузимати уз системска ажурирања.",
+  "Automatic updates are unavailable on this platform.": "Аутоматска ажурирања нису доступна на овој платформи.",
+  "Check for updates at startup": "Провери ажурирања при покретању",
+  "Ask again for the skipped version": "Поново питај за прескочену верзију",
+  "A new version of ActionLay is available. Update now?": "Доступна је нова верзија програма ActionLay. Ажурирати сада?",
+  "ActionLay will restart after the update.": "ActionLay ће се поново покренути након ажурирања.",
+  "Yes": "Да",
+  "Not now": "Не сада",
+  "Skip this version": "Прескочи ову верзију",
+  "Don't ask again": "Не питај поново",
+  "Save your layout and finish exporting before updating.": "Сачувајте распоред и завршите извоз пре ажурирања.",
+  "Downloading update…": "Преузимање ажурирања…",
+  "Preparing update…": "Припрема ажурирања…",
+  "The update failed. Please try again later.": "Ажурирање није успело. Покушајте поново касније."
 }

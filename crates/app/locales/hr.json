@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Nema podataka aktivnosti pri ovom pomaku.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Jedna datoteka: upotrijebite odgovarajuće vremenske oznake, inače poravnajte početke. Po potrebi prilagodite pomak.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Više datoteka ili mapa: automatski pronađite aktivnosti koje odgovaraju vremenu videozapisa. Jedno podudaranje se povezuje; više podudaranja zahtijeva odabir. Bez podudaranja prikazuje se upozorenje.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Mjerni podaci već su izdvojeni iz videozapisa. Možete ih zamijeniti odabirom izvorne datoteke."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Mjerni podaci već su izdvojeni iz videozapisa. Možete ih zamijeniti odabirom izvorne datoteke.",
+  "Automatic updates": "Automatska ažuriranja",
+  "Automatic updates are disabled in development builds.": "Automatska ažuriranja onemogućena su u razvojnim verzijama.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Ažuriranja za ActionLay automatski će se preuzimati zajedno s ažuriranjima sustava.",
+  "Automatic updates are unavailable on this platform.": "Automatska ažuriranja nisu dostupna na ovoj platformi.",
+  "Check for updates at startup": "Provjeri ažuriranja pri pokretanju",
+  "Ask again for the skipped version": "Ponovno pitaj za preskočenu verziju",
+  "A new version of ActionLay is available. Update now?": "Dostupna je nova verzija programa ActionLay. Ažurirati sada?",
+  "ActionLay will restart after the update.": "ActionLay će se ponovno pokrenuti nakon ažuriranja.",
+  "Yes": "Da",
+  "Not now": "Ne sada",
+  "Skip this version": "Preskoči ovu verziju",
+  "Don't ask again": "Ne pitaj više",
+  "Save your layout and finish exporting before updating.": "Spremite raspored i dovršite izvoz prije ažuriranja.",
+  "Downloading update…": "Preuzimanje ažuriranja…",
+  "Preparing update…": "Priprema ažuriranja…",
+  "The update failed. Please try again later.": "Ažuriranje nije uspjelo. Pokušajte ponovno kasnije."
 }

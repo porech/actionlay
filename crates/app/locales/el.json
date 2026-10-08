@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Δεν υπάρχουν δεδομένα δραστηριότητας σε αυτή τη μετατόπιση.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Ένα αρχείο: χρησιμοποιήστε συμβατές χρονικές σημάνσεις, αλλιώς ευθυγραμμίστε τις αρχές. Ρυθμίστε τη μετατόπιση αν χρειάζεται.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Πολλά αρχεία ή φάκελος: βρείτε αυτόματα δραστηριότητες που αντιστοιχούν στην ώρα του βίντεο. Μία αντιστοίχιση συνδέεται· περισσότερες απαιτούν επιλογή. Χωρίς αντιστοίχιση εμφανίζεται προειδοποίηση.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Οι μετρήσεις έχουν ήδη εξαχθεί από το βίντεο. Μπορείτε να τις αντικαταστήσετε επιλέγοντας ένα αρχείο πηγής."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Οι μετρήσεις έχουν ήδη εξαχθεί από το βίντεο. Μπορείτε να τις αντικαταστήσετε επιλέγοντας ένα αρχείο πηγής.",
+  "Automatic updates": "Αυτόματες ενημερώσεις",
+  "Automatic updates are disabled in development builds.": "Οι αυτόματες ενημερώσεις είναι απενεργοποιημένες στις εκδόσεις ανάπτυξης.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Οι ενημερώσεις του ActionLay θα λαμβάνονται αυτόματα μαζί με τις ενημερώσεις συστήματος.",
+  "Automatic updates are unavailable on this platform.": "Οι αυτόματες ενημερώσεις δεν είναι διαθέσιμες σε αυτή την πλατφόρμα.",
+  "Check for updates at startup": "Έλεγχος για ενημερώσεις κατά την εκκίνηση",
+  "Ask again for the skipped version": "Ερώτηση ξανά για την έκδοση που παραλείφθηκε",
+  "A new version of ActionLay is available. Update now?": "Υπάρχει νέα έκδοση του ActionLay. Ενημέρωση τώρα;",
+  "ActionLay will restart after the update.": "Το ActionLay θα επανεκκινηθεί μετά την ενημέρωση.",
+  "Yes": "Ναι",
+  "Not now": "Όχι τώρα",
+  "Skip this version": "Παράλειψη αυτής της έκδοσης",
+  "Don't ask again": "Να μη με ρωτήσεις ξανά",
+  "Save your layout and finish exporting before updating.": "Αποθηκεύστε τη διάταξη και ολοκληρώστε την εξαγωγή πριν την ενημέρωση.",
+  "Downloading update…": "Λήψη ενημέρωσης…",
+  "Preparing update…": "Προετοιμασία ενημέρωσης…",
+  "The update failed. Please try again later.": "Η ενημέρωση απέτυχε. Δοκιμάστε ξανά αργότερα."
 }

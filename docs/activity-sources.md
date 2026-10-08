@@ -1,6 +1,6 @@
 # Linked activities and video orientation
 
-This guide describes ActionLay 1.4.1. Linked activities, file/folder matching and
+This guide describes ActionLay 1.4.2. Linked activities, file/folder matching and
 alignment are supported in both the desktop and browser applications. Manual
 video rotation controls are a desktop feature.
 

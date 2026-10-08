@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Không có dữ liệu hoạt động ở độ lệch này.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Một tệp: dùng dấu thời gian tương thích, nếu không thì căn chỉnh điểm bắt đầu. Điều chỉnh độ lệch nếu cần.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Nhiều tệp hoặc thư mục: tự động tìm hoạt động khớp thời gian video. Một kết quả được liên kết; nhiều kết quả cần lựa chọn. Không có kết quả sẽ hiển thị cảnh báo.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Các chỉ số đã được trích xuất từ video. Bạn có thể ghi đè bằng cách chọn tệp nguồn."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Các chỉ số đã được trích xuất từ video. Bạn có thể ghi đè bằng cách chọn tệp nguồn.",
+  "Automatic updates": "Cập nhật tự động",
+  "Automatic updates are disabled in development builds.": "Cập nhật tự động bị tắt trong các bản phát triển.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Các bản cập nhật ActionLay sẽ được tải tự động cùng với bản cập nhật hệ thống.",
+  "Automatic updates are unavailable on this platform.": "Cập nhật tự động không khả dụng trên nền tảng này.",
+  "Check for updates at startup": "Kiểm tra cập nhật khi khởi động",
+  "Ask again for the skipped version": "Hỏi lại về phiên bản đã bỏ qua",
+  "A new version of ActionLay is available. Update now?": "Có phiên bản ActionLay mới. Cập nhật ngay?",
+  "ActionLay will restart after the update.": "ActionLay sẽ khởi động lại sau khi cập nhật.",
+  "Yes": "Có",
+  "Not now": "Không phải bây giờ",
+  "Skip this version": "Bỏ qua phiên bản này",
+  "Don't ask again": "Không hỏi lại",
+  "Save your layout and finish exporting before updating.": "Lưu bố cục và hoàn tất xuất trước khi cập nhật.",
+  "Downloading update…": "Đang tải bản cập nhật…",
+  "Preparing update…": "Đang chuẩn bị cập nhật…",
+  "The update failed. Please try again later.": "Cập nhật thất bại. Vui lòng thử lại sau."
 }

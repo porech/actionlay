@@ -578,5 +578,21 @@
   "No activity data at this offset.": "此偏移處沒有活動資料。",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "單一檔案：使用相容的時間戳記，否則對齊起點。如有需要，請調整偏移。",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "多個檔案或資料夾：自動尋找與影片時間匹配的活動。一個匹配項會自動關聯；多個匹配項需要選擇。沒有匹配項時顯示警告。",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "指標已從影片中擷取。您可以選擇來源檔案來覆寫這些指標。"
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "指標已從影片中擷取。您可以選擇來源檔案來覆寫這些指標。",
+  "Automatic updates": "自動更新",
+  "Automatic updates are disabled in development builds.": "開發版本已停用自動更新。",
+  "ActionLay updates will be downloaded automatically with system updates.": "ActionLay 更新將隨系統更新一起自動下載。",
+  "Automatic updates are unavailable on this platform.": "此平台不支援自動更新。",
+  "Check for updates at startup": "啟動時檢查更新",
+  "Ask again for the skipped version": "重新詢問已略過的版本",
+  "A new version of ActionLay is available. Update now?": "有新版本的 ActionLay。現在更新嗎？",
+  "ActionLay will restart after the update.": "更新完成後 ActionLay 將重新啟動。",
+  "Yes": "是",
+  "Not now": "暫不更新",
+  "Skip this version": "略過此版本",
+  "Don't ask again": "不再詢問",
+  "Save your layout and finish exporting before updating.": "更新前請儲存版面配置並完成匯出。",
+  "Downloading update…": "正在下載更新…",
+  "Preparing update…": "正在準備更新…",
+  "The update failed. Please try again later.": "更新失敗。請稍後再試。"
 }

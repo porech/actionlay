@@ -578,5 +578,21 @@
   "No activity data at this offset.": "No hay datos de actividad con este desfase.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Un solo archivo: usa marcas de tiempo compatibles; de lo contrario, alinea los inicios. Ajusta el desfase si es necesario.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Varios archivos o una carpeta: busca automáticamente actividades que coincidan con la hora del vídeo. Una coincidencia se vincula; varias requieren elegir. Si no hay coincidencias, se muestra un aviso.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Las métricas ya se han extraído del vídeo. Puedes sobrescribirlas eligiendo un archivo fuente."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Las métricas ya se han extraído del vídeo. Puedes sobrescribirlas eligiendo un archivo fuente.",
+  "Automatic updates": "Actualizaciones automáticas",
+  "Automatic updates are disabled in development builds.": "Las actualizaciones automáticas están desactivadas en las versiones de desarrollo.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Las actualizaciones de ActionLay se descargarán automáticamente junto con las del sistema.",
+  "Automatic updates are unavailable on this platform.": "Las actualizaciones automáticas no están disponibles en esta plataforma.",
+  "Check for updates at startup": "Buscar actualizaciones al iniciar",
+  "Ask again for the skipped version": "Volver a preguntar por la versión omitida",
+  "A new version of ActionLay is available. Update now?": "Hay una nueva versión de ActionLay disponible. ¿Actualizar ahora?",
+  "ActionLay will restart after the update.": "ActionLay se reiniciará después de la actualización.",
+  "Yes": "Sí",
+  "Not now": "Ahora no",
+  "Skip this version": "Omitir esta versión",
+  "Don't ask again": "No volver a preguntar",
+  "Save your layout and finish exporting before updating.": "Guarda el diseño y termina la exportación antes de actualizar.",
+  "Downloading update…": "Descargando actualización…",
+  "Preparing update…": "Preparando actualización…",
+  "The update failed. Please try again later.": "La actualización ha fallado. Inténtalo de nuevo más tarde."
 }

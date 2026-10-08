@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Nenhum dado de atividade neste deslocamento.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Arquivo único: use datas e horas compatíveis; caso contrário, alinhe os inícios. Ajuste o deslocamento se necessário.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Vários arquivos ou uma pasta: encontre automaticamente atividades que correspondam ao horário do vídeo. Uma correspondência é vinculada; várias exigem uma escolha. Nenhuma correspondência gera um aviso.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "As métricas já foram extraídas do vídeo. Você pode substituí-las escolhendo um arquivo de origem."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "As métricas já foram extraídas do vídeo. Você pode substituí-las escolhendo um arquivo de origem.",
+  "Automatic updates": "Atualizações automáticas",
+  "Automatic updates are disabled in development builds.": "As atualizações automáticas estão desativadas nas versões de desenvolvimento.",
+  "ActionLay updates will be downloaded automatically with system updates.": "As atualizações do ActionLay serão baixadas automaticamente junto com as do sistema.",
+  "Automatic updates are unavailable on this platform.": "As atualizações automáticas não estão disponíveis nesta plataforma.",
+  "Check for updates at startup": "Verificar atualizações ao iniciar",
+  "Ask again for the skipped version": "Perguntar novamente sobre a versão ignorada",
+  "A new version of ActionLay is available. Update now?": "Uma nova versão do ActionLay está disponível. Atualizar agora?",
+  "ActionLay will restart after the update.": "O ActionLay será reiniciado após a atualização.",
+  "Yes": "Sim",
+  "Not now": "Agora não",
+  "Skip this version": "Ignorar esta versão",
+  "Don't ask again": "Não perguntar novamente",
+  "Save your layout and finish exporting before updating.": "Salve o layout e conclua a exportação antes de atualizar.",
+  "Downloading update…": "Baixando atualização…",
+  "Preparing update…": "Preparando atualização…",
+  "The update failed. Please try again later.": "A atualização falhou. Tente novamente mais tarde."
 }

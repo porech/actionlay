@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Немає даних активності за цього зсуву.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Один файл: використовуйте сумісні часові позначки, інакше вирівняйте початки. За потреби налаштуйте зсув.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Кілька файлів або папка: автоматично знайдіть активності, що відповідають часу відео. Одна прив’язується; за кількох потрібен вибір. Якщо збігів немає, з’явиться попередження.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Метрики вже отримано з відео. Ви можете замінити їх, вибравши файл джерела."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Метрики вже отримано з відео. Ви можете замінити їх, вибравши файл джерела.",
+  "Automatic updates": "Автоматичні оновлення",
+  "Automatic updates are disabled in development builds.": "Автоматичні оновлення вимкнено у збірках для розробки.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Оновлення ActionLay завантажуватимуться автоматично разом з оновленнями системи.",
+  "Automatic updates are unavailable on this platform.": "Автоматичні оновлення недоступні на цій платформі.",
+  "Check for updates at startup": "Перевіряти оновлення під час запуску",
+  "Ask again for the skipped version": "Знову запитувати про пропущену версію",
+  "A new version of ActionLay is available. Update now?": "Доступна нова версія ActionLay. Оновити зараз?",
+  "ActionLay will restart after the update.": "ActionLay перезапуститься після оновлення.",
+  "Yes": "Так",
+  "Not now": "Не зараз",
+  "Skip this version": "Пропустити цю версію",
+  "Don't ask again": "Більше не запитувати",
+  "Save your layout and finish exporting before updating.": "Збережіть макет і завершіть експорт перед оновленням.",
+  "Downloading update…": "Завантаження оновлення…",
+  "Preparing update…": "Підготовка оновлення…",
+  "The update failed. Please try again later.": "Не вдалося оновити. Спробуйте пізніше."
 }

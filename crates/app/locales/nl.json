@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Geen activiteitsgegevens bij deze verschuiving.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Eén bestand: gebruik passende tijdstempels, anders worden de beginpunten uitgelijnd. Pas de verschuiving zo nodig aan.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Meerdere bestanden of een map: zoek automatisch activiteiten die bij de videotijd passen. Eén overeenkomst wordt gekoppeld; bij meerdere kiest u zelf. Geen overeenkomst geeft een waarschuwing.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "De meetgegevens zijn al uit de video gehaald. Je kunt ze overschrijven door een bronbestand te kiezen."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "De meetgegevens zijn al uit de video gehaald. Je kunt ze overschrijven door een bronbestand te kiezen.",
+  "Automatic updates": "Automatische updates",
+  "Automatic updates are disabled in development builds.": "Automatische updates zijn uitgeschakeld in ontwikkelversies.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Updates voor ActionLay worden automatisch samen met systeemupdates gedownload.",
+  "Automatic updates are unavailable on this platform.": "Automatische updates zijn niet beschikbaar op dit platform.",
+  "Check for updates at startup": "Bij het opstarten op updates controleren",
+  "Ask again for the skipped version": "Opnieuw vragen voor de overgeslagen versie",
+  "A new version of ActionLay is available. Update now?": "Er is een nieuwe versie van ActionLay beschikbaar. Nu bijwerken?",
+  "ActionLay will restart after the update.": "ActionLay wordt na de update opnieuw gestart.",
+  "Yes": "Ja",
+  "Not now": "Niet nu",
+  "Skip this version": "Deze versie overslaan",
+  "Don't ask again": "Niet meer vragen",
+  "Save your layout and finish exporting before updating.": "Sla uw lay-out op en voltooi het exporteren voordat u bijwerkt.",
+  "Downloading update…": "Update downloaden…",
+  "Preparing update…": "Update voorbereiden…",
+  "The update failed. Please try again later.": "De update is mislukt. Probeer het later opnieuw."
 }

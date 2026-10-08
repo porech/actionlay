@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Pri tem zamiku ni podatkov aktivnosti.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Ena datoteka: uporabite ustrezne časovne oznake, sicer poravnajte začetke. Po potrebi prilagodite zamik.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Več datotek ali mapa: samodejno poiščite aktivnosti, ki ustrezajo času videoposnetka. Eno ujemanje se poveže; več ujemanj zahteva izbiro. Brez ujemanj se prikaže opozorilo.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Meritve so že pridobljene iz videoposnetka. Prepišete jih lahko z izbiro izvorne datoteke."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Meritve so že pridobljene iz videoposnetka. Prepišete jih lahko z izbiro izvorne datoteke.",
+  "Automatic updates": "Samodejne posodobitve",
+  "Automatic updates are disabled in development builds.": "Samodejne posodobitve so v razvojnih različicah onemogočene.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Posodobitve za ActionLay se bodo samodejno prenesle skupaj s sistemskimi posodobitvami.",
+  "Automatic updates are unavailable on this platform.": "Samodejne posodobitve na tej platformi niso na voljo.",
+  "Check for updates at startup": "Preveri posodobitve ob zagonu",
+  "Ask again for the skipped version": "Znova vprašaj za preskočeno različico",
+  "A new version of ActionLay is available. Update now?": "Na voljo je nova različica programa ActionLay. Posodobim zdaj?",
+  "ActionLay will restart after the update.": "ActionLay se bo po posodobitvi znova zagnal.",
+  "Yes": "Da",
+  "Not now": "Ne zdaj",
+  "Skip this version": "Preskoči to različico",
+  "Don't ask again": "Ne sprašuj več",
+  "Save your layout and finish exporting before updating.": "Pred posodobitvijo shranite postavitev in dokončajte izvoz.",
+  "Downloading update…": "Prenašanje posodobitve…",
+  "Preparing update…": "Priprava posodobitve…",
+  "The update failed. Please try again later.": "Posodobitev ni uspela. Poskusite znova pozneje."
 }

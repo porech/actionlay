@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Няма данни за активност при това отместване.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Един файл: използвайте съответстващите времеви отметки, иначе подравнете началата. При нужда коригирайте отместването.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Няколко файла или папка: автоматично намерете активности, съответстващи на часа на видеото. Едно съвпадение се свързва; няколко изискват избор. Без съвпадение се показва предупреждение.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Измерванията вече са извлечени от видеоклипа. Можете да ги замените, като изберете изходен файл."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Измерванията вече са извлечени от видеоклипа. Можете да ги замените, като изберете изходен файл.",
+  "Automatic updates": "Автоматични актуализации",
+  "Automatic updates are disabled in development builds.": "Автоматичните актуализации са изключени в развойните версии.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Актуализациите на ActionLay ще се изтеглят автоматично заедно със системните актуализации.",
+  "Automatic updates are unavailable on this platform.": "Автоматичните актуализации не са налични на тази платформа.",
+  "Check for updates at startup": "Проверка за актуализации при стартиране",
+  "Ask again for the skipped version": "Попитай отново за пропуснатата версия",
+  "A new version of ActionLay is available. Update now?": "Налична е нова версия на ActionLay. Актуализиране сега?",
+  "ActionLay will restart after the update.": "ActionLay ще се рестартира след актуализацията.",
+  "Yes": "Да",
+  "Not now": "Не сега",
+  "Skip this version": "Пропусни тази версия",
+  "Don't ask again": "Не питай повече",
+  "Save your layout and finish exporting before updating.": "Запазете оформлението и завършете експортирането преди актуализация.",
+  "Downloading update…": "Изтегляне на актуализация…",
+  "Preparing update…": "Подготовка на актуализация…",
+  "The update failed. Please try again later.": "Актуализацията е неуспешна. Опитайте отново по-късно."
 }

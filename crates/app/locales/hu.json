@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Nincsenek tevékenységadatok ennél az eltolásnál.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Egy fájl: használja az egyező időbélyegeket, egyébként igazítsa a kezdőpontokat. Szükség esetén állítsa be az eltolást.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Több fájl vagy egy mappa: automatikusan keresse meg a videó idejének megfelelő tevékenységeket. Egy találat összekapcsolódik; több esetén választani kell. Találat nélkül figyelmeztetés jelenik meg.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "A mérési adatok már ki lettek nyerve a videóból. Forrásfájl kiválasztásával felülírhatja őket."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "A mérési adatok már ki lettek nyerve a videóból. Forrásfájl kiválasztásával felülírhatja őket.",
+  "Automatic updates": "Automatikus frissítések",
+  "Automatic updates are disabled in development builds.": "Az automatikus frissítések le vannak tiltva a fejlesztői verziókban.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Az ActionLay frissítései a rendszerfrissítésekkel együtt automatikusan letöltődnek.",
+  "Automatic updates are unavailable on this platform.": "Az automatikus frissítések ezen a platformon nem érhetők el.",
+  "Check for updates at startup": "Frissítések keresése indításkor",
+  "Ask again for the skipped version": "Kérdezzen újra a kihagyott verzióról",
+  "A new version of ActionLay is available. Update now?": "Az ActionLay új verziója elérhető. Frissíti most?",
+  "ActionLay will restart after the update.": "Az ActionLay a frissítés után újraindul.",
+  "Yes": "Igen",
+  "Not now": "Most nem",
+  "Skip this version": "Verzió kihagyása",
+  "Don't ask again": "Ne kérdezze újra",
+  "Save your layout and finish exporting before updating.": "Frissítés előtt mentse az elrendezést és fejezze be az exportálást.",
+  "Downloading update…": "Frissítés letöltése…",
+  "Preparing update…": "Frissítés előkészítése…",
+  "The update failed. Please try again later.": "A frissítés sikertelen. Próbálja újra később."
 }

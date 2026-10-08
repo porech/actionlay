@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Pri tomto posune nie sú žiadne údaje aktivity.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Jeden súbor: použite zodpovedajúce časové pečiatky, inak zarovnajte začiatky. V prípade potreby upravte posun.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Viac súborov alebo priečinok: automaticky vyhľadajte aktivity zodpovedajúce času videa. Jedna zhoda sa prepojí; viac zhôd vyžaduje výber. Žiadna zhoda zobrazí upozornenie.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metriky už boli získané z videa. Môžete ich prepísať výberom zdrojového súboru."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metriky už boli získané z videa. Môžete ich prepísať výberom zdrojového súboru.",
+  "Automatic updates": "Automatické aktualizácie",
+  "Automatic updates are disabled in development builds.": "Automatické aktualizácie sú vo vývojových verziách vypnuté.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Aktualizácie ActionLay sa budú sťahovať automaticky spolu s aktualizáciami systému.",
+  "Automatic updates are unavailable on this platform.": "Automatické aktualizácie nie sú na tejto platforme dostupné.",
+  "Check for updates at startup": "Kontrolovať aktualizácie pri spustení",
+  "Ask again for the skipped version": "Znovu sa opýtať na preskočenú verziu",
+  "A new version of ActionLay is available. Update now?": "Je dostupná nová verzia ActionLay. Aktualizovať teraz?",
+  "ActionLay will restart after the update.": "ActionLay sa po aktualizácii reštartuje.",
+  "Yes": "Áno",
+  "Not now": "Teraz nie",
+  "Skip this version": "Preskočiť túto verziu",
+  "Don't ask again": "Už sa nepýtať",
+  "Save your layout and finish exporting before updating.": "Pred aktualizáciou uložte rozloženie a dokončite export.",
+  "Downloading update…": "Sťahovanie aktualizácie…",
+  "Preparing update…": "Príprava aktualizácie…",
+  "The update failed. Please try again later.": "Aktualizácia zlyhala. Skúste to znova neskôr."
 }

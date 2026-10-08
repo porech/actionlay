@@ -14,8 +14,8 @@ or a separate overlay for your video editor. Free and open source.
 
 | System | Download | Install |
 |---|---|---|
-| macOS 12+, Apple Silicon **and Intel** | [Universal DMG](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.4.1-macos-universal.dmg) | Open the DMG and drag ActionLay to Applications |
-| Windows 10/11, 64-bit | [Windows installer](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.4.1-windows-x64-setup.exe) | Choose installation for yourself or everyone; desktop shortcut optional |
+| macOS 12+, Apple Silicon **and Intel** | [Universal DMG](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.4.2-macos-universal.dmg) | Open the DMG and drag ActionLay to Applications |
+| Windows 10/11, 64-bit | [Windows installer](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.4.2-windows-x64-setup.exe) | Choose installation for yourself or everyone; desktop shortcut optional |
 | Linux, 64-bit | [Package repositories and setup instructions](https://porech.github.io/actionlay/packages/) | Add the APT or DNF repository, then install `actionlay` |
 
 The **[latest release](https://github.com/porech/actionlay/releases/latest)** also
@@ -32,6 +32,22 @@ prompt; choose **More info → Run anyway** if you want to run the downloaded bu
 
 For upcoming changes, use the **[development release](https://github.com/porech/actionlay/releases/tag/nightly)**,
 updated after successful builds of `main`. It may contain unfinished changes.
+
+Stable desktop builds check for newer stable releases at startup and offer **Yes**,
+**Not now**, **Skip this version**, or **Don't ask again**. Restore either persistent
+choice under **Settings → Advanced → Automatic updates**. Downloads show progress
+and are checked against the release asset's SHA-256 digest before installation;
+ActionLay restarts when the update finishes. Save edited layouts and finish exports
+before updating. Development builds never check for updates.
+
+Windows installations keep their current directory and per-user/all-user mode
+(with UAC for all-user updates). Portable Windows copies replace just their
+executable. macOS replaces the running app bundle at its actual location, including
+custom names and directories; standalone executables replace only themselves.
+Linux portable copies replace their executable, while DEB/RPM installations use
+system updates and disable the built-in updater. Portable replacements need a
+writable executable directory. Failed downloads leave the current installation
+intact; installation errors are reported when ActionLay next starts.
 
 The Windows installer supports per-user or all-user installation, upgrades,
 and uninstall from Windows Apps. Linux packages
@@ -113,7 +129,7 @@ adjust alignment. In the browser, use the **Metric sources** toolbar button or
 expand that section for file/folder selection and alignment controls.
 See [linked activities and video orientation](docs/activity-sources.md) for matching
 rules, offset examples, the INSGPS representation and verification. These source
-and orientation controls are available in ActionLay 1.4.1.
+and orientation controls are available in ActionLay 1.4.2.
 
 Widgets that need historical telemetry show their own loading indicator and
 percentage until the required data is available, including after seeking.
@@ -217,7 +233,7 @@ or GPL-3.0-or-later, at your option; see the [artwork licence and attribution](a
 The binaries include GPL-enabled FFmpeg,
 x264 and x265. Source revisions and build scripts are included in the repository;
 licence notices and source links accompany the downloads. Each release also
-includes the exact FFmpeg/x264/x265 sources in `third-party-sources-1.4.1.tar.gz`.
+includes the exact FFmpeg/x264/x265 sources in `third-party-sources-1.4.2.tar.gz`.
 
 ## Legal notice
 

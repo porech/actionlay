@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Bu zaman kaymasında etkinlik verisi yok.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Tek dosya: uyumlu zaman damgalarını kullanın, aksi halde başlangıçları hizalayın. Gerekirse zaman kaymasını ayarlayın.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Birden fazla dosya veya klasör: video zamanıyla eşleşen etkinlikleri otomatik bulun. Tek eşleşme bağlanır; birden fazla eşleşmede seçim gerekir. Eşleşme yoksa uyarı gösterilir.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metrikler videodan zaten çıkarıldı. Bir kaynak dosyası seçerek bunların üzerine yazabilirsiniz."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metrikler videodan zaten çıkarıldı. Bir kaynak dosyası seçerek bunların üzerine yazabilirsiniz.",
+  "Automatic updates": "Otomatik güncellemeler",
+  "Automatic updates are disabled in development builds.": "Geliştirme sürümlerinde otomatik güncellemeler devre dışıdır.",
+  "ActionLay updates will be downloaded automatically with system updates.": "ActionLay güncellemeleri sistem güncellemeleriyle birlikte otomatik olarak indirilecektir.",
+  "Automatic updates are unavailable on this platform.": "Bu platformda otomatik güncellemeler kullanılamıyor.",
+  "Check for updates at startup": "Başlangıçta güncellemeleri denetle",
+  "Ask again for the skipped version": "Atlanan sürüm için tekrar sor",
+  "A new version of ActionLay is available. Update now?": "ActionLay’in yeni bir sürümü mevcut. Şimdi güncellensin mi?",
+  "ActionLay will restart after the update.": "ActionLay güncellemeden sonra yeniden başlatılacaktır.",
+  "Yes": "Evet",
+  "Not now": "Şimdi değil",
+  "Skip this version": "Bu sürümü atla",
+  "Don't ask again": "Bir daha sorma",
+  "Save your layout and finish exporting before updating.": "Güncellemeden önce düzeninizi kaydedin ve dışa aktarmayı tamamlayın.",
+  "Downloading update…": "Güncelleme indiriliyor…",
+  "Preparing update…": "Güncelleme hazırlanıyor…",
+  "The update failed. Please try again later.": "Güncelleme başarısız oldu. Lütfen daha sonra tekrar deneyin."
 }

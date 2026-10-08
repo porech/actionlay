@@ -3,6 +3,7 @@ use eframe::egui;
 
 pub fn show(ctx: &egui::Context, visible: &mut bool, prefs: &mut crate::prefs::Prefs) -> bool {
     let before = (
+        prefs.updates.clone(),
         prefs.buffering,
         prefs.show_diagnostic_data,
         prefs.software_video_decoding,
@@ -12,6 +13,8 @@ pub fn show(ctx: &egui::Context, visible: &mut bool, prefs: &mut crate::prefs::P
         .open(visible)
         .default_width(440.0)
         .show(ctx, |ui| {
+            crate::updater::settings(ui, &mut prefs.updates);
+            ui.separator();
             ui.checkbox(&mut prefs.software_video_decoding, crate::i18n::text("Use software video decoding"));
             ui.small(crate::i18n::ui_text(ui, "Applies the next time a video is opened."));
             ui.separator();
@@ -34,6 +37,7 @@ pub fn show(ctx: &egui::Context, visible: &mut bool, prefs: &mut crate::prefs::P
         });
     *options = options.normalized();
     (
+        prefs.updates.clone(),
         prefs.buffering,
         prefs.show_diagnostic_data,
         prefs.software_video_decoding,

@@ -578,5 +578,21 @@
   "No activity data at this offset.": "لا توجد بيانات نشاط عند هذه الإزاحة.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "ملف واحد: استخدم الطوابع الزمنية المتوافقة، وإلا فحاذِ البدايات. اضبط الإزاحة عند الحاجة.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "عدة ملفات أو مجلد: ابحث تلقائيًا عن الأنشطة المطابقة لوقت الفيديو. تُربط المطابقة الوحيدة؛ وتتطلب المطابقات المتعددة اختيارًا. يظهر تحذير عند عدم وجود مطابقة.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "تم استخراج المقاييس من الفيديو بالفعل. يمكنك استبدالها باختيار ملف مصدر."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "تم استخراج المقاييس من الفيديو بالفعل. يمكنك استبدالها باختيار ملف مصدر.",
+  "Automatic updates": "التحديثات التلقائية",
+  "Automatic updates are disabled in development builds.": "التحديثات التلقائية معطلة في إصدارات التطوير.",
+  "ActionLay updates will be downloaded automatically with system updates.": "سيتم تنزيل تحديثات ActionLay تلقائيًا مع تحديثات النظام.",
+  "Automatic updates are unavailable on this platform.": "التحديثات التلقائية غير متاحة على هذا النظام.",
+  "Check for updates at startup": "التحقق من التحديثات عند بدء التشغيل",
+  "Ask again for the skipped version": "السؤال مجددًا عن الإصدار الذي تم تخطيه",
+  "A new version of ActionLay is available. Update now?": "يتوفر إصدار جديد من ActionLay. هل تريد التحديث الآن؟",
+  "ActionLay will restart after the update.": "ستتم إعادة تشغيل ActionLay بعد التحديث.",
+  "Yes": "نعم",
+  "Not now": "ليس الآن",
+  "Skip this version": "تخطي هذا الإصدار",
+  "Don't ask again": "عدم السؤال مجددًا",
+  "Save your layout and finish exporting before updating.": "احفظ التخطيط وأكمل التصدير قبل التحديث.",
+  "Downloading update…": "جارٍ تنزيل التحديث…",
+  "Preparing update…": "جارٍ تحضير التحديث…",
+  "The update failed. Please try again later.": "فشل التحديث. يرجى المحاولة لاحقًا."
 }

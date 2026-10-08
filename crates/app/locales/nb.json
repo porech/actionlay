@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Ingen aktivitetsdata ved denne forskyvningen.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Én fil: bruk samsvarende tidsstempler, ellers justeres startpunktene. Tilpass forskyvningen ved behov.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Flere filer eller en mappe: finn automatisk aktiviteter som samsvarer med videoens tidspunkt. Ett treff kobles til; flere krever et valg. Ingen treff gir en advarsel.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metrikkene er allerede hentet fra videoen. Du kan overskrive dem ved å velge en kildefil."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metrikkene er allerede hentet fra videoen. Du kan overskrive dem ved å velge en kildefil.",
+  "Automatic updates": "Automatiske oppdateringer",
+  "Automatic updates are disabled in development builds.": "Automatiske oppdateringer er deaktivert i utviklingsversjoner.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Oppdateringer for ActionLay lastes ned automatisk sammen med systemoppdateringer.",
+  "Automatic updates are unavailable on this platform.": "Automatiske oppdateringer er ikke tilgjengelige på denne plattformen.",
+  "Check for updates at startup": "Se etter oppdateringer ved oppstart",
+  "Ask again for the skipped version": "Spør igjen om den hoppede versjonen",
+  "A new version of ActionLay is available. Update now?": "En ny versjon av ActionLay er tilgjengelig. Oppdater nå?",
+  "ActionLay will restart after the update.": "ActionLay starter på nytt etter oppdateringen.",
+  "Yes": "Ja",
+  "Not now": "Ikke nå",
+  "Skip this version": "Hopp over denne versjonen",
+  "Don't ask again": "Ikke spør igjen",
+  "Save your layout and finish exporting before updating.": "Lagre oppsettet og fullfør eksporten før du oppdaterer.",
+  "Downloading update…": "Laster ned oppdatering…",
+  "Preparing update…": "Forbereder oppdatering…",
+  "The update failed. Please try again later.": "Oppdateringen mislyktes. Prøv igjen senere."
 }

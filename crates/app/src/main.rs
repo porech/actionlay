@@ -20,6 +20,7 @@ mod prefs;
 mod rotation;
 mod telemetry_load;
 mod transport;
+mod updater;
 mod video_view;
 mod window;
 
@@ -110,6 +111,7 @@ struct App {
     /// pts of the current video's frame on screen (None before its first frame): the
     /// overlay is rendered for this time.
     shown_t: Option<f64>,
+    updater: updater::Updater,
     prefs: prefs::Prefs,
     prefs_path: Option<PathBuf>,
     max_texture: u32,
@@ -1772,6 +1774,7 @@ impl App {
 impl eframe::App for App {
     fn on_exit(&mut self) {
         self.save_prefs();
+        self.updater.on_exit();
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
@@ -1819,11 +1822,15 @@ impl eframe::App for App {
         if !fullscreen {
             self.about.show(ui.ctx());
         }
+        let update_preferences = self.prefs.updates.clone();
         if !fullscreen && advanced::show(ui.ctx(), &mut self.advanced_visible, &mut self.prefs) {
             if let Some(player) = &mut self.player {
                 player.set_buffering(self.prefs.buffering);
             }
             self.save_prefs();
+            if self.prefs.updates != update_preferences {
+                self.updater.preferences_changed();
+            }
         }
         let regional_changed = !fullscreen
             && i18n::regional_settings(ui.ctx(), &mut self.regional_visible, &mut self.prefs);
@@ -1853,6 +1860,18 @@ impl eframe::App for App {
         }
         if !fullscreen {
             self.show_export(ui.ctx());
+        }
+        let can_restart = !self
+            .export_job
+            .as_ref()
+            .is_some_and(|j| !j.progress.lock().unwrap().done)
+            && !self.editor.as_ref().is_some_and(editor::Editor::dirty)
+            && self.pending_edit_action.is_none();
+        if self
+            .updater
+            .show(ui.ctx(), &mut self.prefs.updates, can_restart)
+        {
+            self.save_prefs();
         }
         if ui.ctx().input(|i| i.viewport().close_requested())
             && self
@@ -2328,6 +2347,7 @@ fn main() -> eframe::Result {
                 loaded_telemetry: None,
                 egui_ctx: cc.egui_ctx.clone(),
                 shown_t: None,
+                updater: updater::Updater::startup(&prefs.updates, &cc.egui_ctx),
                 prefs,
                 prefs_path,
                 max_texture,

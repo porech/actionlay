@@ -578,5 +578,21 @@
   "No activity data at this offset.": "Nu există date de activitate la acest decalaj.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Un singur fișier: utilizați marcaje temporale compatibile, altfel aliniați începuturile. Ajustați decalajul dacă este necesar.",
   "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Mai multe fișiere sau un dosar: găsiți automat activități care corespund orei videoclipului. O potrivire este asociată; mai multe necesită o alegere. Lipsa potrivirilor produce un avertisment.",
-  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metricile au fost deja extrase din videoclip. Le poți suprascrie alegând un fișier sursă."
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metricile au fost deja extrase din videoclip. Le poți suprascrie alegând un fișier sursă.",
+  "Automatic updates": "Actualizări automate",
+  "Automatic updates are disabled in development builds.": "Actualizările automate sunt dezactivate în versiunile de dezvoltare.",
+  "ActionLay updates will be downloaded automatically with system updates.": "Actualizările ActionLay vor fi descărcate automat împreună cu actualizările sistemului.",
+  "Automatic updates are unavailable on this platform.": "Actualizările automate nu sunt disponibile pe această platformă.",
+  "Check for updates at startup": "Caută actualizări la pornire",
+  "Ask again for the skipped version": "Întreabă din nou despre versiunea omisă",
+  "A new version of ActionLay is available. Update now?": "Este disponibilă o versiune nouă de ActionLay. Actualizezi acum?",
+  "ActionLay will restart after the update.": "ActionLay va reporni după actualizare.",
+  "Yes": "Da",
+  "Not now": "Nu acum",
+  "Skip this version": "Omite această versiune",
+  "Don't ask again": "Nu mai întreba",
+  "Save your layout and finish exporting before updating.": "Salvează aspectul și finalizează exportul înainte de actualizare.",
+  "Downloading update…": "Se descarcă actualizarea…",
+  "Preparing update…": "Se pregătește actualizarea…",
+  "The update failed. Please try again later.": "Actualizarea a eșuat. Încearcă din nou mai târziu."
 }
