@@ -1,14 +1,21 @@
 # Linked activities and video orientation
 
-This guide describes ActionLay 1.4.0. Linked activities, file/folder matching and
+This guide describes ActionLay 1.4.1. Linked activities, file/folder matching and
 alignment are supported in both the desktop and browser applications. Manual
 video rotation controls are a desktop feature.
 
 ## Link an activity
 
-Open a video first. On desktop, use **File → Video sources…**, then
+The toolbar and File menu open metric sources. Without a video, an instruction
+asks you to open one first. If camera metrics have already been extracted, the
+source controls explain that an external source file can override them. Camera
+data still fills gaps where the external activity has no values.
+
+Open a video first. On desktop, use **Metric sources…** in the toolbar or
+**File → Metric sources…**, then
 **Link GPX/FIT/INSGPS…** or **Activity folder…**. You can also drop activity files
-or a folder onto an open video. In the browser, expand **Video sources** and use
+or a folder onto an open video. In the browser, use the **Metric sources** toolbar
+button or expand that section and use
 the corresponding file or folder selector. Both frontends accept GPX, FIT and
 Insta360 phone `.insgps` files, including uppercase extensions. Before the
 selection controls, both interfaces explain single-file alignment and automatic
@@ -117,7 +124,7 @@ filtering policy.
 
 ## Video rotation on desktop
 
-**Video sources → Video rotation** offers **Automatic**, **0° (original)**,
+**Metric sources → Video rotation** offers **Automatic**, **0° (original)**,
 **90° clockwise**, **180°** and **90° counterclockwise**. Automatic is the default
 and respects the video's display matrix. A manual choice overrides it and is
 remembered per video. Preview, the video shown in the editor, overlay canvas

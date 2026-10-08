@@ -444,8 +444,8 @@
   "Value style": "Vrednostni slog",
   "Version": "Različica",
   "Video": "Video",
-  "Video sources": "Video viri",
-  "Video sources…": "Video viri…",
+  "Metric sources": "Viri meritev",
+  "Metric sources…": "Viri meritev…",
   "Video with overlay": "Video s prekrivanjem",
   "Visible": "Vidno",
   "Volume": "Glasnost",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "Ni vzorcev s časovno oznako.",
   "No activity data at this offset.": "Pri tem zamiku ni podatkov aktivnosti.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Ena datoteka: uporabite ustrezne časovne oznake, sicer poravnajte začetke. Po potrebi prilagodite zamik.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Več datotek ali mapa: samodejno poiščite aktivnosti, ki ustrezajo času videoposnetka. Eno ujemanje se poveže; več ujemanj zahteva izbiro. Brez ujemanj se prikaže opozorilo."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Več datotek ali mapa: samodejno poiščite aktivnosti, ki ustrezajo času videoposnetka. Eno ujemanje se poveže; več ujemanj zahteva izbiro. Brez ujemanj se prikaže opozorilo.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Meritve so že pridobljene iz videoposnetka. Prepišete jih lahko z izbiro izvorne datoteke."
 }

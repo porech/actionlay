@@ -23,6 +23,30 @@ async function ready(page) {
   await page.locator('summary[data-i18n="Preferences"]').click();
   await page.locator('#maps').uncheck();
 }
+test('metric sources toolbar warns without video and explains extracted camera metrics', async ({ page }) => {
+  await ready(page);
+  await expect(page.locator('#metric-sources')).toHaveText('Metric sources');
+  await page.locator('#metric-sources').click();
+  await expect(page.locator('#status')).toHaveText('Open a video to link sources.');
+  await expect(page.locator('#sources')).not.toHaveAttribute('open', '');
+  await page.locator('#sources summary').click();
+  await expect(page.locator('#status')).toHaveText('Open a video to link sources.');
+  await expect(page.locator('#sources')).not.toHaveAttribute('open', '');
+  await page.locator('#language').selectOption('it');
+  await expect(page.locator('#metric-sources')).toHaveText('Sorgenti metriche');
+  await page.locator('#metric-sources').click();
+  await expect(page.locator('#status')).toHaveText('Apri un video per collegare le sorgenti.');
+  await page.locator('#video-file').setInputFiles(telemetryFixture);
+  await expect(page.locator('#status')).toHaveText('telemetry.mp4');
+  await page.locator('#metric-sources').click();
+  await expect(page.locator('#camera-metrics')).toBeVisible();
+  await expect(page.locator('#camera-metrics')).toContainText('Le metriche sono già state estratte dal video.');
+  await page.locator('#language').selectOption('en');
+  await expect(page.locator('#camera-metrics')).toHaveText('Metrics have already been extracted from the video. You can override them by choosing a source file.');
+  await page.locator('#video-file').setInputFiles(fixture);
+  await expect(page.locator('#status')).toHaveText('source.mp4');
+  await expect(page.locator('#camera-metrics')).toBeHidden();
+});
 test('persist preferences, edit/import/download layout with assets, restore after reload', async ({ page }) => {
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await ready(page);

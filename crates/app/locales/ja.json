@@ -444,8 +444,8 @@
   "Value style": "値のスタイル",
   "Version": "バージョン",
   "Video": "動画",
-  "Video sources": "動画のソース",
-  "Video sources…": "動画のソース…",
+  "Metric sources": "メトリクスのソース",
+  "Metric sources…": "メトリクスのソース…",
   "Video with overlay": "オーバーレイ付き動画",
   "Visible": "表示",
   "Volume": "音量",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "タイムスタンプ付きのサンプルがありません。",
   "No activity data at this offset.": "このオフセットにアクティビティデータがありません。",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "ファイル1つ：一致するタイムスタンプを使用し、一致しない場合は開始点を揃えます。必要に応じてオフセットを調整してください。",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "複数のファイルまたはフォルダー：動画の時刻に一致するアクティビティを自動検索します。1つならリンクし、複数なら選択を求めます。一致がなければ警告を表示します。"
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "複数のファイルまたはフォルダー：動画の時刻に一致するアクティビティを自動検索します。1つならリンクし、複数なら選択を求めます。一致がなければ警告を表示します。",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "メトリクスはすでに動画から抽出されています。ソースファイルを選択すると上書きできます。"
 }

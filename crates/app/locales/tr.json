@@ -444,8 +444,8 @@
   "Value style": "Değer stili",
   "Version": "Sürüm",
   "Video": "Video",
-  "Video sources": "Video kaynakları",
-  "Video sources…": "Video kaynakları…",
+  "Metric sources": "Metrik kaynakları",
+  "Metric sources…": "Metrik kaynakları…",
   "Video with overlay": "Yer paylaşımlı video",
   "Visible": "Görünür",
   "Volume": "Ses düzeyi",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "Zaman damgalı örnek yok.",
   "No activity data at this offset.": "Bu zaman kaymasında etkinlik verisi yok.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Tek dosya: uyumlu zaman damgalarını kullanın, aksi halde başlangıçları hizalayın. Gerekirse zaman kaymasını ayarlayın.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Birden fazla dosya veya klasör: video zamanıyla eşleşen etkinlikleri otomatik bulun. Tek eşleşme bağlanır; birden fazla eşleşmede seçim gerekir. Eşleşme yoksa uyarı gösterilir."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Birden fazla dosya veya klasör: video zamanıyla eşleşen etkinlikleri otomatik bulun. Tek eşleşme bağlanır; birden fazla eşleşmede seçim gerekir. Eşleşme yoksa uyarı gösterilir.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metrikler videodan zaten çıkarıldı. Bir kaynak dosyası seçerek bunların üzerine yazabilirsiniz."
 }

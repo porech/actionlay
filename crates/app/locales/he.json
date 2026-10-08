@@ -444,8 +444,8 @@
   "Value style": "סגנון ערך",
   "Version": "גרסה",
   "Video": "וִידֵאוֹ",
-  "Video sources": "מקורות וידאו",
-  "Video sources…": "מקורות וידאו...",
+  "Metric sources": "מקורות מדדים",
+  "Metric sources…": "מקורות מדדים…",
   "Video with overlay": "וידאו עם שכבת-על",
   "Visible": "גלוי",
   "Volume": "עוצמת שמע",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "אין דגימות עם חותמת זמן.",
   "No activity data at this offset.": "אין נתוני פעילות בהיסט זה.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "קובץ יחיד: השתמשו בחותמות זמן תואמות, אחרת יישרו את ההתחלות. התאימו את ההיסט לפי הצורך.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "מספר קבצים או תיקייה: חפשו אוטומטית פעילויות התואמות לזמן הסרטון. התאמה יחידה מקושרת; מספר התאמות מחייב בחירה. כשאין התאמה מוצגת אזהרה."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "מספר קבצים או תיקייה: חפשו אוטומטית פעילויות התואמות לזמן הסרטון. התאמה יחידה מקושרת; מספר התאמות מחייב בחירה. כשאין התאמה מוצגת אזהרה.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "המדדים כבר חולצו מהסרטון. ניתן להחליף אותם על ידי בחירת קובץ מקור."
 }

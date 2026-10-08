@@ -444,8 +444,8 @@
   "Value style": "Värdestil",
   "Version": "version",
   "Video": "Video",
-  "Video sources": "Videokällor",
-  "Video sources…": "Videokällor...",
+  "Metric sources": "Metrikkällor",
+  "Metric sources…": "Metrikkällor…",
   "Video with overlay": "Video med överlägg",
   "Visible": "Synlig",
   "Volume": "Volym",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "Inga mätvärden med tidsstämpel.",
   "No activity data at this offset.": "Inga aktivitetsdata vid denna förskjutning.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "En fil: använd matchande tidsstämplar, annars justeras startpunkterna. Anpassa förskjutningen vid behov.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Flera filer eller en mapp: hitta automatiskt aktiviteter som matchar videons tid. En träff länkas; flera kräver ett val. Ingen träff ger en varning."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Flera filer eller en mapp: hitta automatiskt aktiviteter som matchar videons tid. En träff länkas; flera kräver ett val. Ingen träff ger en varning.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Mätvärdena har redan hämtats från videon. Du kan skriva över dem genom att välja en källfil."
 }

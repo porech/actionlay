@@ -444,8 +444,8 @@
   "Value style": "Štýl hodnoty",
   "Version": "Verzia",
   "Video": "Video",
-  "Video sources": "Zdroje videa",
-  "Video sources…": "Zdroje videa…",
+  "Metric sources": "Zdroje metrík",
+  "Metric sources…": "Zdroje metrík…",
   "Video with overlay": "Video s prekrytím",
   "Visible": "Viditeľné",
   "Volume": "Hlasitosť",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "Žiadne vzorky s časovou pečiatkou.",
   "No activity data at this offset.": "Pri tomto posune nie sú žiadne údaje aktivity.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Jeden súbor: použite zodpovedajúce časové pečiatky, inak zarovnajte začiatky. V prípade potreby upravte posun.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Viac súborov alebo priečinok: automaticky vyhľadajte aktivity zodpovedajúce času videa. Jedna zhoda sa prepojí; viac zhôd vyžaduje výber. Žiadna zhoda zobrazí upozornenie."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Viac súborov alebo priečinok: automaticky vyhľadajte aktivity zodpovedajúce času videa. Jedna zhoda sa prepojí; viac zhôd vyžaduje výber. Žiadna zhoda zobrazí upozornenie.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metriky už boli získané z videa. Môžete ich prepísať výberom zdrojového súboru."
 }

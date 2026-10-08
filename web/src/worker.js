@@ -34,9 +34,13 @@ async function run({ id, type, ...data }) {
     metadataOperation = new AbortController();
     duration = data.duration;
     reader = await openGpmf(file, core, duration, metadataOperation.signal, utc => core.set_video_metadata_utc(utc ?? undefined));
-    if (reader?.samples.length) reader.onPublish = () => self.postMessage({telemetryUpdated:true});
-    else core.finish_telemetry(duration);
-    result = { packets: reader?.samples.length ?? 0, videoUtc: core.video_utc() };
+    if (reader?.samples.length) {
+      const current = reader, key = videoKey;
+      reader.onPublish = () => {
+        if (reader === current) self.postMessage({telemetryUpdated:true, cameraMetrics:core.camera_has_metrics(), videoKey:key});
+      };
+    } else core.finish_telemetry(duration);
+    result = { packets: reader?.samples.length ?? 0, videoUtc: core.video_utc(), cameraMetrics:core.camera_has_metrics() };
     requestTelemetry(0, true);
   } else if (['activity-context','activity-summary','activity-link','activity-offset','activity-unlink','video-utc'].includes(type)) {
     if (!file || videoKey !== data.videoKey) throw new Error('Open a video before linking an activity');

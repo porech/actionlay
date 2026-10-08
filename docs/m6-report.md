@@ -6,7 +6,7 @@
 
 # M6 implementation and validation
 
-GPX/FIT activities can be linked through File → Video sources… or dropped onto
+GPX/FIT activities can be linked through File → Metric sources… or dropped onto
 an open video. Alignment uses recording UTC plus a signed activity offset;
 manual video UTC handles cameras without a usable clock. Activity samples win
 where available and camera samples fill gaps. Links are retained per video

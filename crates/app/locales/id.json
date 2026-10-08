@@ -444,8 +444,8 @@
   "Value style": "Gaya nilai",
   "Version": "Versi",
   "Video": "Video",
-  "Video sources": "Sumber video",
-  "Video sources…": "Sumber video…",
+  "Metric sources": "Sumber metrik",
+  "Metric sources…": "Sumber metrik…",
   "Video with overlay": "Video dengan overlay",
   "Visible": "Terlihat",
   "Volume": "Volume",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "Tidak ada sampel dengan stempel waktu.",
   "No activity data at this offset.": "Tidak ada data aktivitas pada offset ini.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Satu file: gunakan stempel waktu yang cocok, jika tidak sejajarkan awal. Sesuaikan offset jika diperlukan.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Beberapa file atau folder: cari otomatis aktivitas yang cocok dengan waktu video. Satu kecocokan ditautkan; beberapa memerlukan pilihan. Tanpa kecocokan, peringatan ditampilkan."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Beberapa file atau folder: cari otomatis aktivitas yang cocok dengan waktu video. Satu kecocokan ditautkan; beberapa memerlukan pilihan. Tanpa kecocokan, peringatan ditampilkan.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metrik sudah diekstrak dari video. Anda dapat menimpanya dengan memilih berkas sumber."
 }

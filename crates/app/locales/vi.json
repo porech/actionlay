@@ -444,8 +444,8 @@
   "Value style": "Kiểu giá trị",
   "Version": "Phiên bản",
   "Video": "Video",
-  "Video sources": "Nguồn video",
-  "Video sources…": "Nguồn video…",
+  "Metric sources": "Nguồn chỉ số",
+  "Metric sources…": "Nguồn chỉ số…",
   "Video with overlay": "Video kèm lớp phủ",
   "Visible": "Hiển thị",
   "Volume": "Âm lượng",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "Không có mẫu có dấu thời gian.",
   "No activity data at this offset.": "Không có dữ liệu hoạt động ở độ lệch này.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Một tệp: dùng dấu thời gian tương thích, nếu không thì căn chỉnh điểm bắt đầu. Điều chỉnh độ lệch nếu cần.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Nhiều tệp hoặc thư mục: tự động tìm hoạt động khớp thời gian video. Một kết quả được liên kết; nhiều kết quả cần lựa chọn. Không có kết quả sẽ hiển thị cảnh báo."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Nhiều tệp hoặc thư mục: tự động tìm hoạt động khớp thời gian video. Một kết quả được liên kết; nhiều kết quả cần lựa chọn. Không có kết quả sẽ hiển thị cảnh báo.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Các chỉ số đã được trích xuất từ video. Bạn có thể ghi đè bằng cách chọn tệp nguồn."
 }

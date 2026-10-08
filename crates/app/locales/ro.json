@@ -444,8 +444,8 @@
   "Value style": "Stilul valorii",
   "Version": "Versiune",
   "Video": "Video",
-  "Video sources": "Surse video",
-  "Video sources…": "Surse video...",
+  "Metric sources": "Surse de metrici",
+  "Metric sources…": "Surse de metrici…",
   "Video with overlay": "Videoclip cu suprapunere",
   "Visible": "Vizibil",
   "Volume": "Volum",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "Nu există eșantioane cu marcaj temporal.",
   "No activity data at this offset.": "Nu există date de activitate la acest decalaj.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Un singur fișier: utilizați marcaje temporale compatibile, altfel aliniați începuturile. Ajustați decalajul dacă este necesar.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Mai multe fișiere sau un dosar: găsiți automat activități care corespund orei videoclipului. O potrivire este asociată; mai multe necesită o alegere. Lipsa potrivirilor produce un avertisment."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Mai multe fișiere sau un dosar: găsiți automat activități care corespund orei videoclipului. O potrivire este asociată; mai multe necesită o alegere. Lipsa potrivirilor produce un avertisment.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metricile au fost deja extrase din videoclip. Le poți suprascrie alegând un fișier sursă."
 }

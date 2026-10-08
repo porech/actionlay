@@ -197,6 +197,12 @@ impl Core {
             data: data.to_vec(),
         });
     }
+    pub fn camera_has_metrics(&self) -> bool {
+        let s = self.0.borrow();
+        actionlay_telemetry::Metric::ALL
+            .into_iter()
+            .any(|metric| s.camera_telemetry.availability().is_available(metric))
+    }
     pub fn update_telemetry(&self) -> Result<(), JsValue> {
         let mut s = self.0.borrow_mut();
         if !s.packets.is_empty() {

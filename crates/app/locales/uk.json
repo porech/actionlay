@@ -444,8 +444,8 @@
   "Value style": "Стиль значення",
   "Version": "Версія",
   "Video": "Відео",
-  "Video sources": "Джерела відео",
-  "Video sources…": "Джерела відео…",
+  "Metric sources": "Джерела метрик",
+  "Metric sources…": "Джерела метрик…",
   "Video with overlay": "Відео з накладанням",
   "Visible": "Видимий",
   "Volume": "Гучність",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "Немає відліків із часовими позначками.",
   "No activity data at this offset.": "Немає даних активності за цього зсуву.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Один файл: використовуйте сумісні часові позначки, інакше вирівняйте початки. За потреби налаштуйте зсув.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Кілька файлів або папка: автоматично знайдіть активності, що відповідають часу відео. Одна прив’язується; за кількох потрібен вибір. Якщо збігів немає, з’явиться попередження."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Кілька файлів або папка: автоматично знайдіть активності, що відповідають часу відео. Одна прив’язується; за кількох потрібен вибір. Якщо збігів немає, з’явиться попередження.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Метрики вже отримано з відео. Ви можете замінити їх, вибравши файл джерела."
 }

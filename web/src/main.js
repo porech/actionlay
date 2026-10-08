@@ -6,6 +6,21 @@ import { initializePlayer, refreshPlayer } from './player.js';
 import { readState, writeState, rememberLayout, toBase64, fromBase64, defaultPreferences } from './storage.js';
 const $ = id => document.getElementById(id);
 const status = (message, error = false) => { $('status').removeAttribute('data-i18n'); $('status').textContent = t(message); $('status').classList.toggle('error', error); };
+function requireSourceVideo() {
+  if (loading || !$('video').src) {
+    status('Open a video to link sources.', true);
+    return false;
+  }
+  return true;
+}
+$('metric-sources').onclick = () => {
+  if (!requireSourceVideo()) return;
+  $('sources').open = true;
+  $('sources').scrollIntoView({ block: 'nearest' });
+};
+$('sources').querySelector('summary').onclick = event => {
+  if (!$('sources').open && !requireSourceVideo()) event.preventDefault();
+};
 const base = new URL(import.meta.env.BASE_URL, location.href).href;
 const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
 let requestId = 0;
@@ -18,7 +33,10 @@ function rpc(type, data = {}) {
   });
 }
 worker.onmessage = ({ data }) => {
-  if (data.telemetryUpdated) { lastTime = -1; return; }
+  if (data.telemetryUpdated) {
+    if (data.videoKey === sourceGeneration && data.cameraMetrics !== undefined) $('camera-metrics').hidden = !data.cameraMetrics;
+    lastTime = -1; return;
+  }
   if (data.metadataError) { status(data.metadataError, true); return; }
   if (data.progress) {
     if (data.progress.metadata !== undefined) {
@@ -179,6 +197,7 @@ async function openVideo(file) {
   if (!file) return;
   const mine = ++sourceGeneration;
   activityGeneration++; activityFile = null; activityInfo = null; activityNotice = null;
+  $('camera-metrics').hidden = true;
   videoIdentity = `${file.name}|${file.size}|${file.lastModified}`;
   activitySettings = state.preferences.videoSources?.[videoIdentity] ?? {};
   $('activity-offset').value = String(activitySettings.offset ?? 0);
@@ -210,7 +229,8 @@ async function openVideo(file) {
     $('start').value = '0'; $('end').value = String(video.duration);
     $('player-controls').hidden = false;
     refreshPlayer();
-    await rpc('open', { file, duration: video.duration, videoKey:mine });
+    const info = await rpc('open', { file, duration: video.duration, videoKey:mine });
+    if (mine === sourceGeneration) $('camera-metrics').hidden = !info.cameraMetrics;
     if (activitySettings.utc) await rpc('video-utc', {utc:activitySettings.utc,videoKey:mine});
     if (mine !== sourceGeneration) return;
     status(file.name);

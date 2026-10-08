@@ -444,8 +444,8 @@
   "Value style": "Estil de valor",
   "Version": "Versió",
   "Video": "Vídeo",
-  "Video sources": "Fonts de vídeo",
-  "Video sources…": "Fonts de vídeo...",
+  "Metric sources": "Fonts de mètriques",
+  "Metric sources…": "Fonts de mètriques…",
   "Video with overlay": "Vídeo amb superposició",
   "Visible": "Visible",
   "Volume": "Volum",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "No hi ha mostres amb marca de temps.",
   "No activity data at this offset.": "No hi ha dades d’activitat amb aquest desfasament.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Un sol fitxer: utilitza marques de temps compatibles; altrament, alinea els inicis. Ajusta el desfasament si cal.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Diversos fitxers o una carpeta: cerca automàticament activitats que coincideixin amb l’hora del vídeo. Una coincidència s’enllaça; diverses requereixen triar. Si no n’hi ha cap, es mostra un avís."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Diversos fitxers o una carpeta: cerca automàticament activitats que coincideixin amb l’hora del vídeo. Una coincidència s’enllaça; diverses requereixen triar. Si no n’hi ha cap, es mostra un avís.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Les mètriques ja s’han extret del vídeo. Pots sobreescriure-les triant un fitxer font."
 }

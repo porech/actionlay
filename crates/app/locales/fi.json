@@ -444,8 +444,8 @@
   "Value style": "Arvotyyli",
   "Version": "versio",
   "Video": "Video",
-  "Video sources": "Videolähteet",
-  "Video sources…": "Videolähteet…",
+  "Metric sources": "Mittaritietojen lähteet",
+  "Metric sources…": "Mittaritietojen lähteet…",
   "Video with overlay": "Video peitolla",
   "Visible": "Näkyy",
   "Volume": "Äänenvoimakkuus",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "Ei aikaleimattuja näytteitä.",
   "No activity data at this offset.": "Ei aktiviteettitietoja tällä aikasiirtymällä.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Yksi tiedosto: käytä yhteensopivia aikaleimoja, muuten kohdista alut. Säädä aikasiirtymää tarvittaessa.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Useita tiedostoja tai kansio: etsi automaattisesti videon aikaan sopivat aktiviteetit. Yksi osuma liitetään; useista on valittava yksi. Jos osumia ei ole, näytetään varoitus."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Useita tiedostoja tai kansio: etsi automaattisesti videon aikaan sopivat aktiviteetit. Yksi osuma liitetään; useista on valittava yksi. Jos osumia ei ole, näytetään varoitus.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Mittaritiedot on jo poimittu videosta. Voit korvata ne valitsemalla lähdetiedoston."
 }

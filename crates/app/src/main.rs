@@ -622,6 +622,12 @@ impl App {
                     command = Some(menus::Command::OpenVideo);
                 }
                 if ui
+                    .button(crate::i18n::ui_text(ui, "Metric sources…"))
+                    .clicked()
+                {
+                    command = Some(menus::Command::Sources);
+                }
+                if ui
                     .add_enabled(
                         self.video_path.is_some(),
                         egui::Button::new(crate::i18n::text("Export...")),
@@ -1023,7 +1029,7 @@ impl App {
         let mut changed = false;
         let mut mode_changed = false;
         let mut rotation_changed = false;
-        egui::Window::new(crate::i18n::text("Video sources")).open(&mut visible).default_width(550.0).show(ctx, |ui| {
+        egui::Window::new(crate::i18n::text("Metric sources")).open(&mut visible).default_width(550.0).show(ctx, |ui| {
             let Some(player) = &self.player else { ui.label(crate::i18n::ui_text(ui, "Open a video to link sources.")); return; };
             ui.label(crate::i18n::ui_text(ui, format!("{} video chapter(s)",player.timeline().chapters.len())));
             ui.horizontal(|ui| {
@@ -1039,6 +1045,9 @@ impl App {
                 mode_changed |= ui.checkbox(&mut self.source_settings.load_sequence,crate::i18n::ui_text(ui, "Load the complete GoPro sequence from its first chapter")).changed();
             });
             ui.separator();
+            if self.camera_telemetry.as_ref().is_some_and(|telemetry| actionlay_telemetry::Metric::ALL.into_iter().any(|metric| telemetry.availability().is_available(metric))) {
+                ui.label(crate::i18n::ui_text(ui, "Metrics have already been extracted from the video. You can override them by choosing a source file."));
+            }
             ui.label(crate::i18n::ui_text(ui, "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed."));
             ui.label(crate::i18n::ui_text(ui, "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning."));
             if let Some(path) = &self.source_settings.activity { ui.label(crate::i18n::user_text(ui, path.display().to_string())); }
@@ -1311,7 +1320,7 @@ impl App {
             menus::Command::RegionalSettings => self.regional_visible = true,
             menus::Command::AdvancedSettings => self.advanced_visible = true,
             menus::Command::About => self.about.visible = true,
-            menus::Command::Sources => self.select_sources = self.player.is_some(),
+            menus::Command::Sources => self.select_sources = true,
             menus::Command::AudioSettings => {
                 match actionlay_media::audio::AudioOutput::devices() {
                     Ok(names) => self.audio_devices = names,

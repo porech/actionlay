@@ -444,8 +444,8 @@
   "Value style": "Stil vrijednosti",
   "Version": "Verzija",
   "Video": "Video",
-  "Video sources": "Video izvori",
-  "Video sources…": "Video izvori…",
+  "Metric sources": "Izvori mjernih podataka",
+  "Metric sources…": "Izvori mjernih podataka…",
   "Video with overlay": "Video s preklapanjem",
   "Visible": "Vidljivo",
   "Volume": "Glasnoća",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "Nema uzoraka s vremenskom oznakom.",
   "No activity data at this offset.": "Nema podataka aktivnosti pri ovom pomaku.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Jedna datoteka: upotrijebite odgovarajuće vremenske oznake, inače poravnajte početke. Po potrebi prilagodite pomak.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Više datoteka ili mapa: automatski pronađite aktivnosti koje odgovaraju vremenu videozapisa. Jedno podudaranje se povezuje; više podudaranja zahtijeva odabir. Bez podudaranja prikazuje se upozorenje."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Više datoteka ili mapa: automatski pronađite aktivnosti koje odgovaraju vremenu videozapisa. Jedno podudaranje se povezuje; više podudaranja zahtijeva odabir. Bez podudaranja prikazuje se upozorenje.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Mjerni podaci već su izdvojeni iz videozapisa. Možete ih zamijeniti odabirom izvorne datoteke."
 }

@@ -444,8 +444,8 @@
   "Value style": "값 스타일",
   "Version": "버전",
   "Video": "비디오",
-  "Video sources": "비디오 소스",
-  "Video sources…": "비디오 소스…",
+  "Metric sources": "측정 데이터 소스",
+  "Metric sources…": "측정 데이터 소스…",
   "Video with overlay": "오버레이가 포함된 동영상",
   "Visible": "표시",
   "Volume": "음량",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "타임스탬프가 있는 샘플이 없습니다.",
   "No activity data at this offset.": "이 오프셋에 활동 데이터가 없습니다.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "파일 하나: 호환되는 타임스탬프를 사용하고, 그렇지 않으면 시작점을 맞춥니다. 필요한 경우 오프셋을 조정하세요.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "여러 파일 또는 폴더: 동영상 시간과 일치하는 활동을 자동으로 찾습니다. 하나면 연결하고, 여러 개면 선택을 요청합니다. 일치하는 활동이 없으면 경고를 표시합니다."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "여러 파일 또는 폴더: 동영상 시간과 일치하는 활동을 자동으로 찾습니다. 하나면 연결하고, 여러 개면 선택을 요청합니다. 일치하는 활동이 없으면 경고를 표시합니다.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "측정 데이터가 이미 동영상에서 추출되었습니다. 소스 파일을 선택하여 덮어쓸 수 있습니다."
 }

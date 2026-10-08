@@ -1,48 +1,32 @@
-# ActionLay 1.4.0
+# ActionLay 1.4.1
 
-ActionLay 1.4.0 adds Insta360 phone GPS files, automatic activity matching on
-desktop and web, linked telemetry in exports and desktop video rotation controls.
+ActionLay 1.4.1 makes telemetry source controls easier to find on desktop and web.
 
-## What’s new
+## What’s changed
 
-### Linked activities on desktop and web
+- Rename **Video sources** to **Metric sources** throughout the interface, including
+  menus and the source dialog. All 34 translations use the same terminology,
+  including English.
+- Add **Metric sources** to the desktop and browser toolbar.
+- Opening metric sources without a video now shows an instruction to open a video
+  first, instead of silently doing nothing. This works from the menu, toolbar and
+  browser source section.
+- When the video already provides extracted metrics, source controls explain that
+  an external source file can override them. The notice follows progressive
+  telemetry loading and is translated in all 34 languages.
 
-- **INSGPS support:** read Insta360 phone GPS files alongside GPX and FIT,
-  retaining millisecond timestamps, coordinates, stored speed, course and altitude.
-- **Multiple files and folders:** match activity sample times against the video's
-  UTC reference. A single compatible candidate is linked automatically. Multiple
-  candidates are listed with filenames and UTC ranges so you can choose. If none
-  match, a clear warning suggests setting Video UTC or selecting a single file.
-- **Single-file alignment:** use compatible video/activity timestamps, or align
-  their beginnings when dates cannot be matched. A warning explains the fallback
-  and suggests adjusting the activity offset if visual alignment needs correction.
-  Positive offsets move activity data later in the video.
-- **Export linked telemetry:** the selected activity and offset are used for both
-  preview and export. Embedded camera values fill activity gaps. Progressive
-  camera metadata updates preserve the linked activity in the browser.
-- **Remember source settings:** desktop retains links and alignment per video.
-  The browser retains alignment settings, but videos and activity files must be
-  selected again after reloading.
-- Source selection explains single-file alignment and automatic discovery from
-  multiple files or a folder before you choose. The guidance, new controls and
-  actionable warnings are translated in all 34 languages.
+The INSGPS support, automatic activity matching, alignment and export behavior
+introduced in 1.4.0 are retained.
 
-### Desktop video rotation
-
-- **Automatic** respects the video's display-matrix orientation.
-- Manual **0°**, **90° clockwise**, **180°** and **90° counterclockwise** overrides
-  are remembered per video and apply to preview, editor canvas and export.
-- CLI exports support `--rotation auto|0|90|180|270`.
-
-See the [activity source guide](https://github.com/porech/actionlay/blob/v1.4.0/docs/activity-sources.md)
+See the [activity source guide](https://github.com/porech/actionlay/blob/v1.4.1/docs/activity-sources.md)
 for matching rules, offset examples, the INSGPS representation and regression coverage.
-The [browser guide](https://github.com/porech/actionlay/blob/v1.4.0/docs/web.md)
+The [browser guide](https://github.com/porech/actionlay/blob/v1.4.1/docs/web.md)
 describes browser capabilities and limits.
 
 ## Download and install
 
-- **Windows 10/11 x64:** use [`actionlay-1.4.0-windows-x64-setup.exe`](https://github.com/porech/actionlay/releases/download/v1.4.0/actionlay-1.4.0-windows-x64-setup.exe).
-- **macOS 12 or newer, Apple Silicon and Intel:** use [`actionlay-1.4.0-macos-universal.dmg`](https://github.com/porech/actionlay/releases/download/v1.4.0/actionlay-1.4.0-macos-universal.dmg), then drag ActionLay to Applications.
+- **Windows 10/11 x64:** use [`actionlay-1.4.1-windows-x64-setup.exe`](https://github.com/porech/actionlay/releases/download/v1.4.1/actionlay-1.4.1-windows-x64-setup.exe).
+- **macOS 12 or newer, Apple Silicon and Intel:** use [`actionlay-1.4.1-macos-universal.dmg`](https://github.com/porech/actionlay/releases/download/v1.4.1/actionlay-1.4.1-macos-universal.dmg), then drag ActionLay to Applications.
 - **Linux x64:** follow the [signed APT/DNF repository instructions](https://porech.github.io/actionlay/packages/), using the stable channel.
 - **Browser:** [open ActionLay Web](https://porech.github.io/actionlay/web/). Processing stays on your device.
 
@@ -72,4 +56,4 @@ signed or Apple-notarized; macOS and Windows may require allowing an unknown pub
 - Insta360 playback shows raw video, without 360 stitching or reframing.
 - Privacy zones affect maps; they do not redact footage or other GPS widgets.
 
-[All changes since 1.3.0](https://github.com/porech/actionlay/compare/v1.3.0...v1.4.0)
+[All changes since 1.4.0](https://github.com/porech/actionlay/compare/v1.4.0...v1.4.1)

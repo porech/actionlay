@@ -279,7 +279,7 @@
   "Open a video": "Apri un video",
   "Open a video before linking an activity": "Apri un video prima di collegare un’attività",
   "Open a video file": "Aprire un file video",
-  "Open a video to link sources.": "Apri un video per collegare le fonti.",
+  "Open a video to link sources.": "Apri un video per collegare le sorgenti.",
   "Open layout from file…": "Apri layout da file…",
   "Open this file alone (disable automatic chapters)": "Apri questo file da solo (disabilita i capitoli automatici)",
   "Open video": "Apri il video",
@@ -444,8 +444,8 @@
   "Value style": "Stile valore",
   "Version": "Versione",
   "Video": "Video",
-  "Video sources": "Sorgenti video",
-  "Video sources…": "Sorgenti video...",
+  "Metric sources": "Sorgenti metriche",
+  "Metric sources…": "Sorgenti metriche…",
   "Video with overlay": "Video con sovrapposizione",
   "Visible": "Visibile",
   "Volume": "Volume",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "Nessun campione con timestamp.",
   "No activity data at this offset.": "Nessun dato dell’attività a questo offset.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "File singolo: usa i timestamp se compatibili; altrimenti allinea gli inizi. Se necessario, regola l’offset.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Più file o una cartella: cerca automaticamente le attività compatibili con l’orario del video. Se ne trova una, la collega; se ne trova più di una, ti chiede di scegliere. Se non ne trova, mostra un avviso."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Più file o una cartella: cerca automaticamente le attività compatibili con l’orario del video. Se ne trova una, la collega; se ne trova più di una, ti chiede di scegliere. Se non ne trova, mostra un avviso.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Le metriche sono già state estratte dal video. Puoi sovrascriverle scegliendo un file sorgente."
 }

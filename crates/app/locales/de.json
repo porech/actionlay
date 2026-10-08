@@ -444,8 +444,8 @@
   "Value style": "Wertstil",
   "Version": "Version",
   "Video": "Video",
-  "Video sources": "Videoquellen",
-  "Video sources…": "Videoquellen…",
+  "Metric sources": "Messwertquellen",
+  "Metric sources…": "Messwertquellen…",
   "Video with overlay": "Video mit Overlay",
   "Visible": "Sichtbar",
   "Volume": "Lautstärke",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "Keine zeitgestempelten Messwerte.",
   "No activity data at this offset.": "Keine Aktivitätsdaten bei diesem Versatz.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Einzelne Datei: passende Zeitstempel verwenden, andernfalls die Anfänge ausrichten. Bei Bedarf den Versatz anpassen.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Mehrere Dateien oder ein Ordner: Aktivitäten automatisch anhand der Videozeit finden. Ein Treffer wird verknüpft; mehrere erfordern eine Auswahl. Ohne Treffer erscheint eine Warnung."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Mehrere Dateien oder ein Ordner: Aktivitäten automatisch anhand der Videozeit finden. Ein Treffer wird verknüpft; mehrere erfordern eine Auswahl. Ohne Treffer erscheint eine Warnung.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Messwerte wurden bereits aus dem Video extrahiert. Sie können sie durch Auswahl einer Quelldatei überschreiben."
 }

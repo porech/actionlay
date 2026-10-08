@@ -133,7 +133,7 @@ impl Menus {
         );
         let sources = MenuItem::with_id(
             "sources",
-            crate::i18n::native_text("Video sources…"),
+            crate::i18n::native_text("Metric sources…"),
             true,
             None,
         );
@@ -397,7 +397,7 @@ impl Menus {
                     });
                     for (label, action, enabled) in [
                         ("Open Video…    Ctrl+O", Command::OpenVideo, true),
-                        ("Video sources…", Command::Sources, has_video),
+                        ("Metric sources…", Command::Sources, true),
                         (
                             "Select Layout…    Ctrl+Shift+O",
                             Command::SelectLayout,

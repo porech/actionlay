@@ -444,8 +444,8 @@
   "Value style": "Value style",
   "Version": "Version",
   "Video": "Video",
-  "Video sources": "Video sources",
-  "Video sources…": "Video sources…",
+  "Metric sources": "Metric sources",
+  "Metric sources…": "Metric sources…",
   "Video with overlay": "Video with overlay",
   "Visible": "Visible",
   "Volume": "Volume",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "No timestamped samples.",
   "No activity data at this offset.": "No activity data at this offset.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Metrics have already been extracted from the video. You can override them by choosing a source file."
 }

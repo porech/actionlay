@@ -444,8 +444,8 @@
   "Value style": "Стиль значения",
   "Version": "Версия",
   "Video": "Видео",
-  "Video sources": "Источники видео",
-  "Video sources…": "Источники видео…",
+  "Metric sources": "Источники метрик",
+  "Metric sources…": "Источники метрик…",
   "Video with overlay": "Видео с наложением",
   "Visible": "Виден",
   "Volume": "Громкость",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "Нет отсчётов с временными метками.",
   "No activity data at this offset.": "Нет данных активности при этом сдвиге.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Один файл: используйте совместимые временные метки, иначе выровняйте начала. При необходимости настройте сдвиг.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Несколько файлов или папка: автоматически найдите активности, соответствующие времени видео. Одна привязывается; при нескольких требуется выбор. Если совпадений нет, появится предупреждение."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Несколько файлов или папка: автоматически найдите активности, соответствующие времени видео. Одна привязывается; при нескольких требуется выбор. Если совпадений нет, появится предупреждение.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Метрики уже извлечены из видео. Вы можете заменить их, выбрав исходный файл."
 }

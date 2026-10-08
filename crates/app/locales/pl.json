@@ -444,8 +444,8 @@
   "Value style": "Styl wartości",
   "Version": "Wersja",
   "Video": "Wideo",
-  "Video sources": "Źródła wideo",
-  "Video sources…": "Źródła wideo…",
+  "Metric sources": "Źródła danych pomiarowych",
+  "Metric sources…": "Źródła danych pomiarowych…",
   "Video with overlay": "Wideo z nakładką",
   "Visible": "Widoczne",
   "Volume": "Głośność",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "Brak próbek ze znacznikiem czasu.",
   "No activity data at this offset.": "Brak danych aktywności przy tym przesunięciu.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Jeden plik: użyj zgodnych znaczników czasu, a w przeciwnym razie wyrównaj początki. W razie potrzeby dostosuj przesunięcie.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Wiele plików lub folder: automatycznie znajdź aktywności pasujące do czasu filmu. Jeden wynik zostanie powiązany; kilka wymaga wyboru. Brak wyników powoduje ostrzeżenie."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Wiele plików lub folder: automatycznie znajdź aktywności pasujące do czasu filmu. Jeden wynik zostanie powiązany; kilka wymaga wyboru. Brak wyników powoduje ostrzeżenie.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Dane pomiarowe zostały już wyodrębnione z filmu. Możesz je zastąpić, wybierając plik źródłowy."
 }

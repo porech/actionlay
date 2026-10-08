@@ -14,8 +14,8 @@ or a separate overlay for your video editor. Free and open source.
 
 | System | Download | Install |
 |---|---|---|
-| macOS 12+, Apple Silicon **and Intel** | [Universal DMG](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.4.0-macos-universal.dmg) | Open the DMG and drag ActionLay to Applications |
-| Windows 10/11, 64-bit | [Windows installer](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.4.0-windows-x64-setup.exe) | Choose installation for yourself or everyone; desktop shortcut optional |
+| macOS 12+, Apple Silicon **and Intel** | [Universal DMG](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.4.1-macos-universal.dmg) | Open the DMG and drag ActionLay to Applications |
+| Windows 10/11, 64-bit | [Windows installer](https://github.com/porech/actionlay/releases/latest/download/actionlay-1.4.1-windows-x64-setup.exe) | Choose installation for yourself or everyone; desktop shortcut optional |
 | Linux, 64-bit | [Package repositories and setup instructions](https://porech.github.io/actionlay/packages/) | Add the APT or DNF repository, then install `actionlay` |
 
 The **[latest release](https://github.com/porech/actionlay/releases/latest)** also
@@ -108,11 +108,12 @@ web app follows stable releases; development builds do not replace it.
 Open or drag a video into ActionLay. Choose **File → Select Layout…** to switch
 dashboards, or open the visual editor to create your own. The editor also works
 without a video. Drag a GPX/FIT/INSGPS file or activity folder onto an open video,
-or use **File → Video sources…** to link activities and adjust alignment. In the
-browser, expand **Video sources** for file/folder selection and alignment controls.
+or use **Metric sources…** in the toolbar or File menu to link activities and
+adjust alignment. In the browser, use the **Metric sources** toolbar button or
+expand that section for file/folder selection and alignment controls.
 See [linked activities and video orientation](docs/activity-sources.md) for matching
 rules, offset examples, the INSGPS representation and verification. These source
-and orientation controls are available in ActionLay 1.4.0.
+and orientation controls are available in ActionLay 1.4.1.
 
 Widgets that need historical telemetry show their own loading indicator and
 percentage until the required data is available, including after seeking.
@@ -216,7 +217,7 @@ or GPL-3.0-or-later, at your option; see the [artwork licence and attribution](a
 The binaries include GPL-enabled FFmpeg,
 x264 and x265. Source revisions and build scripts are included in the repository;
 licence notices and source links accompany the downloads. Each release also
-includes the exact FFmpeg/x264/x265 sources in `third-party-sources-1.4.0.tar.gz`.
+includes the exact FFmpeg/x264/x265 sources in `third-party-sources-1.4.1.tar.gz`.
 
 ## Legal notice
 

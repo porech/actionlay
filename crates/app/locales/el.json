@@ -444,8 +444,8 @@
   "Value style": "Στυλ τιμής",
   "Version": "Έκδοση",
   "Video": "Βίντεο",
-  "Video sources": "Πηγές βίντεο",
-  "Video sources…": "Πηγές βίντεο…",
+  "Metric sources": "Πηγές μετρήσεων",
+  "Metric sources…": "Πηγές μετρήσεων…",
   "Video with overlay": "Βίντεο με επικάλυψη",
   "Visible": "Ορατό",
   "Volume": "Ένταση ήχου",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "Δεν υπάρχουν δείγματα με χρονική σήμανση.",
   "No activity data at this offset.": "Δεν υπάρχουν δεδομένα δραστηριότητας σε αυτή τη μετατόπιση.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Ένα αρχείο: χρησιμοποιήστε συμβατές χρονικές σημάνσεις, αλλιώς ευθυγραμμίστε τις αρχές. Ρυθμίστε τη μετατόπιση αν χρειάζεται.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Πολλά αρχεία ή φάκελος: βρείτε αυτόματα δραστηριότητες που αντιστοιχούν στην ώρα του βίντεο. Μία αντιστοίχιση συνδέεται· περισσότερες απαιτούν επιλογή. Χωρίς αντιστοίχιση εμφανίζεται προειδοποίηση."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Πολλά αρχεία ή φάκελος: βρείτε αυτόματα δραστηριότητες που αντιστοιχούν στην ώρα του βίντεο. Μία αντιστοίχιση συνδέεται· περισσότερες απαιτούν επιλογή. Χωρίς αντιστοίχιση εμφανίζεται προειδοποίηση.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Οι μετρήσεις έχουν ήδη εξαχθεί από το βίντεο. Μπορείτε να τις αντικαταστήσετε επιλέγοντας ένα αρχείο πηγής."
 }

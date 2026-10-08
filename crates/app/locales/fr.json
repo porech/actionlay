@@ -444,8 +444,8 @@
   "Value style": "Style de valeur",
   "Version": "Version",
   "Video": "Vidéo",
-  "Video sources": "Sources vidéo",
-  "Video sources…": "Sources vidéo…",
+  "Metric sources": "Sources des métriques",
+  "Metric sources…": "Sources des métriques…",
   "Video with overlay": "Vidéo avec superposition",
   "Visible": "Visible",
   "Volume": "Volume",
@@ -577,5 +577,6 @@
   "No timestamped samples.": "Aucun échantillon horodaté.",
   "No activity data at this offset.": "Aucune donnée d’activité à ce décalage.",
   "Single file: use compatible timestamps, otherwise align starts. Adjust the offset if needed.": "Fichier unique : utilisez les horodatages compatibles, sinon alignez les débuts. Ajustez le décalage si nécessaire.",
-  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Plusieurs fichiers ou un dossier : recherchez automatiquement les activités correspondant à l’heure de la vidéo. Une correspondance est liée ; plusieurs nécessitent un choix. Aucune correspondance produit un avertissement."
+  "Multiple files or a folder: automatically find activities matching the video time. One match is linked; several require a choice. No match produces a warning.": "Plusieurs fichiers ou un dossier : recherchez automatiquement les activités correspondant à l’heure de la vidéo. Une correspondance est liée ; plusieurs nécessitent un choix. Aucune correspondance produit un avertissement.",
+  "Metrics have already been extracted from the video. You can override them by choosing a source file.": "Les métriques ont déjà été extraites de la vidéo. Vous pouvez les remplacer en choisissant un fichier source."
 }
