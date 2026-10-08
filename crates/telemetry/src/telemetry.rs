@@ -306,6 +306,7 @@ impl Telemetry {
         Ok(tel)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn from_camera_imu(imu: &[telemetry_parser::util::IMUData], duration: f64) -> Self {
         let mut tel = Self::empty(duration);
         let mut samples: Vec<_> = imu
@@ -339,6 +340,7 @@ impl Telemetry {
     /// Orientation from telemetry-parser's normalized quaternion basis.
     /// Native sources use conventional ZYX Euler pitch/roll/yaw in degrees;
     /// GoPro keeps its existing reference-compatible CORI conversion separately.
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn add_camera_orientation(
         &mut self,
         samples: &[telemetry_parser::tags_impl::TimeQuaternion<f64>],

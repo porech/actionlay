@@ -14,10 +14,16 @@ cosmic-text.workspace = true
 resvg.workspace = true
 chrono = { workspace = true, features = ["clock"] }
 log.workspace = true
-fontdb = { version = "0.23", default-features = false, features = ["fs", "fontconfig"] }
+fontdb = { version = "0.23", default-features = false }
 serde_json.workspace = true
 
 [dev-dependencies]
 resvg = { workspace = true, features = ["text"] }
 actionlay-telemetry = { path = "../telemetry", features = ["test-util"] }
 serde_json.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+fontdb = { version = "0.23", default-features = false, features = ["fs", "fontconfig"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-time = "1"

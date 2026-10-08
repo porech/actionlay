@@ -140,6 +140,15 @@ Linked activities, native-camera telemetry and joined chapter timelines are not
 included yet. Export uses eight-bit SDR decoding. Insta360 playback displays the
 raw camera stream, without 360 stitching or reframing.
 
+### Browser build
+
+An initial browser version shares the Rust telemetry, overlay renderer and visual
+layout editor. It supports local video playback, GoPro telemetry, browser-backed
+MP4 export, layout import/download, and preferences/recent layouts in localStorage.
+See [browser build, deployment and current limitations](docs/web.md). The Pages
+workflow deploys the latest stable tag under `/web/` alongside the Linux
+repositories; commits on `main` test the web app without publishing it.
+
 ### Command-line tools
 
 The download includes `actionlay-telemetry` for inspecting telemetry or dumping

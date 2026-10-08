@@ -5,7 +5,11 @@ use std::sync::{
     Mutex,
     atomic::{AtomicBool, Ordering},
 };
-use std::time::{Duration, Instant};
+use std::time::Duration;
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
 static IMPERIAL: AtomicBool = AtomicBool::new(false);
 static LAST: Mutex<Option<(Option<Units>, Instant)>> = Mutex::new(None);
 pub fn current() -> UnitSystem {
@@ -74,7 +78,7 @@ fn system_imperial() -> bool {
             && data[0] == b'1' as u16
     }
 }
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[cfg(not(any(target_os = "macos", target_os = "windows", target_arch = "wasm32")))]
 fn system_imperial() -> bool {
     if let Ok(result) = std::process::Command::new("locale")
         .args(["-k", "LC_MEASUREMENT"])
@@ -100,4 +104,9 @@ fn system_imperial() -> bool {
             .next(),
         Some("US" | "LR" | "MM")
     )
+}
+
+#[cfg(target_arch = "wasm32")]
+fn system_imperial() -> bool {
+    false
 }

@@ -12,6 +12,8 @@ thiserror.workspace = true
 log.workspace = true
 fitparser = "0.11"
 quick-xml = "0.39"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 telemetry-parser = "0.2.6"
 
 [dev-dependencies]

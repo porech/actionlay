@@ -12,6 +12,40 @@ concurrency:
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
 
 jobs:
+  web:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.98.1
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: web
+      - name: Install WASM bindings generator
+        run: cargo install wasm-bindgen-cli --version 0.2.129 --locked
+      - name: Build isolated browser application
+        run: bash scripts/build-web.sh
+      - name: Check backend isolation
+        run: bash scripts/check-backend-isolation.sh
+      - name: Install media fixture tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Test browser persistence and media
+        run: |
+          npm --prefix web test
+          cd web
+          npx playwright install --with-deps chromium
+          npm run test:browser
+      - uses: actions/upload-artifact@v7
+        with:
+          name: actionlay-web
+          path: web/dist
+
   build-test:
     strategy:
       fail-fast: false
@@ -179,6 +213,9 @@ jobs:
             exit 1
           fi
 
+      - name: Desktop backends stay isolated from browser dependencies
+        run: bash scripts/check-backend-isolation.sh
+
       - name: Check formatting (macOS/Linux)
         if: runner.os != 'Windows'
         run: make fmt-check
@@ -336,7 +373,7 @@ jobs:
           if-no-files-found: error
 
   package:
-    needs: [build-test, package-windows, package-linux]
+    needs: [build-test, web, package-windows, package-linux]
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: macos-14
     steps:
@@ -363,6 +400,11 @@ jobs:
         with:
           name: linux-native-packages
           path: dist
+      - name: Package browser application for stable tags only
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)"
+          tar -czf "dist/actionlay-web-$version.tar.gz" -C binaries/actionlay-web .
       - name: Checksums
         run: |
           cd dist
@@ -448,6 +490,21 @@ jobs:
             fi
           done
           test -e site/nightly/apt/InRelease
+      # Reuse the last stable tag's bundle, including on main/nightly runs.
+      # Never build or publish the browser app from an untagged commit.
+      - name: Download stable browser release for Pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          stable="$(gh release view --json tagName --jq .tagName)"
+          count="$(gh release view "$stable" --json assets --jq '[.assets[].name | select(startswith("actionlay-web-") and endswith(".tar.gz"))] | length')"
+          if [ "$count" -gt 0 ]; then
+            test "$count" -eq 1
+            mkdir -p browser-release site/web
+            gh release download "$stable" --pattern 'actionlay-web-*.tar.gz' --dir browser-release
+            tar -xzf browser-release/actionlay-web-*.tar.gz -C site/web
+            test -f site/web/index.html
+          fi
           python3 scripts/pages/render-index.py site
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5

@@ -7,7 +7,9 @@ use std::sync::OnceLock;
 fn installed() -> &'static fontdb::Database {
     static DB: OnceLock<fontdb::Database> = OnceLock::new();
     DB.get_or_init(|| {
+        #[allow(unused_mut)]
         let mut db = fontdb::Database::new();
+        #[cfg(not(target_arch = "wasm32"))]
         db.load_system_fonts();
         db
     })

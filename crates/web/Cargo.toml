@@ -1,0 +1,28 @@
+[package]
+name = "actionlay-web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+actionlay-layout = { path = "../layout" }
+actionlay-render = { path = "../render" }
+actionlay-telemetry = { path = "../telemetry" }
+actionlay-maps = { path = "../maps" }
+wasm-bindgen = "=0.2.129"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["HtmlCanvasElement", "Window", "Navigator"] }
+console_error_panic_hook = "0.1"
+eframe = { version = "0.36", default-features = false, features = ["default_fonts", "glow"] }
+serde_json.workspace = true
+serde.workspace = true
+regex = "1"
+unicode-normalization = "0.1"
+unicode-bidi = "0.3"
+arabic_reshaper = "0.4.2"
+web-time = "1"

@@ -1,7 +1,7 @@
 //! Portable layouts: layout.json and explicitly declared document assets.
 use crate::{Layout, LayoutError, Loaded};
 use std::collections::BTreeSet;
-use std::io::{Read, Write};
+use std::io::{Read, Seek, Write};
 use std::path::{Component, Path};
 use std::sync::Arc;
 use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
@@ -99,8 +99,12 @@ pub fn load_loose_assets(layout: &mut Layout, directory: &Path) -> Result<(), La
 }
 
 pub fn load(path: &Path) -> Result<Loaded, LayoutError> {
-    let mut archive =
-        ZipArchive::new(std::fs::File::open(path)?).map_err(|e| invalid(e.to_string()))?;
+    load_reader(std::fs::File::open(path)?)
+}
+
+/// Read a portable package from a file, memory or another seekable source.
+pub fn load_reader(reader: impl Read + Seek) -> Result<Loaded, LayoutError> {
+    let mut archive = ZipArchive::new(reader).map_err(|e| invalid(e.to_string()))?;
     if archive.len() > MAX_ENTRIES {
         return Err(invalid("too many package entries"));
     }
@@ -156,42 +160,69 @@ pub fn load(path: &Path) -> Result<Loaded, LayoutError> {
 
 /// Synchronize a neighbouring temporary file, then replace the destination.
 pub fn save(layout: &Layout, path: &Path) -> Result<(), LayoutError> {
+    let mut file = tempfile::NamedTempFile::new_in(path.parent().unwrap_or(Path::new(".")))?;
+    write_to(layout, file.as_file_mut())?;
+    file.as_file().sync_all()?;
+    file.persist(path).map_err(|e| e.error)?;
+    Ok(())
+}
+
+/// Encode a portable package without requiring a filesystem.
+pub fn write_to(layout: &Layout, writer: impl Write + Seek) -> Result<(), LayoutError> {
     let text = layout.to_json()?;
     let names = asset_names(layout)?;
     let mut total = text.len() as u64;
-    let mut file = tempfile::NamedTempFile::new_in(path.parent().unwrap_or(Path::new(".")))?;
-    {
-        let mut archive = ZipWriter::new(file.as_file_mut());
-        let options =
-            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
-        archive
-            .start_file("layout.json", options)
-            .map_err(|e| invalid(e.to_string()))?;
-        archive.write_all(text.as_bytes())?;
-        for name in names {
-            let bytes = layout
-                .loaded_assets
-                .get(&name)
-                .ok_or_else(|| invalid(format!("missing asset: {name}")))?;
-            total += bytes.len() as u64;
-            if bytes.len() as u64 > MAX_ASSET || total > MAX_TOTAL {
-                return Err(invalid("package is too large"));
-            }
-            archive
-                .start_file(name, options)
-                .map_err(|e| invalid(e.to_string()))?;
-            archive.write_all(bytes)?;
-        }
-        archive.finish().map_err(|e| invalid(e.to_string()))?;
+    if total > MAX_ASSET {
+        return Err(invalid("layout JSON is too large"));
     }
-    file.as_file().sync_all()?;
-    file.persist(path).map_err(|e| e.error)?;
+    let mut archive = ZipWriter::new(writer);
+    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    archive
+        .start_file("layout.json", options)
+        .map_err(|e| invalid(e.to_string()))?;
+    archive.write_all(text.as_bytes())?;
+    for name in names {
+        let bytes = layout
+            .loaded_assets
+            .get(&name)
+            .ok_or_else(|| invalid(format!("missing asset: {name}")))?;
+        total += bytes.len() as u64;
+        if bytes.len() as u64 > MAX_ASSET || total > MAX_TOTAL {
+            return Err(invalid("package is too large"));
+        }
+        archive
+            .start_file(name, options)
+            .map_err(|e| invalid(e.to_string()))?;
+        archive.write_all(bytes)?;
+    }
+    archive.finish().map_err(|e| invalid(e.to_string()))?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn memory_package_matches_the_native_file_with_all_assets() {
+        let mut layout = crate::default_layout();
+        attach(&mut layout, "assets/image.png".into(), vec![1, 2, 3]).unwrap();
+        layout
+            .extra
+            .insert("future".into(), serde_json::json!({"x":42}));
+        let mut buffer = std::io::Cursor::new(Vec::new());
+        write_to(&layout, &mut buffer).unwrap();
+        assert_eq!(
+            load_reader(std::io::Cursor::new(buffer.get_ref()))
+                .unwrap()
+                .layout,
+            layout
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("same.actionlay-layout");
+        save(&layout, &path).unwrap();
+        assert_eq!(std::fs::read(path).unwrap(), buffer.into_inner());
+    }
+
     #[test]
     fn portable_assets_and_unknown_fields_round_trip() {
         let mut layout = crate::default_layout();

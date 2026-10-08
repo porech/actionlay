@@ -187,6 +187,8 @@ dependencies = [
  "reqwest",
  "serde",
  "tiny-skia",
+ "wasm-bindgen-futures",
+ "web-time",
 ]
 
 [[package]]
@@ -217,6 +219,7 @@ dependencies = [
  "resvg",
  "serde_json",
  "tiny-skia",
+ "web-time",
 ]
 
 [[package]]
@@ -242,6 +245,29 @@ dependencies = [
  "chrono",
  "clap",
  "serde_json",
+]
+
+[[package]]
+name = "actionlay-web"
+version = "1.2.0"
+dependencies = [
+ "actionlay-layout",
+ "actionlay-maps",
+ "actionlay-render",
+ "actionlay-telemetry",
+ "arabic_reshaper",
+ "console_error_panic_hook",
+ "eframe",
+ "js-sys",
+ "regex",
+ "serde",
+ "serde_json",
+ "unicode-bidi",
+ "unicode-normalization",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "web-time",
 ]
 
 [[package]]
@@ -1145,6 +1171,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "console_error_panic_hook"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06aeb73f470f66dcdbf7223caeebb85984942f22f1adb2a088cf9668146bbbc"
+dependencies = [
+ "cfg-if",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1507,6 +1543,7 @@ dependencies = [
  "egui-wgpu",
  "egui-winit",
  "egui_glow",
+ "glow",
  "glutin",
  "glutin-winit",
  "image",

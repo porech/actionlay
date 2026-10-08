@@ -7,9 +7,13 @@ use std::{
         OnceLock,
         atomic::{AtomicUsize, Ordering},
     },
-    time::{Duration, Instant},
 };
 use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
+
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Duration;
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
 
 pub struct Language {
     pub code: &'static str,
@@ -295,7 +299,12 @@ pub fn chosen(language: Option<&str>, system: &str) -> usize {
     resolve(language.unwrap_or(system))
 }
 pub fn activate(language: Option<&str>) -> bool {
+    #[cfg(not(target_arch = "wasm32"))]
     let system = sys_locale::get_locale().unwrap_or_else(|| "en".into());
+    #[cfg(target_arch = "wasm32")]
+    let system = web_sys::window()
+        .and_then(|w| w.navigator().language())
+        .unwrap_or_else(|| "en".into());
     let index = chosen(language, &system);
     CURRENT.swap(index, Ordering::Relaxed) != index
 }
@@ -313,12 +322,14 @@ fn matches(language: &Language, query: &str) -> bool {
     ))
     .contains(&search_key(query))
 }
+#[cfg(not(target_arch = "wasm32"))]
 pub struct Interface {
     pub visible: bool,
     query: String,
     was_open: bool,
     last_check: Instant,
 }
+#[cfg(not(target_arch = "wasm32"))]
 impl Default for Interface {
     fn default() -> Self {
         Self {
@@ -329,6 +340,7 @@ impl Default for Interface {
         }
     }
 }
+#[cfg(not(target_arch = "wasm32"))]
 impl Interface {
     pub fn refresh(&mut self, prefs: &crate::prefs::Prefs, ctx: &egui::Context) -> bool {
         if prefs.language.is_some() {
@@ -428,6 +440,7 @@ pub fn install_fonts(ctx: &egui::Context) {
     ctx.set_fonts(fonts);
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn regional_settings(
     ctx: &egui::Context,
     visible: &mut bool,

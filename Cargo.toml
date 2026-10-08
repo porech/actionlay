@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
-members = ["crates/media", "crates/app", "crates/telemetry", "crates/telemetry-cli", "crates/layout", "crates/render", "crates/maps"]
+members = ["crates/media", "crates/app", "crates/telemetry", "crates/telemetry-cli", "crates/layout", "crates/render", "crates/maps", "crates/web"]
+
+default-members = ["crates/media", "crates/app", "crates/telemetry", "crates/telemetry-cli", "crates/layout", "crates/render", "crates/maps"]
 
 [workspace.package]
 version = "1.2.0"

@@ -9,3 +9,9 @@
 /third_party/
 
 /dist/
+
+/web/node_modules/
+/web/dist/
+/web/public/pkg/
+/web/test-results/
+/web/playwright-report/

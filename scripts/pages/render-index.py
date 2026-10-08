@@ -9,6 +9,8 @@ root = pathlib.Path(__file__).resolve().parents[2]
 site = pathlib.Path(sys.argv[1])
 site.mkdir(parents=True, exist_ok=True)
 shutil.copy2(root / 'assets/icons/actionlay-256.png', site / 'actionlay.png')
+web_link = ('<p><a href="web/">Open ActionLay in your browser</a> — local video playback, telemetry dashboards, layout editing and video export.</p>\n'
+            if (site / 'web/index.html').is_file() else '')
 sections = []
 for channel, label in [('stable', 'Stable releases'), ('nightly', 'Development builds')]:
     if not (site / channel / 'apt/InRelease').exists():
@@ -27,5 +29,5 @@ sudo dnf install actionlay'''
 <style>body{font:16px/1.6 system-ui,sans-serif;background:#edf2ed;color:#153c3b;max-width:900px;margin:48px auto;padding:0 24px}header{display:flex;align-items:center;gap:24px}header img{width:112px}h1{font-size:40px;margin:0}section{background:white;border:1px solid #d3ded6;border-radius:18px;padding:24px;margin:24px 0}pre{overflow:auto;background:#102c32;color:#e3f2e7;border-radius:10px;padding:18px;font-size:13px}a{color:#226e58}footer{font-size:14px}</style>
 <header><img src="actionlay.png" alt="ActionLay gecko"><div><h1>ActionLay packages</h1><p>Telemetry dashboards for action-camera videos.</p></div></header>
 <p>Signed APT and DNF repositories for 64-bit Linux. Packages add ActionLay to your applications menu and Open With without changing your default player. Choose one channel.</p>
-''' + ''.join(sections) + '''<section><h2>Remove ActionLay</h2><pre>sudo apt remove actionlay\n# or\nsudo dnf remove actionlay</pre><p>To stop receiving updates, also remove the repository configuration file added above.</p></section>
+''' + web_link + ''.join(sections) + '''<section><h2>Remove ActionLay</h2><pre>sudo apt remove actionlay\n# or\nsudo dnf remove actionlay</pre><p>To stop receiving updates, also remove the repository configuration file added above.</p></section>
 <footer><a href="https://github.com/porech/actionlay">Source, licence and documentation</a> · <a href="https://github.com/porech/actionlay/releases">Windows installer and universal macOS DMG</a><p>APT and DNF verify signatures using the repository key. Original gecko photograph and artwork: Alessandro Rinaldi, CC BY-SA 4.0 or GPL-3.0-or-later.</p></footer></html>''', encoding='utf-8')

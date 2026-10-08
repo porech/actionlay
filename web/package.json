@@ -1,0 +1,8 @@
+{
+  "name": "actionlay-web",
+  "private": true,
+  "type": "module",
+  "scripts": {"dev": "vite --host 127.0.0.1", "build": "vite build", "test": "node --test tests/*.test.js", "test:browser": "playwright test"},
+  "dependencies": {"mediabunny": "1.61.3", "mp4box": "2.4.1"},
+  "devDependencies": {"vite": "8.3.3", "@playwright/test": "1.58.2"}
+}

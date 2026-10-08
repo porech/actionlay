@@ -5,7 +5,10 @@
 //! descenders. Layouts keep a margin instead (the default layout uses 24 units).
 use std::collections::HashMap;
 use std::fmt::Write as _;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
 
 use actionlay_layout::color::{Color, ColorRef};
 use actionlay_layout::format::{self, Piece};

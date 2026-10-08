@@ -6,11 +6,14 @@ use actionlay_render::{Renderer, tiny_skia::Pixmap};
 use actionlay_telemetry::{Metric, Telemetry};
 use eframe::egui;
 use serde_json::{Value, json};
-use std::path::{Path, PathBuf};
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::Path;
+use std::path::PathBuf;
 
 type NodePath = Vec<usize>;
 
 #[cfg(test)]
+#[path = "editor/m4_tests.rs"]
 mod m4_tests;
 
 #[derive(Clone, Copy, PartialEq)]
@@ -49,6 +52,7 @@ pub struct Editor {
     clipboard: Vec<Node>,
     drag: Option<Drag>,
     pub video_background: bool,
+    #[cfg(not(target_arch = "wasm32"))]
     pub map_progress: Option<crate::telemetry_load::RouteProgress>,
     pub dimensions: [u32; 2],
     snap: bool,
@@ -94,6 +98,7 @@ impl Editor {
             dimensions: video_size.unwrap_or([1920, 1080]),
             snap: true,
             automatic_anchor: false,
+            #[cfg(not(target_arch = "wasm32"))]
             map_progress: None,
             renderer: Renderer::new(),
             offline_maps: actionlay_maps::TileStore::offline(),
@@ -150,6 +155,7 @@ impl Editor {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn save_to(&mut self, path: &Path) -> Result<(), String> {
         if self.invalid_properties {
             return Err("Fix invalid widget parameters before saving".into());
@@ -175,6 +181,23 @@ impl Editor {
         self.path = Some(path.to_path_buf());
         self.is_new = false;
         self.error = None;
+        Ok(())
+    }
+
+    /// Browser saves acknowledge the draft only after persistence succeeds.
+    #[cfg(target_arch = "wasm32")]
+    pub fn acknowledge_save(&mut self) {
+        self.saved = self.draft.clone();
+        self.is_new = false;
+        self.error = None;
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn attach_asset(&mut self, name: String, bytes: Vec<u8>) -> Result<(), String> {
+        let before = self.draft.clone();
+        actionlay_layout::package::attach(&mut self.draft, name, bytes)
+            .map_err(|e| e.to_string())?;
+        self.commit(before);
         Ok(())
     }
 
@@ -785,6 +808,7 @@ impl Editor {
         egui::CentralPanel::default().show(ui, |ui| {
             if !self.video_background {
                 ui.horizontal(|ui| {
+                    #[cfg(not(target_arch = "wasm32"))]
                     if ui
                         .button(crate::i18n::text("Load background image…"))
                         .clicked()
@@ -912,6 +936,7 @@ impl Editor {
                     egui::Color32::WHITE,
                 );
             }
+            #[cfg(not(target_arch = "wasm32"))]
             if self.video_background
                 && let Some(progress) = self.map_progress
             {
@@ -1155,6 +1180,7 @@ impl Editor {
 
     fn properties(&mut self, ui: &mut egui::Ui, telemetry: Option<&Telemetry>) {
         let before = self.draft.clone();
+        #[cfg(not(target_arch = "wasm32"))]
         if ui
             .button(crate::i18n::text("Attach font or image…"))
             .clicked()
@@ -2051,6 +2077,7 @@ fn edit_value(ui: &mut egui::Ui, value: &mut Value, schema: &Value, root: &Value
         _ => {}
     }
 }
+#[cfg(not(target_arch = "wasm32"))]
 fn load_background(ctx: &egui::Context, path: &Path) -> Result<egui::TextureHandle, String> {
     if path.metadata().map_err(|e| e.to_string())?.len() > 32 * 1024 * 1024 {
         return Err("Background image exceeds 32 MB".into());

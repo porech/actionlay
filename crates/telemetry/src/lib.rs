@@ -1,6 +1,7 @@
 //! Telemetry of action-camera videos: GoPro GPMF parsing, derived metrics,
 //! and sampling at any file time. Pure Rust; packets come from the caller
 //! (the media crate demuxes them), so this crate never links FFmpeg.
+#[cfg(not(target_arch = "wasm32"))]
 pub mod camera;
 mod derive;
 pub mod external;

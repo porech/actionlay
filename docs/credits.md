@@ -18,6 +18,9 @@ ActionLay stands on the shoulders of these open-source projects:
 - **[GeographicLib](https://geographiclib.sourceforge.io)** (Charles Karney),
   through [geographiclib-rs](https://github.com/georust/geographiclib-rs),
   computes distances and bearings exactly as gopro-dashboard-overlay does.
+- **[Mediabunny](https://mediabunny.dev/)** (MPL-2.0) supplies browser media
+  demuxing, WebCodecs integration and MP4 export. **[MP4Box.js](https://github.com/gpac/mp4box.js)**
+  (BSD-3-Clause) indexes embedded browser telemetry tracks.
 - **[FFmpeg](https://ffmpeg.org)** does the decoding, through the
   [ffmpeg-next](https://github.com/zmwangx/rust-ffmpeg) Rust bindings.
 - **[tiny-skia](https://github.com/linebender/tiny-skia)** draws the overlay

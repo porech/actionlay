@@ -1,5 +1,8 @@
 //! Circular instruments share the same placement, units and missing-data policy as metrics.
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
 
 use actionlay_layout::color::{Color, ColorRef};
 use actionlay_layout::format;
